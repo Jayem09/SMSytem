@@ -12,7 +12,7 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="w-10 h-10 border-3 border-primary/30 border-t-primary rounded-full animate-spin" />
+        <div className="w-10 h-10 border-3 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
       </div>
     );
   }
