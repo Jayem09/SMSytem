@@ -32,12 +32,20 @@ func Connect(cfg *config.Config) {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	log.Println("✅ Database connected successfully")
+	log.Println(" Database connected successfully")
 
 	// Auto-migrate models
-	if err := DB.AutoMigrate(&models.User{}); err != nil {
+	if err := DB.AutoMigrate(
+		&models.User{},
+		&models.Category{},
+		&models.Brand{},
+		&models.Product{},
+		&models.Customer{},
+		&models.Order{},
+		&models.OrderItem{},
+	); err != nil {
 		log.Fatalf("Failed to auto-migrate: %v", err)
 	}
 
-	log.Println("✅ Database migration completed")
+	log.Println(" Database migration completed")
 }

@@ -17,15 +17,23 @@ import (
 func main() {
 	// Load configuration
 	cfg := config.Load()
-	log.Println("✅ Configuration loaded")
+	log.Println("Configuration loaded")
 
 	// Connect to database
 	database.Connect(cfg)
-	log.Println("✅ Database ready")
+	log.Println("Database ready")
 
 	// Initialize services and handlers
 	authService := services.NewAuthService(cfg)
-	authHandler := handlers.NewAuthHandler(authService)
+
+	h := &routes.Handlers{
+		Auth:     handlers.NewAuthHandler(authService),
+		Category: handlers.NewCategoryHandler(),
+		Brand:    handlers.NewBrandHandler(),
+		Product:  handlers.NewProductHandler(),
+		Customer: handlers.NewCustomerHandler(),
+		Order:    handlers.NewOrderHandler(),
+	}
 
 	// Setup Gin router
 	router := gin.Default()
@@ -40,11 +48,11 @@ func main() {
 	}))
 
 	// Setup routes
-	routes.Setup(router, cfg, authHandler)
+	routes.Setup(router, cfg, h)
 
 	// Start server
 	addr := fmt.Sprintf(":%s", cfg.ServerPort)
-	log.Printf("🚀 Server starting on http://localhost%s", addr)
+	log.Printf("Server starting on http://localhost%s", addr)
 	if err := router.Run(addr); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
