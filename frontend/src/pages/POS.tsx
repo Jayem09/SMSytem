@@ -29,12 +29,15 @@ interface OrderItem {
 
 interface Order {
   id: number;
-  customer_id?: number;
+  customer_id?: number | null;
+  guest_name?: string;
+  guest_phone?: string;
   total_amount: number;
   discount_amount: number;
   payment_method: string;
   created_at: string;
   items?: OrderItem[];
+  customer?: { name: string };
 }
 
 export default function POS() {
@@ -50,10 +53,13 @@ export default function POS() {
   // Checkout State
   const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
   const [customerId, setCustomerId] = useState('');
+  const [guestName, setGuestName] = useState('');
+  const [guestPhone, setGuestPhone] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [discount, setDiscount] = useState('0');
   const [successModalOpen, setSuccessModalOpen] = useState(false);
   const [lastOrder, setLastOrder] = useState<Order | null>(null);
+  const [isProcessingTerminal, setIsProcessingTerminal] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -116,8 +122,29 @@ export default function POS() {
   const handleCheckout = async () => {
     if (cart.length === 0) return;
     try {
+      if (paymentMethod === 'card') {
+        setIsProcessingTerminal(true);
+        try {
+          // 1. Call the Terminal Service
+          const terminalRes = await api.post('/api/terminal/payment', { amount: finalTotal });
+          if (terminalRes.data.status !== "APPROVED") {
+            alert(`Terminal Error: ${terminalRes.data.error_message || "Transaction Declined"}`);
+            setIsProcessingTerminal(false);
+            return;
+          }
+          // The terminal approved the transaction. Proceed to save the order.
+        } catch (termErr: any) {
+          alert(`Failed to communicate with terminal: ${termErr.message}`);
+          setIsProcessingTerminal(false);
+          return;
+        }
+        setIsProcessingTerminal(false);
+      }
+
       const payload = {
         customer_id: customerId ? parseInt(customerId) : null,
+        guest_name: !customerId ? guestName : '',
+        guest_phone: !customerId ? guestPhone : '',
         payment_method: paymentMethod,
         discount_amount: parseFloat(discount),
         items: cart.map(item => ({
@@ -131,14 +158,14 @@ export default function POS() {
       setCart([]);
       setCheckoutModalOpen(false);
       setSuccessModalOpen(true);
+      setGuestName('');
+      setGuestPhone('');
       fetchData(); // Refresh stock and meta
     } catch (err: unknown) {
-      const axiosError = err as { response?: { data?: { error?: string } } };
-      if (axiosError.response?.data?.error) {
-        alert(axiosError.response.data.error);
-      } else {
-        alert('Checkout failed');
-      }
+      const axiosError = err as { response?: { data?: { error?: string, details?: string } } };
+      const errorMessage = axiosError.response?.data?.error || 'Checkout failed';
+      const detailMessage = axiosError.response?.data?.details ? `\nDetails: ${axiosError.response.data.details}` : '';
+      alert(`${errorMessage}${detailMessage}`);
     }
   };
 
@@ -354,6 +381,12 @@ export default function POS() {
               ...customers.map(c => ({ value: c.id, label: c.name.toUpperCase() }))
             ]}
           />
+          {!customerId && (
+            <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-1 duration-200">
+              <FormField label="Guest Name" value={guestName} onChange={setGuestName} placeholder="Enter full name" />
+              <FormField label="Contact Number" value={guestPhone} onChange={setGuestPhone} placeholder="09XX XXX XXXX" />
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
              <div className="col-span-2">
                <label className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2 block">Payment Protocol</label>
@@ -382,9 +415,21 @@ export default function POS() {
 
           <button
             onClick={handleCheckout}
-            className="w-full mt-4 py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-100"
+            disabled={isProcessingTerminal}
+            className={`w-full mt-4 py-4 text-white rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-xl ${
+              isProcessingTerminal 
+                ? 'bg-gray-400 cursor-not-allowed' 
+                : 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-100'
+            }`}
           >
-            CONFIRM TRANSACTION
+            {isProcessingTerminal ? (
+              <span className="flex items-center justify-center gap-2">
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                WAITING FOR TERMINAL...
+              </span>
+            ) : (
+              'CONFIRM TRANSACTION'
+            )}
           </button>
         </div>
       </Modal>
@@ -431,6 +476,17 @@ export default function POS() {
               <div className="mb-6">
                 <p className="text-sm font-bold">Date: {new Date(lastOrder.created_at).toLocaleDateString()}</p>
                 <p className="text-sm">Payment: {lastOrder.payment_method.toUpperCase()}</p>
+                {lastOrder.customer ? (
+                  <p className="text-sm">Customer: {lastOrder.customer.name}</p>
+                ) : lastOrder.guest_name ? (
+                  <div className="mt-2 text-sm border-t border-gray-100 pt-2">
+                    <p className="font-bold">Walk-in Customer:</p>
+                    <p>{lastOrder.guest_name}</p>
+                    {lastOrder.guest_phone && <p>{lastOrder.guest_phone}</p>}
+                  </div>
+                ) : (
+                  <p className="text-sm">Customer: WALK-IN</p>
+                )}
               </div>
 
               <table className="w-full mb-6 text-sm">

@@ -22,6 +22,7 @@ type Handlers struct {
 	Dashboard *handlers.DashboardHandler
 	Import    *handlers.ImportHandler
 	Log       *handlers.LogHandler
+	Terminal  *handlers.TerminalHandler
 }
 
 // Setup configures all API routes.
@@ -127,6 +128,9 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 
 			// Activity Logs
 			admin.GET("/logs", h.Log.List)
+
+			// Terminal
+			admin.POST("/terminal/payment", h.Terminal.ProcessPayment)
 		}
 	}
 }

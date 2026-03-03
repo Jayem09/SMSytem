@@ -7,7 +7,9 @@ import (
 // Order represents a customer purchase.
 type Order struct {
 	ID             uint      `gorm:"primaryKey" json:"id"`
-	CustomerID     uint      `gorm:"index;not null" json:"customer_id"`
+	CustomerID     *uint     `gorm:"index" json:"customer_id"`
+	GuestName      string    `gorm:"size:255" json:"guest_name"`
+	GuestPhone     string    `gorm:"size:50" json:"guest_phone"`
 	UserID         uint      `gorm:"index;not null" json:"user_id"`
 	TotalAmount    float64   `gorm:"not null;default:0" json:"total_amount"`
 	DiscountAmount float64   `gorm:"default:0" json:"discount_amount"`

@@ -25,6 +25,8 @@ func main() {
 	// Initialize services and handlers
 	authService := services.NewAuthService(cfg)
 	logService := services.NewLogService()
+	// Initialize terminal service in Simulation Mode (true) for now.
+	terminalService := services.NewTerminalService(true, "COM1")
 
 	h := &routes.Handlers{
 		Auth:      handlers.NewAuthHandler(authService),
@@ -37,6 +39,7 @@ func main() {
 		Dashboard: handlers.NewDashboardHandler(),
 		Import:    handlers.NewImportHandler(),
 		Log:       handlers.NewLogHandler(),
+		Terminal:  handlers.NewTerminalHandler(terminalService),
 	}
 
 	// Setup Gin router

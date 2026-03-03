@@ -5,9 +5,10 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   children: ReactNode;
+  maxWidth?: string;
 }
 
-export default function Modal({ open, onClose, title, children }: ModalProps) {
+export default function Modal({ open, onClose, title, children, maxWidth = 'max-w-md' }: ModalProps) {
   if (!open) return null;
 
   return (
@@ -16,7 +17,7 @@ export default function Modal({ open, onClose, title, children }: ModalProps) {
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
 
       {/* Panel */}
-      <div className="relative bg-white border border-gray-200 rounded-lg shadow-lg w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
+      <div className={`relative bg-white border border-gray-200 rounded-lg shadow-lg w-full ${maxWidth} mx-4 max-h-[90vh] overflow-y-auto`}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
           <h2 className="text-sm font-semibold text-gray-900">{title}</h2>
           <button

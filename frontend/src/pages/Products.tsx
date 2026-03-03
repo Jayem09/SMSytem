@@ -299,50 +299,58 @@ export default function Products() {
         onDelete={isAdmin ? handleDelete : undefined}
       />
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Product' : 'New Product'}>
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Product' : 'New Product'} maxWidth="max-w-4xl">
         <form onSubmit={handleSubmit}>
           {error && <p className="text-red-600 text-sm mb-3">{error}</p>}
           <FormField label="Name" value={name} onChange={setName} required placeholder="Product name" />
-          <FormField label="Description" type="textarea" value={description} onChange={setDescription} />
-          <div className="grid grid-cols-2 gap-3">
-            <FormField label="Price" type="number" value={price} onChange={setPrice} required min={0} step="0.01" />
-            <FormField label="Stock" type="number" value={stock} onChange={setStock} required min={0} />
+          <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <FormField label="Description" type="textarea" value={description} onChange={setDescription} />
+              <div className="grid grid-cols-2 gap-3">
+                <FormField label="Price" type="number" value={price} onChange={setPrice} required min={0} step="0.01" />
+                <FormField label="Stock" type="number" value={stock} onChange={setStock} required min={0} />
+              </div>
+            </div>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <FormField label="Size (Optional)" value={size} onChange={setSize} placeholder="e.g. 225/45 R17" />
+                <FormField
+                  label="Parent Model (Optional)"
+                  type="select"
+                  value={parentId}
+                  onChange={setParentId}
+                  options={[
+                    { value: '', label: 'None (Top level)' },
+                    ...products.filter(p => !p.parent_id && p.id !== editing?.id).map(p => ({ value: p.id, label: p.name }))
+                  ]}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <FormField
+                  label="Category"
+                  type="select"
+                  value={categoryId}
+                  onChange={setCategoryId}
+                  required
+                  options={categories.map((c) => ({ value: c.id, label: c.name }))}
+                />
+                <FormField
+                  label="Brand"
+                  type="select"
+                  value={brandId}
+                  onChange={setBrandId}
+                  required
+                  options={brands.map((b) => ({ value: b.id, label: b.name }))}
+                />
+              </div>
+            </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <FormField label="Size (Optional)" value={size} onChange={setSize} placeholder="e.g. 225/45 R17" />
-            <FormField
-              label="Parent Model (Optional)"
-              type="select"
-              value={parentId}
-              onChange={setParentId}
-              options={[
-                { value: '', label: 'None (Top level)' },
-                ...products.filter(p => !p.parent_id && p.id !== editing?.id).map(p => ({ value: p.id, label: p.name }))
-              ]}
-            />
-          </div>
-          <FormField
-            label="Category"
-            type="select"
-            value={categoryId}
-            onChange={setCategoryId}
-            required
-            options={categories.map((c) => ({ value: c.id, label: c.name }))}
-          />
-          <FormField
-            label="Brand"
-            type="select"
-            value={brandId}
-            onChange={setBrandId}
-            required
-            options={brands.map((b) => ({ value: b.id, label: b.name }))}
-          />
 
           {/* Dynamic Technical Specs */}
           {categories.find(c => String(c.id) === categoryId)?.name?.toLowerCase()?.includes('tire') && (
-            <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 mb-3">
-              <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Tire Specifications</p>
-              <div className="grid grid-cols-2 gap-3">
+            <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-4">
+              <p className="text-xs font-black text-gray-400 mb-4 uppercase tracking-[0.2em]">Tire Specifications</p>
+              <div className="grid grid-cols-4 gap-4">
                 <FormField label="Speed Rating" value={speedRating} onChange={setSpeedRating} placeholder="e.g. V, H, W" />
                 <FormField label="Load Index" value={loadIndex} onChange={setLoadIndex} placeholder="e.g. 91, 104" />
                 <FormField label="Ply Rating" value={plyRating} onChange={setPlyRating} placeholder="e.g. 10PR" />
@@ -352,15 +360,17 @@ export default function Products() {
           )}
 
           {categories.find(c => String(c.id) === categoryId)?.name?.toLowerCase()?.includes('mags') && (
-            <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 mb-3">
-              <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Mags Specifications</p>
-              <div className="grid grid-cols-2 gap-3">
-                <FormField label="PCD" value={pcd} onChange={setPcd} placeholder="e.g. 5x114.3" />
-                <FormField label="Offset (ET)" value={offsetEt} onChange={setOffsetEt} placeholder="e.g. 45" />
-                <FormField label="Width" value={width} onChange={setWidth} placeholder="e.g. 8.5J" />
-                <FormField label="Center Bore" value={bore} onChange={setBore} placeholder="e.g. 73.1" />
+            <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-4">
+              <p className="text-xs font-black text-gray-400 mb-4 uppercase tracking-[0.2em]">Mags Specifications</p>
+              <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField label="PCD" value={pcd} onChange={setPcd} placeholder="e.g. 5x114.3" />
+                  <FormField label="Offset (ET)" value={offsetEt} onChange={setOffsetEt} placeholder="e.g. 45" />
+                  <FormField label="Width" value={width} onChange={setWidth} placeholder="e.g. 8.5J" />
+                  <FormField label="Center Bore" value={bore} onChange={setBore} placeholder="e.g. 73.1" />
+                </div>
+                <FormField label="Finish" value={finish} onChange={setFinish} placeholder="e.g. Matte Black" />
               </div>
-              <FormField label="Finish" value={finish} onChange={setFinish} placeholder="e.g. Matte Black" />
             </div>
           )}
 
@@ -370,7 +380,7 @@ export default function Products() {
         </form>
       </Modal>
 
-      <Modal open={detailsModalOpen} onClose={() => setDetailsModalOpen(false)} title="Product Details">
+      <Modal open={detailsModalOpen} onClose={() => setDetailsModalOpen(false)} title="Product Details" maxWidth="max-w-2xl">
         {viewingProduct && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">

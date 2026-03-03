@@ -28,7 +28,9 @@ type orderItemInput struct {
 }
 
 type orderInput struct {
-	CustomerID     uint             `json:"customer_id" binding:"required"`
+	CustomerID     *uint            `json:"customer_id"`
+	GuestName      string           `json:"guest_name"`
+	GuestPhone     string           `json:"guest_phone"`
 	PaymentMethod  string           `json:"payment_method" binding:"required"`
 	DiscountAmount float64          `json:"discount_amount"`
 	DiscountType   string           `json:"discount_type"` // "fixed" or "percentage"
@@ -95,11 +97,13 @@ func (h *OrderHandler) Create(c *gin.Context) {
 		return
 	}
 
-	// Verify customer exists
-	var customer models.Customer
-	if err := database.DB.First(&customer, input.CustomerID).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Customer not found"})
-		return
+	// Verify customer exists if ID provided
+	if input.CustomerID != nil && *input.CustomerID > 0 {
+		var customer models.Customer
+		if err := database.DB.First(&customer, *input.CustomerID).Error; err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Customer not found"})
+			return
+		}
 	}
 
 	// Run everything in a transaction
@@ -154,6 +158,8 @@ func (h *OrderHandler) Create(c *gin.Context) {
 		// Create order
 		order = models.Order{
 			CustomerID:     input.CustomerID,
+			GuestName:      input.GuestName,
+			GuestPhone:     input.GuestPhone,
 			UserID:         userID.(uint),
 			TotalAmount:    finalTotal,
 			DiscountAmount: input.DiscountAmount,
@@ -166,7 +172,7 @@ func (h *OrderHandler) Create(c *gin.Context) {
 		}
 
 		if err := tx.Create(&order).Error; err != nil {
-			return errors.New("failed to create order")
+			return fmt.Errorf("failed to create order: %v", err)
 		}
 
 		return nil
