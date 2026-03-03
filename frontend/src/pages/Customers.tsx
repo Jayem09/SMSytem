@@ -1,9 +1,9 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect, useCallback, type FormEvent } from 'react';
 import api from '../api/axios';
 import DataTable from '../components/DataTable';
 import Modal from '../components/Modal';
 import FormField from '../components/FormField';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 import { History, Edit2, Trash2, Plus, User, Phone, Mail, MapPin } from 'lucide-react';
 
 interface Order {
@@ -41,9 +41,9 @@ export default function Customers() {
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
 
-  const fetchCustomers = async () => {
+  const fetchCustomers = useCallback(async () => {
     try {
-      const params: any = {};
+      const params: Record<string, string> = {};
       if (search) params.search = search;
       const res = await api.get('/api/customers', { params });
       setCustomers(res.data.customers || []);
@@ -52,10 +52,10 @@ export default function Customers() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [search]);
 
-  useEffect(() => { fetchCustomers(); }, []);
-  useEffect(() => { const t = setTimeout(fetchCustomers, 300); return () => clearTimeout(t); }, [search]);
+  useEffect(() => { fetchCustomers(); }, [fetchCustomers]);
+  useEffect(() => { const t = setTimeout(fetchCustomers, 300); return () => clearTimeout(t); }, [fetchCustomers]);
 
   const fetchHistory = async (customer: Customer) => {
     setSelectedCustomer(customer);
@@ -97,8 +97,9 @@ export default function Customers() {
       }
       setModalOpen(false);
       fetchCustomers();
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Operation failed');
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { error?: string } } };
+      setError(axiosError.response?.data?.error || 'Operation failed');
     }
   };
 

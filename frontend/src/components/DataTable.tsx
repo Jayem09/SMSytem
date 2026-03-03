@@ -77,7 +77,7 @@ export default function DataTable<T extends { id: number | string }>({
                 <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                   {columns.map((col) => (
                     <td key={col.key} className="px-4 py-3 text-gray-900">
-                      {col.render ? col.render(item) : (item as any)[col.key]}
+                      {col.render ? col.render(item) : (item as unknown as Record<string, React.ReactNode>)[col.key]}
                     </td>
                   ))}
                   {(onEdit || onDelete || onView || actions) && (

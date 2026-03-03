@@ -32,7 +32,6 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 	database.DB.Model(&models.Order{}).Count(&orderCount)
 	database.DB.Model(&models.Customer{}).Count(&customerCount)
 
-	// Trend data (last 30 days)
 	var salesTrend []DailySale
 	database.DB.Model(&models.Order{}).
 		Select("DATE(created_at) as date, SUM(total_amount) as amount").
@@ -41,7 +40,6 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 		Order("date ASC").
 		Scan(&salesTrend)
 
-	// Low stock alert
 	var lowStockProducts []models.Product
 	database.DB.Where("stock <= ?", 5).Limit(5).Find(&lowStockProducts)
 

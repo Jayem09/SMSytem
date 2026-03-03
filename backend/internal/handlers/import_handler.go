@@ -18,7 +18,6 @@ func NewImportHandler() *ImportHandler {
 	return &ImportHandler{}
 }
 
-// ImportProducts handles POST /api/products/import
 func (h *ImportHandler) ImportProducts(c *gin.Context) {
 	file, err := c.FormFile("file")
 	if err != nil {
@@ -45,13 +44,12 @@ func (h *ImportHandler) ImportProducts(c *gin.Context) {
 		return
 	}
 
-	// Header mapping: name, description, price, stock, category, brand, size
-	var createdCount int
+		var createdCount int
 	var errorMessages []string
 
 	for i, record := range records {
 		if i == 0 {
-			continue // skip header
+			continue
 		}
 
 		if len(record) < 6 {
@@ -70,14 +68,12 @@ func (h *ImportHandler) ImportProducts(c *gin.Context) {
 			size = record[6]
 		}
 
-		// Find or create category
 		var category models.Category
 		if err := database.DB.Where("name = ?", categoryName).FirstOrCreate(&category, models.Category{Name: categoryName}).Error; err != nil {
 			errorMessages = append(errorMessages, fmt.Sprintf("Line %d: failed to resolve category", i+1))
 			continue
 		}
 
-		// Find or create brand
 		var brand models.Brand
 		if err := database.DB.Where("name = ?", brandName).FirstOrCreate(&brand, models.Brand{Name: brandName}).Error; err != nil {
 			errorMessages = append(errorMessages, fmt.Sprintf("Line %d: failed to resolve brand", i+1))

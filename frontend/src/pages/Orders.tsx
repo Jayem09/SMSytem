@@ -3,7 +3,7 @@ import api from '../api/axios';
 import DataTable from '../components/DataTable';
 import Modal from '../components/Modal';
 import FormField from '../components/FormField';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 import { Printer, Eye, Trash2, ChevronUp, Plus } from 'lucide-react';
 
 interface Customer { id: number; name: string; }
@@ -59,8 +59,9 @@ export default function Orders() {
   const fetchOrders = async () => {
     try {
       const res = await api.get('/api/orders');
-      setOrders(res.data.orders || []);
-    } catch {
+      setOrders(res.data.orders);
+    } catch (err: unknown) {
+      console.error('Failed to fetch orders', err);
       setError('Failed to load orders');
     } finally {
       setLoading(false);
@@ -94,7 +95,7 @@ export default function Orders() {
   const removeItem = (i: number) => setItems(items.filter((_, idx) => idx !== i));
   const updateItem = (i: number, field: string, val: string) => {
     const updated = [...items];
-    (updated[i] as any)[field] = val;
+    (updated[i] as unknown as Record<string, string>)[field] = val;
     setItems(updated);
   };
 
@@ -118,8 +119,9 @@ export default function Orders() {
       setModalOpen(false);
       fetchOrders();
       fetchMeta();
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to create order');
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { error?: string } } };
+      setError(axiosError.response?.data?.error || 'Failed to create order');
     }
   };
 

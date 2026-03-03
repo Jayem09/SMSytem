@@ -1,7 +1,8 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 
 const navItems = [
+  { to: '/pos', label: 'POS Checkout' },
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/products', label: 'Products' },
   { to: '/categories', label: 'Categories' },

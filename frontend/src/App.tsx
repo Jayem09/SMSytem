@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
+import ErrorBoundary from './components/ErrorBoundary';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
@@ -12,12 +13,14 @@ import Customers from './pages/Customers';
 import Orders from './pages/Orders';
 import Expenses from './pages/Expenses';
 import ActivityLogs from './pages/ActivityLogs';
+import POS from './pages/POS';
 
 function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <Routes>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <AuthProvider>
+          <Routes>
           {/* Public */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
@@ -32,12 +35,14 @@ function App() {
             <Route path="/orders" element={<Orders />} />
             <Route path="/expenses" element={<Expenses />} />
             <Route path="/logs" element={<ActivityLogs />} />
+            <Route path="/pos" element={<POS />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>
+    </ErrorBoundary>
   );
 }
 

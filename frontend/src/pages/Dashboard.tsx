@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import api from '../api/axios';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { AlertCircle, TrendingUp, DollarSign, Package, Users, ShoppingCart } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -15,14 +15,19 @@ export default function Dashboard() {
     order_count: 0,
     customer_count: 0,
     sales_trend: [] as { date: string; amount: number }[],
-    low_stock_products: [] as any[]
+    low_stock_products: [] as { id: number; name: string; stock: number }[]
   });
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
         const res = await api.get('/api/dashboard');
-        setStats(res.data);
+        setStats(prev => ({
+          ...prev,
+          ...res.data,
+          sales_trend: res.data.sales_trend || [],
+          low_stock_products: res.data.low_stock_products || []
+        }));
       } catch (err) {
         console.error('Failed to fetch dashboard stats', err);
       } finally {
@@ -115,7 +120,7 @@ export default function Dashboard() {
           </div>
           <div className="h-[320px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={stats.sales_trend}>
+              <AreaChart data={stats.sales_trend || []}>
                 <defs>
                   <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15}/>

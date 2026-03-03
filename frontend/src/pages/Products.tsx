@@ -1,9 +1,9 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect, useCallback, type FormEvent } from 'react';
 import api from '../api/axios';
 import DataTable from '../components/DataTable';
 import Modal from '../components/Modal';
 import FormField from '../components/FormField';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 
 interface Category { id: number; name: string; }
 interface Brand { id: number; name: string; }
@@ -72,9 +72,9 @@ export default function Products() {
 
   const [isImporting, setIsImporting] = useState(false);
 
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     try {
-      const params: any = { all: '1' }; // Fetch all including variants if filtered
+      const params: Record<string, string> = { all: '1' };
       if (search) params.search = search;
       if (filterCategory) params.category_id = filterCategory;
       if (filterBrand) params.brand_id = filterBrand;
@@ -86,19 +86,32 @@ export default function Products() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [search, filterCategory, filterBrand]);
 
-  const fetchMeta = async () => {
-    const [catRes, brandRes] = await Promise.all([
-      api.get('/api/categories'),
-      api.get('/api/brands'),
-    ]);
-    setCategories(catRes.data.categories || []);
-    setBrands(brandRes.data.brands || []);
-  };
+  const fetchMeta = useCallback(async () => {
+    try {
+      const [catRes, brandRes] = await Promise.all([
+        api.get('/api/categories'),
+        api.get('/api/brands'),
+      ]);
+      setCategories(catRes.data.categories || []);
+      setBrands(brandRes.data.brands || []);
+    } catch {
+      setError('Failed to load metadata');
+    }
+  }, []);
 
-  useEffect(() => { fetchProducts(); fetchMeta(); }, []);
-  useEffect(() => { const t = setTimeout(fetchProducts, 300); return () => clearTimeout(t); }, [search, filterCategory, filterBrand]);
+  useEffect(() => { 
+    fetchProducts(); 
+    fetchMeta(); 
+  }, [fetchProducts, fetchMeta]);
+
+  // Debounced search is already handled by fetchProducts dependency on search/filters
+  // but if we want to keep the timeout:
+  useEffect(() => { 
+    const t = setTimeout(fetchProducts, 300); 
+    return () => clearTimeout(t); 
+  }, [fetchProducts]);
 
   const openCreate = () => {
     setEditing(null);
@@ -160,8 +173,13 @@ export default function Products() {
       }
       setModalOpen(false);
       fetchProducts();
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Operation failed');
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { error?: string } } };
+      if (axiosError.response?.data?.error) {
+        setError(axiosError.response.data.error);
+      } else {
+        setError('Operation failed');
+      }
     }
   };
 
@@ -195,8 +213,13 @@ export default function Products() {
       });
       alert(res.data.message);
       fetchProducts();
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Import failed');
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { error?: string } } };
+      if (axiosError.response?.data?.error) {
+        setError(axiosError.response.data.error);
+      } else {
+        setError('Import failed');
+      }
     } finally {
       setIsImporting(false);
       e.target.value = '';
@@ -252,12 +275,12 @@ export default function Products() {
           { key: 'category', label: 'Category', render: (p) => p.category?.name || '--' },
           { key: 'brand', label: 'Brand', render: (p) => p.brand?.name || '--' },
           // Dynamic Columns based on filter
-          ...(categories.find(c => String(c.id) === filterCategory)?.name.toLowerCase().includes('mags') ? [
+          ...(categories.find(c => String(c.id) === filterCategory)?.name?.toLowerCase()?.includes('mags') ? [
             { key: 'pcd', label: 'PCD', render: (p: Product) => p.pcd || '--' },
             { key: 'offset', label: 'ET', render: (p: Product) => p.offset_et || '--' },
             { key: 'width', label: 'Width', render: (p: Product) => p.width || '--' },
           ] : []),
-          ...(categories.find(c => String(c.id) === filterCategory)?.name.toLowerCase().includes('tire') ? [
+          ...(categories.find(c => String(c.id) === filterCategory)?.name?.toLowerCase()?.includes('tire') ? [
             { key: 'speed', label: 'Speed', render: (p: Product) => p.speed_rating || '--' },
             { key: 'load', label: 'Load', render: (p: Product) => p.load_index || '--' },
           ] : []),
@@ -316,7 +339,7 @@ export default function Products() {
           />
 
           {/* Dynamic Technical Specs */}
-          {categories.find(c => String(c.id) === categoryId)?.name.toLowerCase().includes('tire') && (
+          {categories.find(c => String(c.id) === categoryId)?.name?.toLowerCase()?.includes('tire') && (
             <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 mb-3">
               <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Tire Specifications</p>
               <div className="grid grid-cols-2 gap-3">
@@ -328,7 +351,7 @@ export default function Products() {
             </div>
           )}
 
-          {categories.find(c => String(c.id) === categoryId)?.name.toLowerCase().includes('mags') && (
+          {categories.find(c => String(c.id) === categoryId)?.name?.toLowerCase()?.includes('mags') && (
             <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 mb-3">
               <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Mags Specifications</p>
               <div className="grid grid-cols-2 gap-3">

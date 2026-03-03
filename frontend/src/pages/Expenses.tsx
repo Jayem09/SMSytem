@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '../api/axios';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 
 interface Expense {
   id: number;
@@ -62,8 +62,8 @@ export default function Expenses() {
       });
       setIsModalOpen(false);
       fetchExpenses();
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to save');
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Operation failed');
     }
   };
 

@@ -3,7 +3,7 @@ import api from '../api/axios';
 import DataTable from '../components/DataTable';
 import Modal from '../components/Modal';
 import FormField from '../components/FormField';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 
 interface Brand {
   id: number;
@@ -58,8 +58,9 @@ export default function Brands() {
       }
       setModalOpen(false);
       fetchBrands();
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Operation failed');
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { error?: string } } };
+      setError(axiosError.response?.data?.error || 'Operation failed');
     }
   };
 
