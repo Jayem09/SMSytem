@@ -2,17 +2,18 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
 const navItems = [
-  { to: '/pos', label: 'POS Checkout' },
-  { to: '/dashboard', label: 'Dashboard' },
-  { to: '/products', label: 'Products' },
-  { to: '/categories', label: 'Categories' },
-  { to: '/brands', label: 'Brands' },
-  { to: '/suppliers', label: 'Suppliers' },
-  { to: '/purchase-orders', label: 'Purchase Orders' },
-  { to: '/customers', label: 'Customers' },
-  { to: '/orders', label: 'Orders' },
-  { to: '/expenses', label: 'Expenses' },
-  { to: '/logs', label: 'Activity Logs' },
+  { to: '/pos', label: 'POS Checkout', roles: ['admin', 'cashier'] },
+  { to: '/dashboard', label: 'Dashboard', roles: ['admin', 'cashier'] },
+  { to: '/customers', label: 'Customers', roles: ['admin', 'cashier'] },
+  { to: '/orders', label: 'Orders', roles: ['admin', 'cashier'] },
+  { to: '/products', label: 'Products', roles: ['admin'] },
+  { to: '/categories', label: 'Categories', roles: ['admin'] },
+  { to: '/brands', label: 'Brands', roles: ['admin'] },
+  { to: '/suppliers', label: 'Suppliers', roles: ['admin'] },
+  { to: '/purchase-orders', label: 'Purchase Orders', roles: ['admin'] },
+  { to: '/expenses', label: 'Expenses', roles: ['admin'] },
+  { to: '/logs', label: 'Activity Logs', roles: ['admin'] },
+  { to: '/staff', label: 'Staff & Roles', roles: ['admin'] },
 ];
 
 export default function Layout() {
@@ -24,6 +25,9 @@ export default function Layout() {
     navigate('/login');
   };
 
+  // Default to 'user' if role is missing just in case
+  const currentRole = user?.role || 'user';
+
   return (
     <div className="min-h-screen flex bg-gray-50">
       {/* Sidebar */}
@@ -33,7 +37,9 @@ export default function Layout() {
         </div>
 
         <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
-          {navItems.map((item) => (
+          {navItems
+            .filter((item) => item.roles.includes(currentRole))
+            .map((item) => (
             <NavLink
               key={item.to}
               to={item.to}

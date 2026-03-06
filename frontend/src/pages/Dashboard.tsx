@@ -81,8 +81,9 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Key Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+      {/* Key Metrics Grid - Admin Only */}
+      {user?.role === 'admin' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         {[
           { label: 'Total Sales', value: stats.total_sales, color: 'blue', icon: DollarSign, trend: '+12%' },
           { label: 'Total Expenses', value: stats.total_expenses, color: 'rose', icon: ShoppingCart, trend: '-5%' },
@@ -104,9 +105,11 @@ export default function Dashboard() {
           </div>
         ))}
       </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        {/* Sales Chart */}
+        {/* Sales Chart - Admin Only */}
+        {user?.role === 'admin' && (
         <div className="lg:col-span-2 bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
           <div className="flex items-center justify-between mb-8">
             <div>
@@ -163,9 +166,10 @@ export default function Dashboard() {
             </ResponsiveContainer>
           </div>
         </div>
+        )}
 
-        {/* Operational Quick Stats */}
-        <div className="flex flex-col gap-6">
+        {/* Operational Quick Stats - Visible to all */}
+        <div className={`flex flex-col gap-6 ${user?.role !== 'admin' ? 'lg:col-span-3' : ''}`}>
           <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
             <h2 className="text-xl font-bold text-gray-900 mb-6">Inventory Summary</h2>
             <div className="space-y-6">
@@ -194,9 +198,15 @@ export default function Dashboard() {
             </div>
             <h2 className="text-xl font-bold mb-2 relative z-10">Export Data</h2>
             <p className="text-sm text-gray-400 mb-6 relative z-10">Generate professional CSV reports for external auditing.</p>
-            <button className="w-full bg-white text-gray-900 font-bold py-3 rounded-2xl relative z-10 hover:bg-gray-100 transition-colors">
-              DOWNLOAD CSV
-            </button>
+            {user?.role === 'admin' ? (
+              <button className="w-full bg-white text-gray-900 font-bold py-3 rounded-2xl relative z-10 hover:bg-gray-100 transition-colors">
+                DOWNLOAD CSV
+              </button>
+            ) : (
+              <button disabled className="w-full bg-gray-500 text-gray-300 font-bold py-3 rounded-2xl relative z-10 cursor-not-allowed">
+                ADMIN USE ONLY
+              </button>
+            )}
           </div>
         </div>
       </div>

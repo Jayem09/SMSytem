@@ -25,6 +25,7 @@ type Handlers struct {
 	Terminal      *handlers.TerminalHandler
 	Supplier      *handlers.SupplierHandler
 	PurchaseOrder *handlers.PurchaseOrderHandler
+	User          *handlers.UserHandler
 }
 
 // Setup configures all API routes.
@@ -73,7 +74,6 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 		{
 			products.GET("", h.Product.List)
 			products.GET("/:id", h.Product.GetByID)
-			products.POST("/import", h.Import.ImportProducts)
 		}
 
 		// ─── Customers ───
@@ -93,15 +93,6 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 			orders.POST("", h.Order.Create)
 		}
 
-		// ─── Expenses ───
-		expenses := protected.Group("/expenses")
-		{
-			expenses.GET("", h.Expense.List)
-			expenses.POST("", h.Expense.Create)
-			expenses.PUT("/:id", h.Expense.Update)
-			expenses.DELETE("/:id", h.Expense.Delete)
-		}
-
 		// ─── Admin-only routes ───
 		admin := protected.Group("")
 		admin.Use(middleware.RequireRole("admin"))
@@ -116,10 +107,11 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 			admin.PUT("/brands/:id", h.Brand.Update)
 			admin.DELETE("/brands/:id", h.Brand.Delete)
 
-			// Product CUD
+			// Product CUD & Import
 			admin.POST("/products", h.Product.Create)
 			admin.PUT("/products/:id", h.Product.Update)
 			admin.DELETE("/products/:id", h.Product.Delete)
+			admin.POST("/products/import", h.Import.ImportProducts)
 
 			// Customer delete
 			admin.DELETE("/customers/:id", h.Customer.Delete)
@@ -133,26 +125,43 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 
 			// Terminal
 			admin.POST("/terminal/payment", h.Terminal.ProcessPayment)
-		}
 
-		// ─── Suppliers ───
-		suppliers := protected.Group("/suppliers")
-		{
-			suppliers.GET("", h.Supplier.List)
-			suppliers.GET("/:id", h.Supplier.GetByID)
-			suppliers.POST("", h.Supplier.Create)
-			suppliers.PUT("/:id", h.Supplier.Update)
-			suppliers.DELETE("/:id", h.Supplier.Delete)
-		}
+			// ─── Expenses ───
+			expenses := admin.Group("/expenses")
+			{
+				expenses.GET("", h.Expense.List)
+				expenses.POST("", h.Expense.Create)
+				expenses.PUT("/:id", h.Expense.Update)
+				expenses.DELETE("/:id", h.Expense.Delete)
+			}
 
-		// ─── Purchase Orders ───
-		purchaseOrders := protected.Group("/purchase-orders")
-		{
-			purchaseOrders.GET("", h.PurchaseOrder.List)
-			purchaseOrders.GET("/:id", h.PurchaseOrder.GetByID)
-			purchaseOrders.POST("", h.PurchaseOrder.Create)
-			purchaseOrders.PUT("/:id/receive", h.PurchaseOrder.Receive)
-			purchaseOrders.DELETE("/:id", h.PurchaseOrder.Delete)
+			// ─── Suppliers ───
+			suppliers := admin.Group("/suppliers")
+			{
+				suppliers.GET("", h.Supplier.List)
+				suppliers.GET("/:id", h.Supplier.GetByID)
+				suppliers.POST("", h.Supplier.Create)
+				suppliers.PUT("/:id", h.Supplier.Update)
+				suppliers.DELETE("/:id", h.Supplier.Delete)
+			}
+
+			// ─── Purchase Orders ───
+			purchaseOrders := admin.Group("/purchase-orders")
+			{
+				purchaseOrders.GET("", h.PurchaseOrder.List)
+				purchaseOrders.GET("/:id", h.PurchaseOrder.GetByID)
+				purchaseOrders.POST("", h.PurchaseOrder.Create)
+				purchaseOrders.PUT("/:id/receive", h.PurchaseOrder.Receive)
+				purchaseOrders.DELETE("/:id", h.PurchaseOrder.Delete)
+			}
+
+			// ─── Users (Staff Management) ───
+			users := admin.Group("/users")
+			{
+				users.GET("", h.User.List)
+				users.PUT("/:id/role", h.User.UpdateRole)
+				users.DELETE("/:id", h.User.Delete)
+			}
 		}
 	}
 }

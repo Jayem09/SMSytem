@@ -75,20 +75,20 @@ export function printReceipt(order: ReceiptOrder, tin?: string, businessAddress?
       <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         @page {
-          size: 8.5in 11in;
+          size: 8.27in 11.69in;
           margin: 0;
         }
         body {
           font-family: 'Courier New', Courier, monospace;
           font-size: 15px;
           color: #000;
-          width: 8.5in;
-          height: 11in;
+          width: 8.27in;
+          height: 11.69in;
           position: relative;
           /* ★ PRINTER OFFSET — adjust this single value to shift ALL text up/down ★
              Negative = move UP, Positive = move DOWN
              Change this when switching printers */
-          --printer-offset: -0.50in;
+          --printer-offset: 0in;
         }
 
         /* ═══════════════════════════════════════════════
@@ -99,8 +99,8 @@ export function printReceipt(order: ReceiptOrder, tin?: string, businessAddress?
           position: absolute;
           top: 0;
           left: 0;
-          width: 8.5in;
-          height: 11in;
+          width: 8.27in;
+          height: 11.69in;
           opacity: 0.3;
           z-index: 0;
           pointer-events: none;
@@ -113,7 +113,17 @@ export function printReceipt(order: ReceiptOrder, tin?: string, businessAddress?
 
         /* Hide background + toolbar when actually printing */
         @media print {
-          .bg-template { display: none !important; }
+          /* TEMP: Allow background image on print for alignment verification */
+           .bg-template { 
+             display: block !important; 
+             opacity: 0.25 !important; 
+             -webkit-print-color-adjust: exact !important; 
+             print-color-adjust: exact !important; 
+           }
+           .bg-template img { 
+             display: block !important; 
+             opacity: 0.25 !important; 
+           }
           .toolbar { display: none !important; }
         }
 
@@ -133,17 +143,17 @@ export function printReceipt(order: ReceiptOrder, tin?: string, businessAddress?
            ══════════════════════════════════════════════ */
 
         /* ---------- Customer Info Section ---------- */
-        .date-field { position: absolute; top: calc(1.65in + var(--printer-offset));  left: 5.85in;  font-size: 15px; }
-        .reg-name   { position: absolute; top: calc(2.26in + var(--printer-offset));  left: 2.00in;  font-size: 15px; }
-        .tin-field   { position: absolute; top: calc(2.60in + var(--printer-offset));  left: 1.00in;  font-size: 15px; }
-        .address    { position: absolute; top: calc(2.92in + var(--printer-offset));  left: 2.00in;  font-size: 15px; }
+        .date-field { position: absolute; top: calc(1.70in + var(--printer-offset));  left: 6.80in;  font-size: 15px; }
+        .reg-name   { position: absolute; top: calc(2.01in + var(--printer-offset));  left: 2.10in;  font-size: 15px; }
+        .tin-field   { position: absolute; top: calc(2.43in + var(--printer-offset));  left: 2.15in;  font-size: 15px; }
+        .address    { position: absolute; top: calc(2.77in + var(--printer-offset));  left: 1.70in;  font-size: 15px; }
 
         /* ---------- Items Table ---------- */
         .items-table {
           position: absolute;
-          top: calc(3.70in + var(--printer-offset));
-          left: 0.43in;
-          width: 7.55in;
+          top: calc(3.47in + var(--printer-offset));
+          left: 1.52in;
+          width: 6.40in;
         }
         .items-table table {
           width: 100%;
@@ -153,26 +163,25 @@ export function printReceipt(order: ReceiptOrder, tin?: string, businessAddress?
           height: 0.29in;
           vertical-align: middle;
         }
-        .items-table .col-desc  { width: 55%; }
-        .items-table td:first-child { padding-left: 0.40in !important; }
-        .items-table .col-qty   { width: 11%; text-align: center; }
-        .items-table .col-price { width: 16%; text-align: right; }
-        .items-table .col-amt   { width: 18%; text-align: right; }
+        .items-table .col-desc  { width: 50%; padding-left: 0.1in; }
+        .items-table .col-qty   { width: 10%; text-align: center; }
+        .items-table .col-price { width: 20%; text-align: right; }
+        .items-table .col-amt   { width: 20%; text-align: right; }
 
         /* ---------- Tax Summary (Bottom Left) ---------- */
-        .vatable-sales   { position: absolute; top: calc(7.55in + var(--printer-offset)); left: 2.50in; font-size: 15px; text-align: right; width: 1.3in; }
-        .vat-amount-left { position: absolute; top: calc(7.82in + var(--printer-offset)); left: 2.50in; font-size: 15px; text-align: right; width: 1.3in; }
-        .zero-rated      { position: absolute; top: calc(8.09in + var(--printer-offset)); left: 2.50in; font-size: 15px; text-align: right; width: 1.3in; }
-        .vat-exempt      { position: absolute; top: calc(8.36in + var(--printer-offset)); left: 2.50in; font-size: 15px; text-align: right; width: 1.3in; }
+        .vatable-sales   { position: absolute; top: calc(7.36in + var(--printer-offset)); left: 2.77in; font-size: 15px; text-align: right; width: 1.2in; }
+        .vat-amount-left { position: absolute; top: calc(7.84in + var(--printer-offset)); left: 2.77in; font-size: 15px; text-align: right; width: 1.2in; }
+        .zero-rated      { position: absolute; top: calc(8.33in + var(--printer-offset)); left: 2.77in; font-size: 15px; text-align: right; width: 1.2in; }
+        .vat-exempt      { position: absolute; top: calc(8.61in + var(--printer-offset)); left: 2.77in; font-size: 15px; text-align: right; width: 1.2in; }
 
         /* ---------- Tax Summary (Bottom Right) ---------- */
-        .total-vat-incl  { position: absolute; top: calc(7.55in + var(--printer-offset)); left: 6.10in; font-size: 15px; text-align: right; width: 1.8in; }
-        .less-vat        { position: absolute; top: calc(7.82in + var(--printer-offset)); left: 6.10in; font-size: 15px; text-align: right; width: 1.8in; }
-        .net-of-vat      { position: absolute; top: calc(8.09in + var(--printer-offset)); left: 6.10in; font-size: 15px; text-align: right; width: 1.8in; }
-        .less-discount   { position: absolute; top: calc(8.46in + var(--printer-offset)); left: 6.10in; font-size: 15px; text-align: right; width: 1.8in; }
-        .add-vat         { position: absolute; top: calc(8.73in + var(--printer-offset)); left: 6.10in; font-size: 15px; text-align: right; width: 1.8in; }
-        .less-withholding { position: absolute; top: calc(9.01in + var(--printer-offset)); left: 6.10in; font-size: 15px; text-align: right; width: 1.8in; }
-        .total-due       { position: absolute; top: calc(9.35in + var(--printer-offset)); left: 6.10in; font-size: 15px; font-weight: bold; text-align: right; width: 1.8in; }
+        .total-vat-incl  { position: absolute; top: calc(7.36in + var(--printer-offset)); left: 6.20in; font-size: 15px; text-align: right; width: 1.5in; }
+        .less-vat        { position: absolute; top: calc(7.84in + var(--printer-offset)); left: 6.20in; font-size: 15px; text-align: right; width: 1.5in; }
+        .net-of-vat      { position: absolute; top: calc(8.12in + var(--printer-offset)); left: 6.20in; font-size: 15px; text-align: right; width: 1.5in; }
+        .less-discount   { position: absolute; top: calc(8.61in + var(--printer-offset)); left: 6.20in; font-size: 15px; text-align: right; width: 1.5in; }
+        .add-vat         { position: absolute; top: calc(8.95in + var(--printer-offset)); left: 6.20in; font-size: 15px; text-align: right; width: 1.5in; }
+        .less-withholding { position: absolute; top: calc(9.23in + var(--printer-offset)); left: 6.20in; font-size: 15px; text-align: right; width: 1.5in; }
+        .total-due       { position: absolute; top: calc(9.58in + var(--printer-offset)); left: 6.20in; font-size: 15px; font-weight: bold; text-align: right; width: 1.5in; }
 
         /* ---------- Toolbar ---------- */
         .toolbar {
@@ -220,7 +229,7 @@ export function printReceipt(order: ReceiptOrder, tin?: string, businessAddress?
 
       <!-- Scanned form background (visible on screen only) -->
       <div class="bg-template" id="bgTemplate">
-        <img src="/invoice-template.png.jpg" alt="Invoice template" />
+        <img src="/PLDT NEW SI FORMAT.xlsx.png" alt="Invoice template" />
       </div>
 
       <!-- Customer Info -->

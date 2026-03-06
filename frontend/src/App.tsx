@@ -16,6 +16,7 @@ import ActivityLogs from './pages/ActivityLogs';
 import POS from './pages/POS';
 import Suppliers from './pages/Suppliers';
 import PurchaseOrders from './pages/PurchaseOrders';
+import Staff from './pages/Staff';
 
 function App() {
   return (
@@ -29,17 +30,21 @@ function App() {
 
           {/* Protected with sidebar layout */}
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+            {/* Shared roles (Admin & Cashier) */}
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/products" element={<Products />} />
-            <Route path="/categories" element={<Categories />} />
-            <Route path="/brands" element={<Brands />} />
+            <Route path="/pos" element={<POS />} />
             <Route path="/customers" element={<Customers />} />
             <Route path="/orders" element={<Orders />} />
-            <Route path="/expenses" element={<Expenses />} />
-            <Route path="/suppliers" element={<Suppliers />} />
-            <Route path="/purchase-orders" element={<PurchaseOrders />} />
-            <Route path="/logs" element={<ActivityLogs />} />
-            <Route path="/pos" element={<POS />} />
+
+            {/* Admin only */}
+            <Route path="/products" element={<ProtectedRoute requiredRole="admin"><Products /></ProtectedRoute>} />
+            <Route path="/categories" element={<ProtectedRoute requiredRole="admin"><Categories /></ProtectedRoute>} />
+            <Route path="/brands" element={<ProtectedRoute requiredRole="admin"><Brands /></ProtectedRoute>} />
+            <Route path="/expenses" element={<ProtectedRoute requiredRole="admin"><Expenses /></ProtectedRoute>} />
+            <Route path="/suppliers" element={<ProtectedRoute requiredRole="admin"><Suppliers /></ProtectedRoute>} />
+            <Route path="/purchase-orders" element={<ProtectedRoute requiredRole="admin"><PurchaseOrders /></ProtectedRoute>} />
+            <Route path="/logs" element={<ProtectedRoute requiredRole="admin"><ActivityLogs /></ProtectedRoute>} />
+            <Route path="/staff" element={<ProtectedRoute requiredRole="admin"><Staff /></ProtectedRoute>} />
           </Route>
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

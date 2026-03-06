@@ -42,6 +42,7 @@ func main() {
 		Terminal:      handlers.NewTerminalHandler(terminalService),
 		Supplier:      handlers.NewSupplierHandler(),
 		PurchaseOrder: handlers.NewPurchaseOrderHandler(),
+		User:          handlers.NewUserHandler(),
 	}
 
 	// Setup Gin router
