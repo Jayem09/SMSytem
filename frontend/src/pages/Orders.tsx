@@ -4,7 +4,7 @@ import DataTable from '../components/DataTable';
 import Modal from '../components/Modal';
 import FormField from '../components/FormField';
 import { useAuth } from '../hooks/useAuth';
-import { Printer, Eye, Trash2, ChevronUp, Plus } from 'lucide-react';
+import { Printer, Eye, Trash2, ChevronUp} from 'lucide-react';
 
 interface Customer { id: number; name: string; }
 interface Product { id: number; name: string; price: number; stock: number; }
@@ -145,7 +145,7 @@ export default function Orders() {
   };
 
   return (
-    <div className="p-6">
+    <div className="p-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Orders</h1>
@@ -153,9 +153,9 @@ export default function Orders() {
         </div>
         <button 
           onClick={openCreate} 
-          className="flex items-center gap-2 px-6 py-3 text-sm font-bold text-white bg-gray-900 hover:bg-gray-800 rounded-2xl transition-all shadow-sm hover:shadow-md active:scale-95 cursor-pointer"
+          className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 rounded-md cursor-pointer"
         >
-          <Plus className="w-4 h-4" />
+
           NEW TRANSACTION
         </button>
       </div>

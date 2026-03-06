@@ -4,7 +4,7 @@ import DataTable from '../components/DataTable';
 import Modal from '../components/Modal';
 import FormField from '../components/FormField';
 import { useAuth } from '../hooks/useAuth';
-import { History, Edit2, Trash2, Plus, User, Phone, Mail, MapPin } from 'lucide-react';
+import { History, Edit2, Trash2, User, Phone, Mail, MapPin } from 'lucide-react';
 
 interface Order {
   id: number;
@@ -120,12 +120,8 @@ export default function Customers() {
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Customers</h1>
           <p className="text-gray-500 mt-1">Manage client profiles and view transaction history.</p>
         </div>
-        <button 
-          onClick={openCreate} 
-          className="flex items-center gap-2 px-6 py-3 text-sm font-bold text-white bg-gray-900 hover:bg-gray-800 rounded-2xl transition-all shadow-sm hover:shadow-md active:scale-95 cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          ADD CUSTOMER
+        <button onClick={openCreate} className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 rounded-md cursor-pointer">
+          Add Customer
         </button>
       </div>
 
@@ -163,7 +159,7 @@ export default function Customers() {
           <div className="flex items-center gap-2 justify-end">
             <button
               onClick={() => fetchHistory(c)}
-              className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors cursor-pointer"
+              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 rounded-md cursor-pointer"
               title="Purchase History"
             >
               <History className="w-4 h-4" />

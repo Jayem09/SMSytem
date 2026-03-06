@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import api from '../api/axios';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { AlertCircle, TrendingUp, DollarSign, Package, Users, ShoppingCart } from 'lucide-react';
+import { AlertCircle, TrendingUp, Package, Users, ShoppingCart, PhilippinePeso } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 export default function Dashboard() {
@@ -85,7 +85,7 @@ export default function Dashboard() {
       {user?.role === 'admin' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         {[
-          { label: 'Total Sales', value: stats.total_sales, color: 'blue', icon: DollarSign, trend: '+12%' },
+          { label: 'Total Sales', value: stats.total_sales, color: 'blue', icon:PhilippinePeso, trend: '+12%' },
           { label: 'Total Expenses', value: stats.total_expenses, color: 'rose', icon: ShoppingCart, trend: '-5%' },
           { label: 'Net Profit', value: stats.net_profit, color: 'emerald', icon: TrendingUp, trend: '+18%' },
         ].map((card, i) => (
