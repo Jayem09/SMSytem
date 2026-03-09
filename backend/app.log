@@ -1641,3 +1641,63 @@ ORDER BY
 2026/03/09 13:39:13 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/product_handler.go:87
 [0m[33m[19.753ms] [34;1m[rows:2113][0m SELECT * FROM `products` WHERE `products`.`deleted_at` IS NULL ORDER BY created_at DESC
 [GIN] 2026/03/09 - 13:39:13 | 200 |   26.841083ms |             ::1 | GET      "/api/products?all=1"
+
+2026/03/09 13:44:40 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/supplier_handler.go:35
+[0m[33m[9.190ms] [34;1m[rows:1][0m SELECT * FROM `suppliers` ORDER BY name ASC
+[GIN] 2026/03/09 - 13:44:40 | 200 |   17.749083ms |             ::1 | GET      "/api/suppliers"
+
+2026/03/09 13:44:40 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/purchase_order_handler.go:45
+[0m[33m[1.365ms] [34;1m[rows:1][0m SELECT * FROM `products` WHERE `products`.`id` = 2112 AND `products`.`deleted_at` IS NULL
+
+2026/03/09 13:44:40 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/purchase_order_handler.go:45
+[0m[33m[5.632ms] [34;1m[rows:1][0m SELECT * FROM `purchase_order_items` WHERE `purchase_order_items`.`purchase_order_id` = 1
+
+2026/03/09 13:44:40 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/purchase_order_handler.go:45
+[0m[33m[0.773ms] [34;1m[rows:1][0m SELECT * FROM `suppliers` WHERE `suppliers`.`id` = 1
+
+2026/03/09 13:44:40 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/purchase_order_handler.go:45
+[0m[33m[0.763ms] [34;1m[rows:1][0m SELECT * FROM `users` WHERE `users`.`id` = 2 AND `users`.`deleted_at` IS NULL
+
+2026/03/09 13:44:40 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/purchase_order_handler.go:45
+[0m[33m[19.728ms] [34;1m[rows:1][0m SELECT * FROM `purchase_orders` ORDER BY created_at DESC
+[GIN] 2026/03/09 - 13:44:40 | 200 |   26.348875ms |             ::1 | GET      "/api/purchase-orders"
+
+2026/03/09 13:44:40 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/supplier_handler.go:35
+[0m[33m[0.761ms] [34;1m[rows:1][0m SELECT * FROM `suppliers` ORDER BY name ASC
+[GIN] 2026/03/09 - 13:44:40 | 200 |    1.982791ms |             ::1 | GET      "/api/suppliers"
+
+2026/03/09 13:44:40 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/purchase_order_handler.go:45
+[0m[33m[4.145ms] [34;1m[rows:1][0m SELECT * FROM `products` WHERE `products`.`id` = 2112 AND `products`.`deleted_at` IS NULL
+
+2026/03/09 13:44:40 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/purchase_order_handler.go:45
+[0m[33m[6.487ms] [34;1m[rows:1][0m SELECT * FROM `purchase_order_items` WHERE `purchase_order_items`.`purchase_order_id` = 1
+
+2026/03/09 13:44:40 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/purchase_order_handler.go:45
+[0m[33m[1.626ms] [34;1m[rows:1][0m SELECT * FROM `suppliers` WHERE `suppliers`.`id` = 1
+
+2026/03/09 13:44:40 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/purchase_order_handler.go:45
+[0m[33m[0.909ms] [34;1m[rows:1][0m SELECT * FROM `users` WHERE `users`.`id` = 2 AND `users`.`deleted_at` IS NULL
+
+2026/03/09 13:44:40 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/purchase_order_handler.go:45
+[0m[33m[9.605ms] [34;1m[rows:1][0m SELECT * FROM `purchase_orders` ORDER BY created_at DESC
+[GIN] 2026/03/09 - 13:44:40 | 200 |   10.629917ms |             ::1 | GET      "/api/purchase-orders"
+
+2026/03/09 13:44:40 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/product_handler.go:87
+[0m[33m[1.787ms] [34;1m[rows:138][0m SELECT * FROM `brands` WHERE `brands`.`id` IN (138,137,136,135,134,133,132,131,130,129,128,127,126,125,124,123,122,121,120,119,118,117,116,115,114,113,112,111,110,109,108,107,106,105,104,103,102,101,100,99,98,97,96,95,94,93,92,91,90,89,88,87,86,85,84,83,82,81,80,79,78,77,76,75,74,73,72,71,70,69,68,67,66,65,64,63,62,61,60,59,58,57,56,55,54,53,52,51,50,49,48,47,46,45,44,43,42,41,40,39,38,37,36,35,34,33,32,31,30,29,28,27,26,25,24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1)
+
+2026/03/09 13:44:40 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/product_handler.go:87
+[0m[33m[0.735ms] [34;1m[rows:1][0m SELECT * FROM `categories` WHERE `categories`.`id` = 1
+
+2026/03/09 13:44:40 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/product_handler.go:87
+[0m[33m[44.832ms] [34;1m[rows:2113][0m SELECT * FROM `products` WHERE parent_id IS NULL AND `products`.`deleted_at` IS NULL ORDER BY created_at DESC
+[GIN] 2026/03/09 - 13:44:40 | 200 |    58.73025ms |             ::1 | GET      "/api/products"
+
+2026/03/09 13:44:40 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/product_handler.go:87
+[0m[33m[1.186ms] [34;1m[rows:138][0m SELECT * FROM `brands` WHERE `brands`.`id` IN (138,137,136,135,134,133,132,131,130,129,128,127,126,125,124,123,122,121,120,119,118,117,116,115,114,113,112,111,110,109,108,107,106,105,104,103,102,101,100,99,98,97,96,95,94,93,92,91,90,89,88,87,86,85,84,83,82,81,80,79,78,77,76,75,74,73,72,71,70,69,68,67,66,65,64,63,62,61,60,59,58,57,56,55,54,53,52,51,50,49,48,47,46,45,44,43,42,41,40,39,38,37,36,35,34,33,32,31,30,29,28,27,26,25,24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1)
+
+2026/03/09 13:44:40 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/product_handler.go:87
+[0m[33m[0.933ms] [34;1m[rows:1][0m SELECT * FROM `categories` WHERE `categories`.`id` = 1
+
+2026/03/09 13:44:40 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/product_handler.go:87
+[0m[33m[29.434ms] [34;1m[rows:2113][0m SELECT * FROM `products` WHERE parent_id IS NULL AND `products`.`deleted_at` IS NULL ORDER BY created_at DESC
+[GIN] 2026/03/09 - 13:44:40 | 200 |    52.63925ms |             ::1 | GET      "/api/products"

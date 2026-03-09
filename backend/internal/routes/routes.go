@@ -7,6 +7,7 @@ import (
 	"smsystem-backend/internal/handlers"
 	"smsystem-backend/internal/middleware"
 
+	"github.com/gin-gonic/contrib/static"
 	"github.com/gin-gonic/gin"
 )
 
@@ -165,4 +166,13 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 			}
 		}
 	}
+
+	// ─── Serve Frontend ───
+	// Serve static files from the "public" directory
+	router.Use(static.Serve("/", static.LocalFile("./public", true)))
+
+	// Fallback to index.html for React Router
+	router.NoRoute(func(c *gin.Context) {
+		c.File("./public/index.html")
+	})
 }
