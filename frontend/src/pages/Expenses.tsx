@@ -28,11 +28,11 @@ export default function Expenses() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({ 
     description: '', 
-    amount: 0, 
+    amount: '' as string | number, 
     category: 'Other', 
     expense_date: new Date().toISOString().split('T')[0],
     product_id: '',
-    quantity: 0
+    quantity: '' as string | number
   });
 
   const fetchExpenses = async () => {
@@ -57,6 +57,7 @@ export default function Expenses() {
       await api.post('/api/expenses', {
         ...formData,
         amount: Number(formData.amount),
+        expense_date: new Date(formData.expense_date).toISOString(),
         product_id: formData.category === 'Inventory' ? Number(formData.product_id) : null,
         quantity: formData.category === 'Inventory' ? Number(formData.quantity) : 0
       });
@@ -119,7 +120,7 @@ export default function Expenses() {
                 <td className="px-6 py-4">
                   <span className="px-2 py-1 bg-gray-100 rounded text-xs text-gray-600">{exp.category}</span>
                 </td>
-                <td className="px-6 py-4 font-medium text-gray-900">${exp.amount.toLocaleString()}</td>
+                <td className="px-6 py-4 font-medium text-gray-900">₱{exp.amount.toLocaleString()}</td>
                 <td className="px-6 py-4 text-gray-500">{new Date(exp.expense_date).toLocaleDateString()}</td>
                 <td className="px-6 py-4">
                   <button onClick={() => deleteExpense(exp.id)} className="text-red-600 hover:text-red-800">Delete</button>
@@ -149,14 +150,14 @@ export default function Expenses() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Amount ($)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Amount (₱)</label>
                   <input
                     type="number"
                     required
                     step="0.01"
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-black"
                     value={formData.amount}
-                    onChange={e => setFormData({ ...formData, amount: Number(e.target.value) })}
+                    onChange={e => setFormData({ ...formData, amount: e.target.value })}
                   />
                 </div>
                 <div>
@@ -200,7 +201,7 @@ export default function Expenses() {
                       min="1"
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-black"
                       value={formData.quantity}
-                      onChange={e => setFormData({ ...formData, quantity: Number(e.target.value) })}
+                      onChange={e => setFormData({ ...formData, quantity: e.target.value })}
                     />
                   </div>
                 </div>

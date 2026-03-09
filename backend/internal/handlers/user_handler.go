@@ -2,12 +2,14 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"smsystem-backend/internal/database"
 	"smsystem-backend/internal/models"
 	"smsystem-backend/internal/services"
 
 	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type UserHandler struct {
@@ -62,7 +64,7 @@ func (h *UserHandler) UpdateRole(c *gin.Context) {
 		return
 	}
 
-	if req.Role != "admin" && req.Role != "cashier" && req.Role != "user" {
+	if req.Role != "admin" && req.Role != "cashier" && req.Role != "user" && req.Role != "purchasing" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid role specified"})
 		return
 	}
@@ -94,6 +96,50 @@ func (h *UserHandler) UpdateRole(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "User role updated successfully"})
+}
+
+// ResetPassword allows admins to force reset a user's password
+func (h *UserHandler) ResetPassword(c *gin.Context) {
+	id := c.Param("id")
+	var req struct {
+		Password string `json:"password" binding:"required,min=6"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var user models.User
+	if err := database.DB.First(&user, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	// Prevent admin from resetting their own password here (they should use a standard profile update)
+	currentUserID, exists := c.Get("userID")
+	if exists && currentUserID.(uint) == user.ID {
+		c.JSON(http.StatusConflict, gin.H{"error": "You should use your profile settings to change your own password."})
+		return
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		log.Printf("Failed to hash password during reset: %v\n", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process the new password"})
+		return
+	}
+
+	if err := database.DB.Model(&user).Update("password", string(hashedPassword)).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password in database"})
+		return
+	}
+
+	if currentUserID != nil {
+		h.LogService.Record(currentUserID.(uint), "PASSWORD_RESET", "User", id, fmt.Sprintf("Reset password for user %s", user.Name), c.ClientIP())
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "User password reset successfully"})
 }
 
 // Delete permanently removes a user account
