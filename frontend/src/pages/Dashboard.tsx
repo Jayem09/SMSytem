@@ -7,9 +7,10 @@ import { useAuth } from '../hooks/useAuth';
 export default function Dashboard() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [stats, setStats] = useState({
     total_sales: 0,
-    total_expenses: 0,
+    total_expenses: 0,  
     net_profit: 0,
     product_count: 0,
     order_count: 0,
@@ -39,6 +40,51 @@ export default function Dashboard() {
 
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(val);
+  };
+
+  const exportToCSV = async () => {
+    try {
+      setExporting(true);
+      const res = await api.get('/api/orders');
+      const orders = res.data.orders;
+      
+      if (!orders || orders.length === 0) {
+        alert('No data to export.');
+        return;
+      }
+
+      const headers = ['Order ID', 'Date', 'Customer', 'Status', 'Payment Method', 'Total Amount', 'Items Summary'];
+      const rows = orders.map((o: any) => {
+        const customerName = o.customer?.name || o.guest_name || 'Walk-In';
+        const date = new Date(o.created_at).toLocaleDateString();
+        const itemsSummary = o.items ? o.items.map((i: any) => `${i.product?.name || 'Unknown'} (x${i.quantity})`).join('; ') : '';
+        
+        return [
+          o.id,
+          `"${date}"`,
+          `"${customerName.replace(/"/g, '""')}"`,
+          `"${o.status}"`,
+          `"${o.payment_method}"`,
+          o.total_amount,
+          `"${itemsSummary.replace(/"/g, '""')}"`
+        ].join(',');
+      });
+
+      const csvContent = [headers.join(','), ...rows].join('\n');
+      const base64 = btoa(unescape(encodeURIComponent(csvContent)));
+      const url = `data:text/csv;charset=utf-8;base64,${base64}`;
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Sales_Report_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error('Export failed', err);
+      alert('Failed to generate CSV report.');
+    } finally {
+      setExporting(false);
+    }
   };
 
   if (loading) {
@@ -199,8 +245,12 @@ export default function Dashboard() {
             <h2 className="text-xl font-bold mb-2 relative z-10">Export Data</h2>
             <p className="text-sm text-gray-400 mb-6 relative z-10">Generate professional CSV reports for external auditing.</p>
             {user?.role === 'admin' ? (
-              <button className="w-full bg-white text-gray-900 font-bold py-3 rounded-2xl relative z-10 hover:bg-gray-100 transition-colors">
-                DOWNLOAD CSV
+              <button 
+                onClick={exportToCSV}
+                disabled={exporting}
+                className="w-full bg-white text-gray-900 font-bold py-3 rounded-2xl relative z-10 hover:bg-gray-100 transition-colors disabled:opacity-75 disabled:cursor-wait"
+              >
+                {exporting ? 'GENERATING...' : 'DOWNLOAD CSV'}
               </button>
             ) : (
               <button disabled className="w-full bg-gray-500 text-gray-300 font-bold py-3 rounded-2xl relative z-10 cursor-not-allowed">
