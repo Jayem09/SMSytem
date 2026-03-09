@@ -17,6 +17,7 @@ import POS from './pages/POS';
 import Suppliers from './pages/Suppliers';
 import PurchaseOrders from './pages/PurchaseOrders';
 import Staff from './pages/Staff';
+import ReceiptTest from './pages/ReceiptTest';
 
 function App() {
   return (
@@ -27,6 +28,7 @@ function App() {
           {/* Public */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/receipt-test" element={<ReceiptTest />} />
 
           {/* Protected with sidebar layout */}
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>

@@ -3,6 +3,7 @@ import api from '../api/axios';
 import Modal from '../components/Modal';
 import FormField from '../components/FormField';
 import { printReceipt } from '../components/Receipt';
+import { printDeliveryReceipt } from '../components/DeliveryReceipt';
 import { Search, ShoppingCart, Trash2, Printer, CheckCircle, Package } from 'lucide-react';
 
 interface Product {
@@ -60,12 +61,14 @@ export default function POS() {
   const [businessAddress, setBusinessAddress] = useState('');
   const [withholdingTaxRate, setWithholdingTaxRate] = useState('0');
   const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [receiptType, setReceiptType] = useState<'SI' | 'DR'>('SI'); // Added Receipt Type
   const [discount, setDiscount] = useState('0');
   const [successModalOpen, setSuccessModalOpen] = useState(false);
   const [lastOrder, setLastOrder] = useState<Order | null>(null);
   const [lastTin, setLastTin] = useState('');
   const [lastBusinessAddress, setLastBusinessAddress] = useState('');
   const [lastWithholdingTaxRate, setLastWithholdingTaxRate] = useState(0);
+  const [lastReceiptType, setLastReceiptType] = useState<'SI' | 'DR'>('SI');
   const [isProcessingTerminal, setIsProcessingTerminal] = useState(false);
 
   const fetchData = async () => {
@@ -128,8 +131,8 @@ export default function POS() {
 
   const handleCheckout = async () => {
     if (cart.length === 0) return;
-    if (!tin.trim() || !businessAddress.trim()) {
-      alert('TIN and Business Address are required for the sales invoice.');
+    if (receiptType === 'SI' && (!tin.trim() || !businessAddress.trim())) {
+      alert('TIN and Business Address are required for a Sales Invoice (SI).');
       return;
     }
     try {
@@ -169,6 +172,8 @@ export default function POS() {
       setLastTin(tin);
       setLastBusinessAddress(businessAddress);
       setLastWithholdingTaxRate(parseFloat(withholdingTaxRate) || 0);
+      setLastReceiptType(receiptType);
+      
       setCart([]);
       setCheckoutModalOpen(false);
       setSuccessModalOpen(true);
@@ -177,6 +182,7 @@ export default function POS() {
       setTin('');
       setBusinessAddress('');
       setWithholdingTaxRate('0');
+      // Keep selected print mechanism
       fetchData(); // Refresh stock and meta
     } catch (err: unknown) {
       const axiosError = err as { response?: { data?: { error?: string, details?: string } } };
@@ -398,17 +404,41 @@ export default function POS() {
               ...customers.map(c => ({ value: c.id, label: c.name.toUpperCase() }))
             ]}
           />
+          <div className="flex bg-gray-100 rounded-xl p-1 mb-4">
+            <button 
+              onClick={() => setReceiptType('SI')}
+              className={`flex-1 py-2 text-xs font-black tracking-widest uppercase transition-all rounded-lg ${
+                receiptType === 'SI' ? 'bg-white shadow text-indigo-600' : 'text-gray-500 hover:text-gray-900'
+              }`}
+            >
+              Sales Invoice
+            </button>
+            <button 
+              onClick={() => setReceiptType('DR')}
+              className={`flex-1 py-2 text-xs font-black tracking-widest uppercase transition-all rounded-lg ${
+                receiptType === 'DR' ? 'bg-white shadow text-indigo-600' : 'text-gray-500 hover:text-gray-900'
+              }`}
+            >
+              Delivery Receipt
+            </button>
+          </div>
           {!customerId && (
             <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-1 duration-200">
               <FormField label="Guest Name" value={guestName} onChange={setGuestName} placeholder="Enter full name" />
               <FormField label="Contact Number" value={guestPhone} onChange={setGuestPhone} placeholder="09XX XXX XXXX" />
             </div>
           )}
-          <div className="grid grid-cols-2 gap-3">
-            <FormField label="TIN" value={tin} onChange={setTin} required placeholder="000-000-000-000" />
-            <FormField label="Business Address" value={businessAddress} onChange={setBusinessAddress} required placeholder="Full business address" />
-          </div>
-          <FormField label="Withholding Tax Rate (%)" type="number" value={withholdingTaxRate} onChange={setWithholdingTaxRate} placeholder="e.g. 1, 2, 5" />
+          {receiptType === 'SI' && (
+            <>
+              <div className="grid grid-cols-2 gap-3 animate-in fade-in zoom-in-95 duration-200">
+                <FormField label="TIN" value={tin} onChange={setTin} required placeholder="000-000-000-000" />
+                <FormField label="Business Address" value={businessAddress} onChange={setBusinessAddress} required placeholder="Full business address" />
+              </div>
+              <div className="animate-in fade-in zoom-in-95 duration-200">
+                <FormField label="Withholding Tax Rate (%)" type="number" value={withholdingTaxRate} onChange={setWithholdingTaxRate} placeholder="e.g. 1, 2, 5" />
+              </div>
+            </>
+          )}
           <div className="grid grid-cols-2 gap-3">
              <div className="col-span-2">
                <label className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2 block">Payment Protocol</label>
@@ -467,11 +497,20 @@ export default function POS() {
           
           <div className="grid grid-cols-2 gap-3 mb-4">
             <button
-               onClick={() => { if (lastOrder) printReceipt(lastOrder, lastTin, lastBusinessAddress, lastWithholdingTaxRate); setSuccessModalOpen(false); }}
+               onClick={() => { 
+                 if (lastOrder) {
+                   if (lastReceiptType === 'SI') {
+                     printReceipt(lastOrder, lastTin, lastBusinessAddress, lastWithholdingTaxRate); 
+                   } else {
+                     printDeliveryReceipt(lastOrder, lastTin, lastBusinessAddress, lastWithholdingTaxRate);
+                   }
+                 }
+                 setSuccessModalOpen(false); 
+               }}
                className="flex items-center justify-center gap-2 py-3 bg-gray-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-800 transition-all"
             >
               <Printer className="w-4 h-4" />
-              PRINT RECEIPT
+              PRINT {lastReceiptType}
             </button>
             <button
                onClick={() => setSuccessModalOpen(false)}

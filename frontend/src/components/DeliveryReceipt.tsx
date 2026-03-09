@@ -27,7 +27,7 @@ interface ReceiptOrder {
   items?: ReceiptOrderItem[];
 }
 
-export function generateReceiptHTML(order: ReceiptOrder, tin?: string, businessAddress?: string, withholdingTaxRate?: number): string {
+export function generateDeliveryReceiptHTML(order: ReceiptOrder, tin?: string, businessAddress?: string, withholdingTaxRate?: number): string {
   const date = new Date(order.created_at);
   const dateStr = date.toLocaleDateString('en-PH', { year: 'numeric', month: '2-digit', day: '2-digit' });
 
@@ -272,8 +272,8 @@ export function generateReceiptHTML(order: ReceiptOrder, tin?: string, businessA
   return html;
 }
 
-export function printReceipt(order: ReceiptOrder, tin?: string, businessAddress?: string, withholdingTaxRate?: number) {
-  const html = generateReceiptHTML(order, tin, businessAddress, withholdingTaxRate);
+export function printDeliveryReceipt(order: ReceiptOrder, tin?: string, businessAddress?: string, withholdingTaxRate?: number) {
+  const html = generateDeliveryReceiptHTML(order, tin, businessAddress, withholdingTaxRate);
 
   const printWindow = window.open('', '_blank', 'width=850,height=1100');
   if (printWindow) {
