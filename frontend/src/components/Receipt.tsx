@@ -10,7 +10,8 @@
 interface ReceiptOrderItem {
   id: number;
   quantity: number;
-  price: number;
+  price?: number;
+  unit_price?: number;
   subtotal: number;
   product?: { name: string };
 }
@@ -52,7 +53,7 @@ export function generateReceiptHTML(order: ReceiptOrder, tin?: string, businessA
   // Build item rows using absolute positioning for columns
   const items = order.items || [];
   const itemRows = items.map((item, index) => {
-    const unitPrice = item.price ?? (item.subtotal && item.quantity ? item.subtotal / item.quantity : 0);
+    const unitPrice = item.unit_price ?? item.price ?? (item.subtotal && item.quantity ? item.subtotal / item.quantity : 0);
     const subtotal = item.subtotal ?? 0;
     
     // Calculate the Y position for this row.

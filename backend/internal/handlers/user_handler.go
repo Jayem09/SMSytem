@@ -52,6 +52,25 @@ func (h *UserHandler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
+// GetStaffList fetches all users (ID and Name only) for selection dropdowns
+func (h *UserHandler) GetStaffList(c *gin.Context) {
+	var users []models.User
+	if err := database.DB.Select("id", "name").Find(&users).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch staff list"})
+		return
+	}
+
+	var response []map[string]interface{}
+	for _, u := range users {
+		response = append(response, map[string]interface{}{
+			"id":   u.ID,
+			"name": u.Name,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"staff": response})
+}
+
 // UpdateRole changes a specific user's role (admin or cashier)
 func (h *UserHandler) UpdateRole(c *gin.Context) {
 	id := c.Param("id")

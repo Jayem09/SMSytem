@@ -1,10 +1,13 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { Settings } from 'lucide-react';
 
 const navItems = [
   { to: '/pos', label: 'POS Checkout', roles: ['admin', 'cashier'] },
   { to: '/dashboard', label: 'Dashboard', roles: ['admin', 'cashier'] },
   { to: '/customers', label: 'Customers', roles: ['admin', 'cashier'] },
+  { to: '/crm', label: 'CRM Analysis', roles: ['admin'] },
+  { to: '/inventory', label: 'Inventory Management', roles: ['admin'] },
   { to: '/orders', label: 'Orders', roles: ['admin', 'cashier'] },
   { to: '/products', label: 'Products', roles: ['admin'] },
   { to: '/categories', label: 'Categories', roles: ['admin'] },
@@ -32,8 +35,13 @@ export default function Layout() {
     <div className="min-h-screen flex bg-gray-50">
       {/* Sidebar */}
       <aside className="w-56 bg-white border-r border-gray-200 flex flex-col fixed h-screen">
-        <div className="px-4 py-4 border-b border-gray-200">
+        <div className="px-4 py-4 border-b border-gray-200 flex justify-between items-center">
           <h1 className="text-lg font-semibold text-gray-900">SMSystem</h1>
+          {user?.role === 'admin' && (
+            <Link to="/settings" className="text-gray-400 hover:text-gray-900 transition-colors" title="Settings">
+              <Settings className="w-5 h-5" />
+            </Link>
+          )}
         </div>
 
         <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">

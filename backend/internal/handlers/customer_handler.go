@@ -8,6 +8,7 @@ import (
 	"smsystem-backend/internal/database"
 	"smsystem-backend/internal/models"
 	"smsystem-backend/internal/services"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -146,4 +147,76 @@ func (h *CustomerHandler) Delete(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Customer deleted"})
+}
+
+// GetCRMStats returns aggregated CRM data: Total Customers, Top Spenders, Recent Buyers, and At-Risk Customers
+func (h *CustomerHandler) GetCRMStats(c *gin.Context) {
+	var totalCustomers int64
+	database.DB.Model(&models.Customer{}).Count(&totalCustomers)
+
+	// Top Spenders
+	type TopSpender struct {
+		ID          uint    `json:"id"`
+		Name        string  `json:"name"`
+		Email       string  `json:"email"`
+		Phone       string  `json:"phone"`
+		TotalSpent  float64 `json:"total_spent"`
+		OrderCount  int     `json:"order_count"`
+		LastPayment string  `json:"last_payment"`
+	}
+	var topSpenders []TopSpender
+	database.DB.Table("customers").
+		Select("customers.id, customers.name, customers.email, customers.phone, SUM(orders.total_amount) as total_spent, count(orders.id) as order_count, MAX(orders.created_at) as last_payment").
+		Joins("JOIN orders ON orders.customer_id = customers.id").
+		Where("orders.status = ?", "completed").
+		Group("customers.id").
+		Order("total_spent DESC").
+		Limit(5).
+		Scan(&topSpenders)
+
+	// Recent Buyers (last 30 days)
+	thirtyDaysAgo := time.Now().AddDate(0, 0, -30)
+	var recentBuyers []TopSpender
+	database.DB.Table("customers").
+		Select("customers.id, customers.name, customers.email, customers.phone, SUM(orders.total_amount) as total_spent, count(orders.id) as order_count, MAX(orders.created_at) as last_payment").
+		Joins("JOIN orders ON orders.customer_id = customers.id").
+		Where("orders.status = ? AND orders.created_at >= ?", "completed", thirtyDaysAgo).
+		Group("customers.id").
+		Order("last_payment DESC").
+		Scan(&recentBuyers)
+
+	// At-Risk Customers (no purchases in the last 60 days, but have bought before)
+	sixtyDaysAgo := time.Now().AddDate(0, 0, -60)
+	var atRiskCustomers []TopSpender
+	database.DB.Table("customers").
+		Select("customers.id, customers.name, customers.email, customers.phone, SUM(orders.total_amount) as total_spent, count(orders.id) as order_count, MAX(orders.created_at) as last_payment").
+		Joins("JOIN orders ON orders.customer_id = customers.id").
+		Where("orders.status = ?", "completed").
+		Group("customers.id").
+		Having("MAX(orders.created_at) < ?", sixtyDaysAgo).
+		Order("last_payment DESC").
+		Scan(&atRiskCustomers)
+
+	// Frequently bought categories (Overall system health view)
+	type CategoryStat struct {
+		Category string `json:"category"`
+		Count    int    `json:"count"`
+	}
+	var categoryStats []CategoryStat
+	database.DB.Table("order_items").
+		Select("categories.name as category, COUNT(order_items.id) as count").
+		Joins("JOIN products ON order_items.product_id = products.id").
+		Joins("JOIN categories ON products.category_id = categories.id").
+		Group("categories.id").
+		Order("count DESC").
+		Limit(5).
+		Scan(&categoryStats)
+
+	c.JSON(http.StatusOK, gin.H{
+		"total_customers":    totalCustomers,
+		"top_spenders":       topSpenders,
+		"recent_buyers":      recentBuyers,
+		"at_risk":            atRiskCustomers,
+		"popular_categories": categoryStats,
+	})
 }

@@ -3,7 +3,9 @@ import api from '../api/axios';
 import DataTable from '../components/DataTable';
 import Modal from '../components/Modal';
 import { useAuth } from '../hooks/useAuth';
-import { Printer, Eye, Trash2 } from 'lucide-react';
+import { Printer, Eye, Trash2, CheckCircle2 } from 'lucide-react';
+import { printReceipt } from '../components/Receipt';
+import { printDeliveryReceipt } from '../components/DeliveryReceipt';
 
 interface Customer { id: number; name: string; }
 interface Product { id: number; name: string; price: number; stock: number; }
@@ -21,8 +23,13 @@ interface Order {
   guest_name?: string;
   guest_phone?: string;
   total_amount: number;
+  discount_amount: number;
   status: string;
   payment_method: string;
+  receipt_type: 'SI' | 'DR';
+  tin: string;
+  business_address: string;
+  withholding_tax_rate: number;
   created_at: string;
   customer?: Customer;
   items?: OrderItem[];
@@ -40,7 +47,6 @@ export default function Orders() {
   const isAdmin = user?.role === 'admin';
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
   const [itemsModalOpen, setItemsModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [error, setError] = useState('');
@@ -70,6 +76,24 @@ export default function Orders() {
       fetchOrders();
     } catch {
       alert('Failed to delete order');
+    }
+  };
+
+  const handleCompletePending = async (order: Order) => {
+    if (!confirm(`Complete Pending Order #${order.id}? This will process the payment and deduct stock.`)) return;
+    try {
+      await api.patch(`/api/orders/${order.id}/status`, { status: 'completed' });
+      fetchOrders();
+    } catch (err: any) {
+      alert(`Failed to complete order: ${err.response?.data?.details || err.message}`);
+    }
+  };
+
+  const handlePrint = (order: Order) => {
+    if (order.receipt_type === 'SI') {
+      printReceipt(order, order.tin || '', order.business_address || '', order.withholding_tax_rate || 0);
+    } else {
+      printDeliveryReceipt(order, order.tin || '', order.business_address || '', order.withholding_tax_rate || 0);
     }
   };
 
@@ -109,12 +133,22 @@ export default function Orders() {
               <Eye className="w-4 h-4" />
             </button>
             <button
-              onClick={() => { setSelectedOrder(order); setInvoiceModalOpen(true); }}
+              onClick={() => handlePrint(order)}
               className="p-2 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 rounded-xl transition-colors cursor-pointer"
-              title="Print Invoice"
+              title={`Print ${order.receipt_type === 'SI' ? 'Sales Invoice' : 'Delivery Receipt'}`}
             >
               <Printer className="w-4 h-4" />
             </button>
+
+            {order.status === 'pending' && (
+              <button
+                onClick={() => handleCompletePending(order)}
+                className="p-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl transition-colors cursor-pointer"
+                title="Complete & Deduct Stock"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+              </button>
+            )}
 
             {isAdmin && (
               <button 
@@ -130,130 +164,86 @@ export default function Orders() {
       />
 
       {/* Items Modal */}
-      <Modal open={itemsModalOpen} onClose={() => setItemsModalOpen(false)} title={selectedOrder ? `Order #${selectedOrder.id} - Items` : 'Order Items'}>
+      <Modal open={itemsModalOpen} onClose={() => setItemsModalOpen(false)} title={`Order #${selectedOrder?.id || ''} Details`} maxWidth="max-w-3xl">
         {selectedOrder && (
-          <div className="max-h-[60vh] overflow-y-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs text-gray-500 uppercase">
-                  <th className="pb-3 border-b border-gray-100">Product</th>
-                  <th className="pb-3 border-b border-gray-100 text-center">Qty</th>
-                  <th className="pb-3 border-b border-gray-100 text-right">Unit Price</th>
-                  <th className="pb-3 border-b border-gray-100 text-right">Subtotal</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {selectedOrder.items?.map((item) => (
-                  <tr key={item.id} className="hover:bg-gray-50">
-                    <td className="py-3 text-gray-900 font-medium">{item.product?.name || `Product #${item.product_id}`}</td>
-                    <td className="py-3 text-gray-600 text-center">{item.quantity}</td>
-                    <td className="py-3 text-gray-600 text-right">₱{item.unit_price.toLocaleString()}</td>
-                    <td className="py-3 text-gray-900 font-bold text-right">₱{item.subtotal.toLocaleString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Modal>
-
-
-
-      {/* Invoice Modal */}
-      <Modal open={invoiceModalOpen} onClose={() => setInvoiceModalOpen(false)} title="Print Preview">
-        {selectedOrder && (
-          <div className="p-4 overflow-y-auto max-h-[80vh]">
-            <div id="printable-invoice" className="bg-white p-8 border border-gray-100 rounded-xl shadow-sm font-sans text-gray-900">
-              <div className="flex justify-between items-start mb-8 pb-8 border-b border-gray-100">
-                <div>
-                  <h1 className="text-3xl font-black text-gray-900 tracking-tighter mb-1">SM TYRE DEPOT</h1>
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">Premium Auto Care & Tyres</p>
-                </div>
-                <div className="text-right">
-                  <h2 className="text-xl font-bold text-gray-900 mb-1">INVOICE</h2>
-                  <p className="text-sm font-medium text-gray-500">#{selectedOrder.id}</p>
-                </div>
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+              <div>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Customer</p>
+                <p className="text-sm font-bold text-gray-900">{selectedOrder.customer?.name || selectedOrder.guest_name || 'Walk-In'}</p>
               </div>
-
-              <div className="grid grid-cols-2 gap-8 mb-12">
-                <div>
-                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Billed To</h3>
-                  <p className="font-bold text-gray-900">{selectedOrder.customer?.name || selectedOrder.guest_name || 'Walk-In Customer'}</p>
-                  <p className="text-sm text-gray-600">
-                    {selectedOrder.customer_id ? `Customer ID: ${selectedOrder.customer_id}` : (selectedOrder.guest_phone ? `Contact: ${selectedOrder.guest_phone}` : 'No Contact Info')}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Issued On</h3>
-                  <p className="font-bold text-gray-900">{new Date(selectedOrder.created_at).toLocaleDateString()}</p>
-                  <p className="text-sm text-gray-600">Payment: {selectedOrder.payment_method.toUpperCase()}</p>
-                </div>
+              <div>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Date</p>
+                <p className="text-sm font-bold text-gray-900">{new Date(selectedOrder.created_at).toLocaleDateString()}</p>
               </div>
+              <div>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Type</p>
+                <p className="text-sm font-bold text-gray-900">{selectedOrder.receipt_type === 'SI' ? 'Sales Invoice' : 'Delivery Receipt'}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Status</p>
+                <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-widest ${
+                  selectedOrder.status === 'completed' ? 'bg-green-100 text-green-700' : 
+                  selectedOrder.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-200 text-gray-700'
+                }`}>
+                  {selectedOrder.status}
+                </span>
+              </div>
+            </div>
 
-              <table className="w-full mb-8">
-                <thead>
-                  <tr className="text-left border-b-2 border-gray-900">
-                    <th className="py-4 text-xs font-black uppercase tracking-widest">Description</th>
-                    <th className="py-4 text-xs font-black uppercase tracking-widest text-center">Qty</th>
-                    <th className="py-4 text-xs font-black uppercase tracking-widest text-right">Price</th>
-                    <th className="py-4 text-xs font-black uppercase tracking-widest text-right">Amount</th>
+            <div className="border border-gray-100 rounded-2xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-100">
+                  <tr className="text-left">
+                    <th className="py-3 px-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Product</th>
+                    <th className="py-3 px-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Qty</th>
+                    <th className="py-3 px-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Unit Price</th>
+                    <th className="py-3 px-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Total</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {selectedOrder.items?.map((item) => (
-                    <tr key={item.id}>
-                      <td className="py-4 font-bold text-gray-900">{item.product?.name}</td>
-                      <td className="py-4 text-center font-medium">{item.quantity}</td>
-                      <td className="py-4 text-right text-gray-600">₱{item.unit_price.toLocaleString()}</td>
-                      <td className="py-4 text-right font-bold">₱{item.subtotal.toLocaleString()}</td>
+                    <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
+                      <td className="py-4 px-4 text-gray-900 font-bold">{item.product?.name || `Product #${item.product_id}`}</td>
+                      <td className="py-4 px-4 text-gray-600 text-center font-medium">{item.quantity}</td>
+                      <td className="py-4 px-4 text-gray-600 text-right">₱{item.unit_price.toLocaleString()}</td>
+                      <td className="py-4 px-4 text-gray-900 font-black text-right">₱{item.subtotal.toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-
-              <div className="flex justify-end pt-8 border-t-2 border-gray-900">
-                <div className="w-64 space-y-3">
-                  <div className="flex justify-between text-sm text-gray-500 font-medium">
-                    <span>Subtotal</span>
-                    <span>₱{selectedOrder.items?.reduce((a,c) => a + c.subtotal, 0).toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between text-lg font-black text-gray-900 pt-3 border-t border-gray-100">
-                    <span className="tracking-tighter uppercase">Total Amount</span>
-                    <span>₱{selectedOrder.total_amount.toLocaleString()}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-20 pt-8 border-t border-gray-100 text-center">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest leading-relaxed">
-                  Thank you for your business!<br/>
-                  Please keep this receipt for your records.
-                </p>
-              </div>
             </div>
 
-            <style dangerouslySetInnerHTML={{ __html: `
-              @media print {
-                body * { visibility: hidden; }
-                #printable-invoice, #printable-invoice * { visibility: visible; }
-                #printable-invoice { 
-                  position: absolute; 
-                  left: 0; 
-                  top: 0; 
-                  width: 100%; 
-                  border: none !important;
-                  box-shadow: none !important;
-                }
-              }
-            `}} />
-
-            <button 
-              onClick={() => window.print()} 
-              className="mt-6 w-full py-4 text-sm font-black text-white bg-gray-900 hover:bg-gray-800 rounded-2xl transition-all shadow-lg hover:shadow-xl active:scale-95 flex items-center justify-center gap-2"
-            >
-              <Printer className="w-4 h-4" />
-              PRINT RECEIPT
-            </button>
+            <div className="flex justify-end pt-2">
+              <div className="w-64 space-y-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500 font-medium">Subtotal</span>
+                  <span className="text-gray-900 font-bold">
+                    ₱{selectedOrder.items?.reduce((sum, item) => sum + item.subtotal, 0).toLocaleString()}
+                  </span>
+                </div>
+                {selectedOrder.discount_amount > 0 && (
+                  <div className="flex justify-between text-sm text-red-600">
+                    <span className="font-medium">Discount</span>
+                    <span className="font-bold">-₱{selectedOrder.discount_amount.toLocaleString()}</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center pt-3 border-t border-gray-100">
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Paid</span>
+                  <span className="text-2xl font-black text-gray-900 tracking-tighter">₱{selectedOrder.total_amount.toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="pt-4 border-t border-gray-100 flex justify-end">
+               <button
+                 onClick={() => handlePrint(selectedOrder)}
+                 className="px-6 py-3 bg-gray-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-800 transition-all flex items-center gap-2 cursor-pointer"
+               >
+                 <Printer className="w-4 h-4" />
+                 Print Receipt
+               </button>
+            </div>
           </div>
         )}
       </Modal>

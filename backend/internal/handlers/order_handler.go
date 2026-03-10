@@ -28,19 +28,29 @@ type orderItemInput struct {
 }
 
 type orderInput struct {
-	CustomerID     *uint            `json:"customer_id"`
-	GuestName      string           `json:"guest_name"`
-	GuestPhone     string           `json:"guest_phone"`
-	PaymentMethod  string           `json:"payment_method" binding:"required"`
-	DiscountAmount float64          `json:"discount_amount"`
-	DiscountType   string           `json:"discount_type"` // "fixed" or "percentage"
-	TaxAmount      float64          `json:"tax_amount"`
-	IsTaxInclusive bool             `json:"is_tax_inclusive"`
-	Items          []orderItemInput `json:"items" binding:"required,min=1,dive"`
+	CustomerID         *uint            `json:"customer_id"`
+	GuestName          string           `json:"guest_name"`
+	GuestPhone         string           `json:"guest_phone"`
+	ServiceAdvisorName string           `json:"service_advisor_name"`
+	PaymentMethod      string           `json:"payment_method" binding:"required"`
+	DiscountAmount     float64          `json:"discount_amount"`
+	DiscountType       string           `json:"discount_type"` // "fixed" or "percentage"
+	TaxAmount          float64          `json:"tax_amount"`
+	IsTaxInclusive     bool             `json:"is_tax_inclusive"`
+	Items              []orderItemInput `json:"items" binding:"required,min=1,dive"`
 }
 
 type statusInput struct {
 	Status string `json:"status" binding:"required,oneof=pending confirmed completed cancelled"`
+}
+
+type checkoutInput struct {
+	orderInput
+	Status             string  `json:"status" binding:"omitempty,oneof=pending completed"`
+	ReceiptType        string  `json:"receipt_type" binding:"required,oneof=SI DR"`
+	TIN                string  `json:"tin"`
+	BusinessAddress    string  `json:"business_address"`
+	WithholdingTaxRate float64 `json:"withholding_tax_rate"`
 }
 
 // List returns all orders with their items, customer, and user.
@@ -82,12 +92,18 @@ func (h *OrderHandler) GetByID(c *gin.Context) {
 }
 
 // Create creates a new order with items inside a database transaction.
-// It validates stock, calculates totals, and reduces product stock atomically.
+// It validates stock, calculates totals, and reduces product stock atomically (unless status is pending).
 func (h *OrderHandler) Create(c *gin.Context) {
-	var input orderInput
+	var input checkoutInput
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Validation failed", "details": err.Error()})
 		return
+	}
+
+	// Default status to completed if not provided
+	orderStatus := "completed"
+	if input.Status != "" {
+		orderStatus = input.Status
 	}
 
 	// Get the authenticated user ID
@@ -119,9 +135,11 @@ func (h *OrderHandler) Create(c *gin.Context) {
 				return errors.New("product ID " + strconv.Itoa(int(item.ProductID)) + " not found")
 			}
 
-			// Check stock
-			if product.Stock < item.Quantity {
-				return errors.New("insufficient stock for " + product.Name + " (available: " + strconv.Itoa(product.Stock) + ")")
+			// Check stock (only if completing immediately)
+			if orderStatus == "completed" {
+				if product.Stock < item.Quantity {
+					return errors.New("insufficient stock for " + product.Name + " (available: " + strconv.Itoa(product.Stock) + ")")
+				}
 			}
 
 			// Calculate subtotal
@@ -135,9 +153,11 @@ func (h *OrderHandler) Create(c *gin.Context) {
 				Subtotal:  subtotal,
 			})
 
-			// Reduce stock
-			if err := tx.Model(&product).Update("stock", product.Stock-item.Quantity).Error; err != nil {
-				return errors.New("failed to update stock for " + product.Name)
+			// Reduce stock only if completing
+			if orderStatus == "completed" {
+				if err := tx.Model(&product).Update("stock", product.Stock-item.Quantity).Error; err != nil {
+					return errors.New("failed to update stock for " + product.Name)
+				}
 			}
 		}
 
@@ -157,18 +177,23 @@ func (h *OrderHandler) Create(c *gin.Context) {
 
 		// Create order
 		order = models.Order{
-			CustomerID:     input.CustomerID,
-			GuestName:      input.GuestName,
-			GuestPhone:     input.GuestPhone,
-			UserID:         userID.(uint),
-			TotalAmount:    finalTotal,
-			DiscountAmount: input.DiscountAmount,
-			DiscountType:   input.DiscountType,
-			TaxAmount:      input.TaxAmount,
-			IsTaxInclusive: input.IsTaxInclusive,
-			Status:         "completed",
-			PaymentMethod:  input.PaymentMethod,
-			Items:          orderItems,
+			CustomerID:         input.CustomerID,
+			GuestName:          input.GuestName,
+			GuestPhone:         input.GuestPhone,
+			UserID:             userID.(uint),
+			ServiceAdvisorName: input.ServiceAdvisorName,
+			TotalAmount:        finalTotal,
+			DiscountAmount:     input.DiscountAmount,
+			DiscountType:       input.DiscountType,
+			TaxAmount:          input.TaxAmount,
+			IsTaxInclusive:     input.IsTaxInclusive,
+			Status:             orderStatus,
+			PaymentMethod:      input.PaymentMethod,
+			Items:              orderItems,
+			ReceiptType:        input.ReceiptType,
+			TIN:                input.TIN,
+			BusinessAddress:    input.BusinessAddress,
+			WithholdingTaxRate: input.WithholdingTaxRate,
 		}
 
 		if err := tx.Create(&order).Error; err != nil {
@@ -212,10 +237,46 @@ func (h *OrderHandler) UpdateStatus(c *gin.Context) {
 	}
 
 	oldStatus := order.Status
-	order.Status = input.Status
-	if err := database.DB.Save(&order).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update order status"})
-		return
+
+	// If transitioning from pending to completed, deduct stock
+	if oldStatus == "pending" && input.Status == "completed" {
+		err := database.DB.Transaction(func(tx *gorm.DB) error {
+			// Fetch items
+			var items []models.OrderItem
+			if err := tx.Where("order_id = ?", id).Find(&items).Error; err != nil {
+				return err
+			}
+
+			for _, item := range items {
+				var product models.Product
+				if err := tx.First(&product, item.ProductID).Error; err != nil {
+					return errors.New("product ID " + strconv.Itoa(int(item.ProductID)) + " not found")
+				}
+
+				if product.Stock < item.Quantity {
+					return errors.New("insufficient stock for " + product.Name + " to complete this order (available: " + strconv.Itoa(product.Stock) + ")")
+				}
+
+				if err := tx.Model(&product).Update("stock", product.Stock-item.Quantity).Error; err != nil {
+					return errors.New("failed to deduct stock for " + product.Name)
+				}
+			}
+
+			order.Status = input.Status
+			return tx.Save(&order).Error
+		})
+
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to complete order", "details": err.Error()})
+			return
+		}
+	} else {
+		// Just update the status normally (e.g. to cancelled)
+		order.Status = input.Status
+		if err := database.DB.Save(&order).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update order status"})
+			return
+		}
 	}
 
 	database.DB.Preload("Customer").Preload("User").Preload("Items.Product").First(&order, order.ID)

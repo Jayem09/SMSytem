@@ -27,6 +27,8 @@ type Handlers struct {
 	Supplier      *handlers.SupplierHandler
 	PurchaseOrder *handlers.PurchaseOrderHandler
 	User          *handlers.UserHandler
+	Inventory     *handlers.InventoryHandler
+	Settings      *handlers.SettingsHandler
 }
 
 // Setup configures all API routes.
@@ -81,6 +83,7 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 		customers := protected.Group("/customers")
 		{
 			customers.GET("", h.Customer.List)
+			customers.GET("/crm-stats", h.Customer.GetCRMStats)
 			customers.GET("/:id", h.Customer.GetByID)
 			customers.POST("", h.Customer.Create)
 			customers.PUT("/:id", h.Customer.Update)
@@ -92,6 +95,16 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 			orders.GET("", h.Order.List)
 			orders.GET("/:id", h.Order.GetByID)
 			orders.POST("", h.Order.Create)
+			orders.PATCH("/:id/status", h.Order.UpdateStatus)
+		}
+
+		// ─── Inventory ───
+		inventory := protected.Group("/inventory")
+		{
+			inventory.GET("/warehouses", h.Inventory.GetWarehouses)
+			inventory.GET("/levels", h.Inventory.GetStockLevels)
+			inventory.GET("/logs", h.Inventory.GetMovementLogs)
+			// Modifications require admin
 		}
 
 		// ─── Admin-only routes ───
@@ -118,7 +131,6 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 			admin.DELETE("/customers/:id", h.Customer.Delete)
 
 			// Order management
-			admin.PUT("/orders/:id/status", h.Order.UpdateStatus)
 			admin.DELETE("/orders/:id", h.Order.Delete)
 
 			// Activity Logs
@@ -134,6 +146,14 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 				expenses.POST("", h.Expense.Create)
 				expenses.PUT("/:id", h.Expense.Update)
 				expenses.DELETE("/:id", h.Expense.Delete)
+			}
+
+			// ─── Inventory (Admin only modifications) ───
+			inventoryAdmin := admin.Group("/inventory")
+			{
+				inventoryAdmin.POST("/in", h.Inventory.StockIn)
+				inventoryAdmin.POST("/out", h.Inventory.StockOut)
+				inventoryAdmin.POST("/adjust", h.Inventory.AdjustStock)
 			}
 
 			// ─── Suppliers ───
@@ -163,6 +183,13 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 				users.PUT("/:id/role", h.User.UpdateRole)
 				users.PUT("/:id/reset-password", h.User.ResetPassword)
 				users.DELETE("/:id", h.User.Delete)
+			}
+
+			// ─── Settings ───
+			settings := admin.Group("/settings")
+			{
+				settings.GET("", h.Settings.GetAll)
+				settings.POST("", h.Settings.UpdateBulk)
 			}
 		}
 	}

@@ -1,13 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import api from '../api/axios';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { AlertCircle, TrendingUp, Package, Users, ShoppingCart, PhilippinePeso } from 'lucide-react';
+import { AlertCircle, TrendingUp, Package, Users, ShoppingCart, PhilippinePeso, MoreVertical, Download } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 export default function Dashboard() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [timeRange, setTimeRange] = useState(30);
   const [stats, setStats] = useState({
     total_sales: 0,
     total_expenses: 0,  
@@ -16,8 +17,19 @@ export default function Dashboard() {
     order_count: 0,
     customer_count: 0,
     sales_trend: [] as { date: string; amount: number }[],
-    low_stock_products: [] as { id: number; name: string; stock: number }[]
+    low_stock_products: [] as { id: number; name: string; stock: number }[],
+    top_advisors_today: [] as { advisor_name: string; total_sales: number; order_count: number }[],
+    top_products_today: [] as { product_name: string; category_name: string; total_qty: number; total_sales: number }[]
   });
+  
+  const [dropdownOpen, setDropdownOpen] = useState<'advisors' | 'products' | null>(null);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => setDropdownOpen(null);
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -27,7 +39,9 @@ export default function Dashboard() {
           ...prev,
           ...res.data,
           sales_trend: res.data.sales_trend || [],
-          low_stock_products: res.data.low_stock_products || []
+          low_stock_products: res.data.low_stock_products || [],
+          top_advisors_today: res.data.top_advisors_today || [],
+          top_products_today: res.data.top_products_today || []
         }));
       } catch (err) {
         console.error('Failed to fetch dashboard stats', err);
@@ -41,6 +55,17 @@ export default function Dashboard() {
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(val);
   };
+
+  const filteredSalesTrend = useMemo(() => {
+    if (!stats.sales_trend || stats.sales_trend.length === 0) return [];
+    if (timeRange === 30) return stats.sales_trend;
+    
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - timeRange);
+    cutoff.setHours(0, 0, 0, 0); // Exact midnight cutoff
+    
+    return stats.sales_trend.filter(d => new Date(d.date) >= cutoff);
+  }, [stats.sales_trend, timeRange]);
 
   const exportToCSV = async () => {
     try {
@@ -84,6 +109,50 @@ export default function Dashboard() {
       alert('Failed to generate CSV report.');
     } finally {
       setExporting(false);
+    }
+  };
+
+  const exportLeaderboard = (type: 'advisors' | 'products') => {
+    try {
+      let headers: string[] = [];
+      let rows: string[] = [];
+      let filename = '';
+
+      if (type === 'advisors') {
+        if (!stats.top_advisors_today?.length) return alert('No advisor data to export.');
+        headers = ['Rank', 'Service Advisor', 'Total Sales (PHP)', 'Orders Completed'];
+        rows = stats.top_advisors_today.map((a, i) => [
+          (i + 1).toString(),
+          `"${a.advisor_name.replace(/"/g, '""')}"`,
+          a.total_sales.toString(),
+          a.order_count.toString()
+        ].join(','));
+        filename = `Top_Advisors_${new Date().toISOString().slice(0, 10)}.csv`;
+      } else {
+        if (!stats.top_products_today?.length) return alert('No product data to export.');
+        headers = ['Rank', 'Product Name', 'Category', 'Total Qty Sold', 'Total Sales (PHP)'];
+        rows = stats.top_products_today.map((p, i) => [
+          (i + 1).toString(),
+          `"${p.product_name.replace(/"/g, '""')}"`,
+          `"${(p.category_name || 'Uncategorized').replace(/"/g, '""')}"`,
+          p.total_qty.toString(),
+          p.total_sales.toString()
+        ].join(','));
+        filename = `Top_Products_${new Date().toISOString().slice(0, 10)}.csv`;
+      }
+
+      const csvContent = [headers.join(','), ...rows].join('\n');
+      const base64 = btoa(unescape(encodeURIComponent(csvContent)));
+      const url = `data:text/csv;charset=utf-8;base64,${base64}`;
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error('Leaderboard export failed', err);
+      alert('Failed to generate export file.');
     }
   };
 
@@ -160,16 +229,20 @@ export default function Dashboard() {
           <div className="flex items-center justify-between mb-8">
             <div>
               <h2 className="text-xl font-bold text-gray-900">Revenue Stream</h2>
-              <p className="text-sm text-gray-500">Sales performance for the last 30 days.</p>
+              <p className="text-sm text-gray-500">Sales performance for the last {timeRange} days.</p>
             </div>
-            <select className="text-xs font-bold border-gray-200 rounded-lg bg-gray-50 px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500">
-              <option>Last 30 Days</option>
-              <option>Last 7 Days</option>
+            <select 
+              className="text-xs font-bold border-gray-200 rounded-lg bg-gray-50 px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
+              value={timeRange}
+              onChange={(e) => setTimeRange(Number(e.target.value))}
+            >
+              <option value={30}>Last 30 Days</option>
+              <option value={7}>Last 7 Days</option>
             </select>
           </div>
           <div className="h-[320px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={stats.sales_trend || []}>
+              <AreaChart data={filteredSalesTrend}>
                 <defs>
                   <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15}/>
@@ -258,6 +331,110 @@ export default function Dashboard() {
               </button>
             )}
           </div>
+
+          {/* Today's Top Advisors */}
+          {user?.role === 'admin' && (
+            <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-3">
+                  <h2 className="text-xl font-bold text-gray-900">Today's Top Advisors</h2>
+                  <span className="text-[10px] font-black tracking-widest text-emerald-500 uppercase bg-emerald-50 px-2 py-1 rounded-lg">Live</span>
+                </div>
+                <div className="relative">
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setDropdownOpen(dropdownOpen === 'advisors' ? null : 'advisors'); }}
+                    className="p-1.5 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <MoreVertical className="w-5 h-5" />
+                  </button>
+                  {dropdownOpen === 'advisors' && (
+                    <div className="absolute right-0 mt-1 w-48 bg-white border border-gray-100 rounded-xl shadow-lg animate-in fade-in zoom-in-95 duration-100 z-50">
+                      <button 
+                        onClick={() => exportLeaderboard('advisors')}
+                        className="w-full text-left px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 flex items-center gap-2 first:rounded-t-xl last:rounded-b-xl"
+                      >
+                        <Download className="w-4 h-4" /> Export CSV Data
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-6">
+                {stats.top_advisors_today && stats.top_advisors_today.length > 0 ? (
+                  stats.top_advisors_today.map((advisor, i) => (
+                    <div key={i} className="flex justify-between items-center">
+                      <div className="flex items-center gap-4">
+                        <span className="text-lg font-black text-gray-300 w-4 text-center">{i + 1}</span>
+                        <div>
+                          <p className="font-bold text-gray-900 mb-0.5">{advisor.advisor_name}</p>
+                          <p className="text-xs text-gray-400 font-medium">
+                            {advisor.order_count} {advisor.order_count === 1 ? 'Sale' : 'Sales'} Completed
+                          </p>
+                        </div>
+                      </div>
+                      <span className="font-black text-gray-900">
+                        {formatCurrency(advisor.total_sales)}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm font-medium text-gray-400">No credited advisor sales yet today.</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Today's Top Products */}
+          {user?.role === 'admin' && (
+            <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-3">
+                  <h2 className="text-xl font-bold text-gray-900">Today's Top Products</h2>
+                  <span className="text-[10px] font-black tracking-widest text-emerald-500 uppercase bg-emerald-50 px-2 py-1 rounded-lg">Live</span>
+                </div>
+                <div className="relative">
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setDropdownOpen(dropdownOpen === 'products' ? null : 'products'); }}
+                    className="p-1.5 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <MoreVertical className="w-5 h-5" />
+                  </button>
+                  {dropdownOpen === 'products' && (
+                    <div className="absolute right-0 mt-1 w-48 bg-white border border-gray-100 rounded-xl shadow-lg animate-in fade-in zoom-in-95 duration-100 z-50">
+                      <button 
+                        onClick={() => exportLeaderboard('products')}
+                        className="w-full text-left px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 flex items-center gap-2 first:rounded-t-xl last:rounded-b-xl"
+                      >
+                        <Download className="w-4 h-4" /> Export CSV Data
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-6">
+                {stats.top_products_today && stats.top_products_today.length > 0 ? (
+                  stats.top_products_today.map((product, i) => (
+                    <div key={i} className="flex justify-between items-center">
+                      <div className="flex items-center gap-4">
+                        <span className="text-lg font-black text-gray-300 w-4 text-center">{i + 1}</span>
+                        <div>
+                          <p className="font-bold text-gray-900 mb-0.5 line-clamp-1">{product.product_name}</p>
+                          <p className="text-xs text-gray-400 font-medium tracking-wide">
+                            {product.category_name?.toUpperCase() || 'UNCATEGORIZED'} • {product.total_qty} Sold
+                          </p>
+                        </div>
+                      </div>
+                      <span className="font-black text-gray-900 ml-4">
+                        {formatCurrency(product.total_sales)}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm font-medium text-gray-400">No product sales yet today.</p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

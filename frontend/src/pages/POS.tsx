@@ -37,6 +37,7 @@ interface Order {
   total_amount: number;
   discount_amount: number;
   payment_method: string;
+  status: string;
   created_at: string;
   items?: OrderItem[];
   customer?: { name: string };
@@ -46,6 +47,7 @@ export default function POS() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<{ id: number; name: string }[]>([]);
   const [customers, setCustomers] = useState<{ id: number; name: string }[]>([]);
+  const [serviceAdvisors, setServiceAdvisors] = useState<string[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
@@ -55,6 +57,7 @@ export default function POS() {
   // Checkout State
   const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
   const [customerId, setCustomerId] = useState('');
+  const [serviceAdvisorName, setServiceAdvisorName] = useState('');
   const [guestName, setGuestName] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
   const [tin, setTin] = useState('');
@@ -75,14 +78,27 @@ export default function POS() {
     setLoading(true);
     setError(null);
     try {
-      const [pRes, cRes, custRes] = await Promise.all([
+      const [pRes, cRes, custRes, settingsRes] = await Promise.all([
         api.get('/api/products?all=1'),
         api.get('/api/categories'),
         api.get('/api/customers'),
+        api.get('/api/settings'),
       ]);
       setProducts(pRes.data.products || []);
       setCategories(cRes.data.categories || []);
       setCustomers(custRes.data.customers || []);
+      
+      // Parse SA list from settings
+      if (settingsRes.data?.service_advisors) {
+        try {
+          const parsed = Array.isArray(settingsRes.data.service_advisors)
+            ? settingsRes.data.service_advisors
+            : JSON.parse(settingsRes.data.service_advisors);
+          setServiceAdvisors(parsed);
+        } catch (e) {
+          console.error("Failed to parse SAs", e);
+        }
+      }
     } catch (err) {
       console.error('POS data fetch failed', err);
       setError('Failed to sync with inventory system. Please check your connection.');
@@ -129,7 +145,7 @@ export default function POS() {
   const subtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
   const finalTotal = Math.max(0, subtotal - parseFloat(discount || '0'));
 
-  const handleCheckout = async () => {
+  const handleCheckout = async (status: 'pending' | 'completed' = 'completed') => {
     if (cart.length === 0) return;
     if (receiptType === 'SI' && (!tin.trim() || !businessAddress.trim())) {
       alert('TIN and Business Address are required for a Sales Invoice (SI).');
@@ -159,8 +175,14 @@ export default function POS() {
         customer_id: customerId ? parseInt(customerId) : null,
         guest_name: !customerId ? guestName : '',
         guest_phone: !customerId ? guestPhone : '',
+        service_advisor_name: serviceAdvisorName,
         payment_method: paymentMethod,
         discount_amount: parseFloat(discount),
+        status: status,
+        receipt_type: receiptType,
+        tin: tin,
+        business_address: businessAddress,
+        withholding_tax_rate: parseFloat(withholdingTaxRate) || 0,
         items: cart.map(item => ({
           product_id: item.id,
           quantity: item.quantity
@@ -179,6 +201,7 @@ export default function POS() {
       setSuccessModalOpen(true);
       setGuestName('');
       setGuestPhone('');
+      setServiceAdvisorName('');
       setTin('');
       setBusinessAddress('');
       setWithholdingTaxRate('0');
@@ -391,109 +414,153 @@ export default function POS() {
       </div>
 
       {/* Checkout Modal */}
-      <Modal open={checkoutModalOpen} onClose={() => setCheckoutModalOpen(false)} title="Finalize Sale">
-        <div className="space-y-4">
-          <FormField
-            label="Customer"
-            type="select"
-            value={customerId}
-            onChange={setCustomerId}
-            placeholder="Search customer..."
-            options={[
-              { value: '', label: 'WALK-IN CUSTOMER' },
-              ...customers.map(c => ({ value: c.id, label: c.name.toUpperCase() }))
-            ]}
-          />
-          <div className="flex bg-gray-100 rounded-xl p-1 mb-4">
-            <button 
-              onClick={() => setReceiptType('SI')}
-              className={`flex-1 py-2 text-xs font-black tracking-widest uppercase transition-all rounded-lg ${
-                receiptType === 'SI' ? 'bg-white shadow text-indigo-600' : 'text-gray-500 hover:text-gray-900'
-              }`}
-            >
-              Sales Invoice
-            </button>
-            <button 
-              onClick={() => setReceiptType('DR')}
-              className={`flex-1 py-2 text-xs font-black tracking-widest uppercase transition-all rounded-lg ${
-                receiptType === 'DR' ? 'bg-white shadow text-indigo-600' : 'text-gray-500 hover:text-gray-900'
-              }`}
-            >
-              Delivery Receipt
-            </button>
-          </div>
-          {!customerId && (
-            <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-1 duration-200">
-              <FormField label="Guest Name" value={guestName} onChange={setGuestName} placeholder="Enter full name" />
-              <FormField label="Contact Number" value={guestPhone} onChange={setGuestPhone} placeholder="09XX XXX XXXX" />
+      <Modal open={checkoutModalOpen} onClose={() => setCheckoutModalOpen(false)} title="Finalize Sale" maxWidth="max-w-3xl">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-2">
+          {/* Left Column: Customer & Service Info */}
+          <div className="space-y-5">
+            <div>
+              <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2 mb-4">Customer Details</h3>
+              <div className="space-y-4">
+                <FormField
+                  label="Customer Identity"
+                  type="select"
+                  value={customerId}
+                  onChange={setCustomerId}
+                  placeholder="Search customer..."
+                  options={[
+                    { value: '', label: 'WALK-IN CUSTOMER' },
+                    ...customers.map(c => ({ value: c.id, label: c.name.toUpperCase() }))
+                  ]}
+                />
+                {!customerId && (
+                  <div className="grid grid-cols-2 gap-3 animate-in fade-in duration-200">
+                    <FormField label="Guest Name" value={guestName} onChange={setGuestName} placeholder="Enter full name" />
+                    <FormField label="Contact" value={guestPhone} onChange={setGuestPhone} placeholder="09XX XXX XXXX" />
+                  </div>
+                )}
+                <FormField
+                  label="Assigned Advisor (Optional)"
+                  type="select"
+                  value={serviceAdvisorName}
+                  onChange={setServiceAdvisorName}
+                  placeholder="Select a Service Advisor..."
+                  options={[
+                    { value: '', label: 'NONE SELECTED' },
+                    ...serviceAdvisors.map(sa => ({ value: sa, label: sa.toUpperCase() }))
+                  ]}
+                />
+              </div>
             </div>
-          )}
-          {receiptType === 'SI' && (
-            <>
-              <div className="grid grid-cols-2 gap-3 animate-in fade-in zoom-in-95 duration-200">
-                <FormField label="TIN" value={tin} onChange={setTin} required placeholder="000-000-000-000" />
-                <FormField label="Business Address" value={businessAddress} onChange={setBusinessAddress} required placeholder="Full business address" />
-              </div>
-              <div className="animate-in fade-in zoom-in-95 duration-200">
-                <FormField label="Withholding Tax Rate (%)" type="number" value={withholdingTaxRate} onChange={setWithholdingTaxRate} placeholder="e.g. 1, 2, 5" />
-              </div>
-            </>
-          )}
-          <div className="grid grid-cols-2 gap-3">
-             <div className="col-span-2">
-               <label className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2 block">Payment Protocol</label>
-               <div className="grid grid-cols-2 gap-2">
-                 {['cash', 'gcash', 'card', 'bank_transfer'].map(method => (
-                   <button
-                    key={method}
-                    onClick={() => setPaymentMethod(method)}
-                    className={`p-3 rounded-xl border text-[10px] font-black uppercase transition-all ${
-                      paymentMethod === method 
-                      ? 'bg-gray-900 text-white border-gray-900 shadow-lg' 
-                      : 'bg-white text-gray-500 border-gray-200 hover:border-gray-900'
+          </div>
+
+          {/* Right Column: Record & Payment Protocol */}
+          <div className="space-y-5 md:pl-6 md:border-l border-gray-100">
+             <div>
+              <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2 mb-4">Paperwork & Payment</h3>
+              <div className="space-y-4">
+                <div className="flex bg-gray-100 rounded-xl p-1">
+                  <button 
+                    onClick={() => setReceiptType('SI')}
+                    className={`flex-1 py-2 text-[10px] font-black tracking-widest uppercase transition-all rounded-lg ${
+                      receiptType === 'SI' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400 hover:text-gray-900'
                     }`}
-                   >
-                     {method.replace('_', ' ')}
-                   </button>
-                 ))}
-               </div>
-             </div>
+                  >
+                    Sales Invoice
+                  </button>
+                  <button 
+                    onClick={() => setReceiptType('DR')}
+                    className={`flex-1 py-2 text-[10px] font-black tracking-widest uppercase transition-all rounded-lg ${
+                      receiptType === 'DR' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400 hover:text-gray-900'
+                    }`}
+                  >
+                    Delivery Receipt
+                  </button>
+                </div>
+
+                {receiptType === 'SI' && (
+                  <div className="grid grid-cols-2 gap-3 animate-in fade-in zoom-in-95 duration-200 bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                    <FormField label="Tax Identification (TIN)" value={tin} onChange={setTin} required placeholder="000-000-000" />
+                    <FormField label="Withholding (%)" type="number" value={withholdingTaxRate} onChange={setWithholdingTaxRate} placeholder="0" />
+                    <div className="col-span-2">
+                      <FormField label="Business Address" value={businessAddress} onChange={setBusinessAddress} required placeholder="Full registered address" />
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">Payment Protocol</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {['cash', 'gcash', 'card', 'bank_transfer'].map(method => (
+                      <button
+                        key={method}
+                        onClick={() => setPaymentMethod(method)}
+                        className={`p-3 rounded-xl border text-[10px] font-black uppercase transition-all ${
+                          paymentMethod === method 
+                          ? 'bg-gray-900 text-white border-gray-900 shadow-md' 
+                          : 'bg-white text-gray-400 border-gray-200 hover:border-gray-900 hover:text-gray-900'
+                        }`}
+                      >
+                        {method.replace('_', ' ')}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer Actions */}
+        <div className="mt-8 pt-6 border-t border-gray-100">
+          <div className="flex items-center justify-between px-6 py-4 bg-gray-50 rounded-2xl border border-gray-100 mb-6">
+            <span className="text-[11px] font-black text-gray-500 uppercase tracking-widest">Final Amount Due</span>
+            <span className="text-4xl font-black text-gray-900 tracking-tighter">₱{finalTotal.toLocaleString()}</span>
           </div>
 
-          <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex justify-between items-center mt-6">
-            <span className="text-sm font-bold text-gray-500">Amount Due</span>
-            <span className="text-2xl font-black text-gray-900">₱{finalTotal.toLocaleString()}</span>
+          <div className="flex gap-4">
+            <button
+              onClick={() => handleCheckout('pending')}
+              disabled={isProcessingTerminal}
+              className={`w-1/3 py-5 bg-white border-2 border-gray-200 text-gray-600 rounded-2xl hover:border-gray-900 hover:text-gray-900 text-[11px] font-black uppercase tracking-widest transition-all ${
+                isProcessingTerminal ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+            >
+              SAVE PENDING
+            </button>
+            <button
+              onClick={() => handleCheckout('completed')}
+              disabled={isProcessingTerminal}
+              className={`flex-1 py-5 text-white rounded-2xl font-black text-[12px] uppercase tracking-widest transition-all shadow-xl active:scale-[0.98] ${
+                isProcessingTerminal 
+                  ? 'bg-gray-300 cursor-not-allowed shadow-none border border-transparent text-gray-500' 
+                  : 'bg-gray-900 hover:bg-black shadow-gray-200/50'
+              }`}
+            >
+              {isProcessingTerminal ? (
+                <span className="flex items-center justify-center gap-3">
+                  <div className="w-5 h-5 border-[3px] border-white/20 border-t-white rounded-full animate-spin" />
+                  WAITING ON TERMINAL
+                </span>
+              ) : (
+                'CONFIRM & PRINT'
+              )}
+            </button>
           </div>
-
-          <button
-            onClick={handleCheckout}
-            disabled={isProcessingTerminal}
-            className={`w-full mt-4 py-4 text-white rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-xl ${
-              isProcessingTerminal 
-                ? 'bg-gray-400 cursor-not-allowed' 
-                : 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-100'
-            }`}
-          >
-            {isProcessingTerminal ? (
-              <span className="flex items-center justify-center gap-2">
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                WAITING FOR TERMINAL...
-              </span>
-            ) : (
-              'CONFIRM TRANSACTION'
-            )}
-          </button>
         </div>
       </Modal>
 
       {/* Success Modal */}
-      <Modal open={successModalOpen} onClose={() => setSuccessModalOpen(false)} title="Sale Successful">
+      <Modal open={successModalOpen} onClose={() => setSuccessModalOpen(false)} title="Success">
         <div className="text-center py-6">
           <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
             <CheckCircle className="w-12 h-12 text-green-500" />
           </div>
-          <h3 className="text-2xl font-black text-gray-900 tracking-tighter mb-2 uppercase">Transaction Recorded</h3>
-          <p className="text-gray-500 text-sm font-medium mb-8">Order #{lastOrder?.id} has been processed and stock updated.</p>
+          <h3 className="text-2xl font-black text-gray-900 tracking-tighter mb-2 uppercase">
+            Order {lastOrder?.status === 'pending' ? 'Saved' : 'Recorded'}
+          </h3>
+          <p className="text-gray-500 text-sm font-medium mb-8">
+            Order #{lastOrder?.id} has been {lastOrder?.status === 'pending' ? 'saved as pending.' : 'processed and stock updated.'}
+          </p>
           
           <div className="grid grid-cols-2 gap-3 mb-4">
             <button
