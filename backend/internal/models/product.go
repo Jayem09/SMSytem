@@ -20,8 +20,9 @@ type Product struct {
 	CategoryID  uint    `gorm:"index" json:"category_id"`
 	BrandID     uint    `gorm:"index" json:"brand_id"`
 
-	// Industry Specific (Mags & Tires)
-	PCD         string `gorm:"size:50" json:"pcd"`          // e.g. "5x114.3"
+	// Industry Specific & Services
+	IsService   bool   `gorm:"not null;default:false" json:"is_service"`
+	PCD         string `gorm:"size:50" json:"pcd"`
 	OffsetET    string `gorm:"size:20" json:"offset_et"`    // e.g. "ET45"
 	Width       string `gorm:"size:20" json:"width"`        // e.g. "8.5J"
 	Bore        string `gorm:"size:20" json:"bore"`         // Center bore e.g. "73.1"

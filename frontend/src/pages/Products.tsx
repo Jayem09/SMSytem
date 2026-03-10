@@ -13,6 +13,7 @@ interface Product {
   description: string;
   price: number;
   stock: number;
+  is_service?: boolean; // Label as service Item
   size?: string;
   parent_id?: number;
   category_id: number;
@@ -54,6 +55,7 @@ export default function Products() {
   const [parentId, setParentId] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [brandId, setBrandId] = useState('');
+  const [isService, setIsService] = useState(false);
 
   // Tech Specs State
   const [pcd, setPcd] = useState('');
@@ -118,6 +120,7 @@ export default function Products() {
     setName(''); setDescription(''); setPrice(''); setStock('0');
     setSize(''); setParentId('');
     setCategoryId(''); setBrandId('');
+    setIsService(false);
     // Reset Specs
     setPcd(''); setOffsetEt(''); setWidth(''); setBore(''); setFinish('');
     setSpeedRating(''); setLoadIndex(''); setDotCode(''); setPlyRating('');
@@ -135,6 +138,7 @@ export default function Products() {
     setParentId(p.parent_id ? String(p.parent_id) : '');
     setCategoryId(String(p.category_id));
     setBrandId(String(p.brand_id));
+    setIsService(!!p.is_service);
     // Populate Specs
     setPcd(p.pcd || ''); setOffsetEt(p.offset_et || ''); setWidth(p.width || '');
     setBore(p.bore || ''); setFinish(p.finish || ''); setSpeedRating(p.speed_rating || '');
@@ -155,6 +159,7 @@ export default function Products() {
       parent_id: parentId ? parseInt(parentId) : null,
       category_id: parseInt(categoryId),
       brand_id: parseInt(brandId),
+      is_service: isService,
       pcd,
       offset_et: offsetEt,
       width,
@@ -274,6 +279,7 @@ export default function Products() {
           )},
           { key: 'category', label: 'Category', render: (p) => p.category?.name || '--' },
           { key: 'brand', label: 'Brand', render: (p) => p.brand?.name || '--' },
+          { key: 'type', label: 'Type', render: (p) => p.is_service ? <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded text-[10px] font-black uppercase tracking-widest">Service</span> : <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-[10px] font-black uppercase tracking-widest">Item</span> },
           // Dynamic Columns based on filter
           ...(categories.find(c => String(c.id) === filterCategory)?.name?.toLowerCase()?.includes('mags') ? [
             { key: 'pcd', label: 'PCD', render: (p: Product) => p.pcd || '--' },
@@ -286,6 +292,7 @@ export default function Products() {
           ] : []),
           { key: 'price', label: 'Price', render: (p) => `P ${p.price.toLocaleString()}` },
           { key: 'stock', label: 'Stock', render: (p) => (
+            p.is_service ? <span className="text-gray-400 font-bold">N/A</span> :
             <span className={p.stock <= 5 ? 'text-red-600 font-medium' : ''}>{p.stock}</span>
           )},
         ]}
@@ -306,9 +313,12 @@ export default function Products() {
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-4">
               <FormField label="Description" type="textarea" value={description} onChange={setDescription} />
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3 items-end">
                 <FormField label="Price" type="number" value={price} onChange={setPrice} required min={0} step="0.01" />
-                <FormField label="Stock" type="number" value={stock} onChange={setStock} required min={0} />
+                
+                {!isService && (
+                  <FormField label="Stock" type="number" value={stock} onChange={setStock} required min={0} />
+                )}
               </div>
             </div>
             <div className="space-y-4">
@@ -343,11 +353,24 @@ export default function Products() {
                   options={brands.map((b) => ({ value: b.id, label: b.name }))}
                 />
               </div>
+
+              <div className="mt-4 flex items-center gap-2">
+                 <input 
+                   type="checkbox" 
+                   id="isServiceToggle"
+                   checked={isService}
+                   onChange={(e) => setIsService(e.target.checked)}
+                   className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+                 />
+                 <label htmlFor="isServiceToggle" className="text-sm font-medium text-gray-700 select-none cursor-pointer">
+                   This is a Service / Labor Item (No stock tracking)
+                 </label>
+              </div>
             </div>
           </div>
 
           {/* Dynamic Technical Specs */}
-          {categories.find(c => String(c.id) === categoryId)?.name?.toLowerCase()?.includes('tire') && (
+          {!isService && categories.find(c => String(c.id) === categoryId)?.name?.toLowerCase()?.includes('tire') && (
             <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-4">
               <p className="text-xs font-black text-gray-400 mb-4 uppercase tracking-[0.2em]">Tire Specifications</p>
               <div className="grid grid-cols-4 gap-4">
@@ -359,7 +382,7 @@ export default function Products() {
             </div>
           )}
 
-          {categories.find(c => String(c.id) === categoryId)?.name?.toLowerCase()?.includes('mags') && (
+          {!isService && categories.find(c => String(c.id) === categoryId)?.name?.toLowerCase()?.includes('mags') && (
             <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-4">
               <p className="text-xs font-black text-gray-400 mb-4 uppercase tracking-[0.2em]">Mags Specifications</p>
               <div className="grid grid-cols-2 gap-6">

@@ -136,7 +136,7 @@ func (h *OrderHandler) Create(c *gin.Context) {
 			}
 
 			// Check stock (only if completing immediately)
-			if orderStatus == "completed" {
+			if orderStatus == "completed" && !product.IsService {
 				if product.Stock < item.Quantity {
 					return errors.New("insufficient stock for " + product.Name + " (available: " + strconv.Itoa(product.Stock) + ")")
 				}
@@ -154,7 +154,7 @@ func (h *OrderHandler) Create(c *gin.Context) {
 			})
 
 			// Reduce stock only if completing
-			if orderStatus == "completed" {
+			if orderStatus == "completed" && !product.IsService {
 				if err := tx.Model(&product).Update("stock", product.Stock-item.Quantity).Error; err != nil {
 					return errors.New("failed to update stock for " + product.Name)
 				}
@@ -253,12 +253,14 @@ func (h *OrderHandler) UpdateStatus(c *gin.Context) {
 					return errors.New("product ID " + strconv.Itoa(int(item.ProductID)) + " not found")
 				}
 
-				if product.Stock < item.Quantity {
-					return errors.New("insufficient stock for " + product.Name + " to complete this order (available: " + strconv.Itoa(product.Stock) + ")")
-				}
+				if !product.IsService {
+					if product.Stock < item.Quantity {
+						return errors.New("insufficient stock for " + product.Name + " to complete this order (available: " + strconv.Itoa(product.Stock) + ")")
+					}
 
-				if err := tx.Model(&product).Update("stock", product.Stock-item.Quantity).Error; err != nil {
-					return errors.New("failed to deduct stock for " + product.Name)
+					if err := tx.Model(&product).Update("stock", product.Stock-item.Quantity).Error; err != nil {
+						return errors.New("failed to deduct stock for " + product.Name)
+					}
 				}
 			}
 

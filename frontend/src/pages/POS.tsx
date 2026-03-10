@@ -11,6 +11,7 @@ interface Product {
   name: string;
   price: number;
   stock: number;
+  is_service?: boolean;
   image_url?: string;
   category_id: number;
   category?: { name: string };
@@ -112,7 +113,7 @@ export default function POS() {
   }, []);
 
   const addToCart = (product: Product) => {
-    if (product.stock <= 0) return;
+    if (!product.is_service && product.stock <= 0) return;
     
     setCart((prev) => {
       const existing = prev.find((item) => item.id === product.id);
@@ -134,7 +135,8 @@ export default function POS() {
     setCart((prev) =>
       prev.map((item) => {
         if (item.id === productId) {
-          const newQty = Math.max(1, Math.min(item.quantity + delta, item.stock));
+          const maxQty = item.is_service ? 999 : item.stock;
+          const newQty = Math.max(1, Math.min(item.quantity + delta, maxQty));
           return { ...item, quantity: newQty };
         }
         return item;
@@ -296,9 +298,9 @@ export default function POS() {
                 <button
                   key={p.id}
                   onClick={() => addToCart(p)}
-                  disabled={p.stock <= 0}
+                  disabled={!p.is_service && p.stock <= 0}
                   className={`flex flex-col text-left bg-white rounded-2xl border transition-all active:scale-95 group relative overflow-hidden ${
-                    p.stock <= 0 
+                    (!p.is_service && p.stock <= 0) 
                     ? 'opacity-60 cursor-not-allowed border-gray-200' 
                     : 'border-gray-100 hover:border-gray-900 shadow-sm hover:shadow-md'
                   }`}
@@ -306,14 +308,20 @@ export default function POS() {
                   <div className="p-4 flex-1">
                     <div className="flex items-start justify-between mb-2">
                       <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{p.category?.name}</span>
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${p.stock <= 5 ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
-                        STK: {p.stock}
-                      </span>
+                      {p.is_service ? (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-50 text-purple-600">
+                          SERVICE
+                        </span>
+                      ) : (
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${p.stock <= 5 ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+                          STK: {p.stock}
+                        </span>
+                      )}
                     </div>
                     <h3 className="text-sm font-bold text-gray-900 leading-tight mb-1 line-clamp-2">{p.name}</h3>
                     <p className="text-lg font-black text-indigo-600">₱{p.price.toLocaleString()}</p>
                   </div>
-                  {p.stock <= 0 && (
+                  {!p.is_service && p.stock <= 0 && (
                     <div className="absolute inset-0 bg-white/40 backdrop-blur-[1px] flex items-center justify-center">
                       <span className="bg-red-600 text-white text-[10px] font-black px-2 py-1 rounded-lg shadow-xl">OUT OF STOCK</span>
                     </div>

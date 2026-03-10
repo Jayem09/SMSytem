@@ -18,6 +18,7 @@ interface Expense {
 interface Product {
   id: number;
   name: string;
+  is_service?: boolean;
 }
 
 export default function Expenses() {

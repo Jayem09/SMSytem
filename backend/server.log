@@ -1213,3 +1213,143 @@ ORDER BY
 2026/03/10 11:20:13 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/dashboard_handler.go:78
 [0m[33m[0.596ms] [34;1m[rows:2][0m SELECT products.name as product_name, categories.name as category_name, SUM(order_items.quantity) as total_qty, SUM(order_items.subtotal) as total_sales FROM `order_items` JOIN orders ON orders.id = order_items.order_id JOIN products ON products.id = order_items.product_id LEFT JOIN categories ON categories.id = products.category_id WHERE DATE(orders.created_at) = CURDATE() GROUP BY `products`.`id` ORDER BY total_qty DESC LIMIT 5
 [GIN] 2026/03/10 - 11:20:13 | 200 |    5.382791ms |             ::1 | GET      "/api/dashboard"
+
+2026/03/10 11:33:46 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/customer_handler.go:155
+[0m[33m[16.278ms] [34;1m[rows:1][0m SELECT count(*) FROM `customers`
+
+2026/03/10 11:33:46 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/customer_handler.go:175
+[0m[33m[7.625ms] [34;1m[rows:0][0m SELECT customers.id, customers.name, customers.email, customers.phone, SUM(orders.total_amount) as total_spent, count(orders.id) as order_count, MAX(orders.created_at) as last_payment FROM `customers` JOIN orders ON orders.customer_id = customers.id WHERE orders.status = 'completed' GROUP BY `customers`.`id` ORDER BY total_spent DESC LIMIT 5
+
+2026/03/10 11:33:46 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/customer_handler.go:186
+[0m[33m[2.958ms] [34;1m[rows:0][0m SELECT customers.id, customers.name, customers.email, customers.phone, SUM(orders.total_amount) as total_spent, count(orders.id) as order_count, MAX(orders.created_at) as last_payment FROM `customers` JOIN orders ON orders.customer_id = customers.id WHERE orders.status = 'completed' AND orders.created_at >= '2026-02-08 11:33:46.01' GROUP BY `customers`.`id` ORDER BY last_payment DESC
+
+2026/03/10 11:33:46 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/customer_handler.go:198
+[0m[33m[1.708ms] [34;1m[rows:0][0m SELECT customers.id, customers.name, customers.email, customers.phone, SUM(orders.total_amount) as total_spent, count(orders.id) as order_count, MAX(orders.created_at) as last_payment FROM `customers` JOIN orders ON orders.customer_id = customers.id WHERE orders.status = 'completed' GROUP BY `customers`.`id` HAVING MAX(orders.created_at) < '2026-01-09 11:33:46.013' ORDER BY last_payment DESC
+
+2026/03/10 11:33:46 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/customer_handler.go:213
+[0m[33m[6.813ms] [34;1m[rows:1][0m SELECT categories.name as category, COUNT(order_items.id) as count FROM `order_items` JOIN products ON order_items.product_id = products.id JOIN categories ON products.category_id = categories.id GROUP BY `categories`.`id` ORDER BY count DESC LIMIT 5
+[GIN] 2026/03/10 - 11:33:46 | 200 |   41.922667ms |             ::1 | GET      "/api/customers/crm-stats"
+
+2026/03/10 11:33:46 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/customer_handler.go:155
+[0m[33m[0.387ms] [34;1m[rows:1][0m SELECT count(*) FROM `customers`
+
+2026/03/10 11:33:46 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/customer_handler.go:175
+[0m[33m[1.229ms] [34;1m[rows:0][0m SELECT customers.id, customers.name, customers.email, customers.phone, SUM(orders.total_amount) as total_spent, count(orders.id) as order_count, MAX(orders.created_at) as last_payment FROM `customers` JOIN orders ON orders.customer_id = customers.id WHERE orders.status = 'completed' GROUP BY `customers`.`id` ORDER BY total_spent DESC LIMIT 5
+
+2026/03/10 11:33:46 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/customer_handler.go:186
+[0m[33m[1.200ms] [34;1m[rows:0][0m SELECT customers.id, customers.name, customers.email, customers.phone, SUM(orders.total_amount) as total_spent, count(orders.id) as order_count, MAX(orders.created_at) as last_payment FROM `customers` JOIN orders ON orders.customer_id = customers.id WHERE orders.status = 'completed' AND orders.created_at >= '2026-02-08 11:33:46.026' GROUP BY `customers`.`id` ORDER BY last_payment DESC
+
+2026/03/10 11:33:46 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/customer_handler.go:198
+[0m[33m[0.663ms] [34;1m[rows:0][0m SELECT customers.id, customers.name, customers.email, customers.phone, SUM(orders.total_amount) as total_spent, count(orders.id) as order_count, MAX(orders.created_at) as last_payment FROM `customers` JOIN orders ON orders.customer_id = customers.id WHERE orders.status = 'completed' GROUP BY `customers`.`id` HAVING MAX(orders.created_at) < '2026-01-09 11:33:46.028' ORDER BY last_payment DESC
+
+2026/03/10 11:33:46 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/customer_handler.go:213
+[0m[33m[0.994ms] [34;1m[rows:1][0m SELECT categories.name as category, COUNT(order_items.id) as count FROM `order_items` JOIN products ON order_items.product_id = products.id JOIN categories ON products.category_id = categories.id GROUP BY `categories`.`id` ORDER BY count DESC LIMIT 5
+[GIN] 2026/03/10 - 11:33:46 | 200 |    4.770125ms |             ::1 | GET      "/api/customers/crm-stats"
+
+2026/03/10 11:33:50 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/customer_handler.go:41
+[0m[33m[7.540ms] [34;1m[rows:0][0m SELECT * FROM `customers` ORDER BY name ASC
+[GIN] 2026/03/10 - 11:33:50 | 200 |    7.743708ms |             ::1 | GET      "/api/customers"
+
+2026/03/10 11:33:50 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/customer_handler.go:41
+[0m[33m[0.853ms] [34;1m[rows:0][0m SELECT * FROM `customers` ORDER BY name ASC
+[GIN] 2026/03/10 - 11:33:50 | 200 |      986.25µs |             ::1 | GET      "/api/customers"
+
+2026/03/10 11:33:50 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/customer_handler.go:41
+[0m[33m[2.923ms] [34;1m[rows:0][0m SELECT * FROM `customers` ORDER BY name ASC
+[GIN] 2026/03/10 - 11:33:50 | 200 |     3.28175ms |             ::1 | GET      "/api/customers"
+
+2026/03/10 11:33:59 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/log_handler.go:20
+[0m[33m[2.954ms] [34;1m[rows:3][0m SELECT * FROM `users` WHERE `users`.`id` IN (2,9,8) AND `users`.`deleted_at` IS NULL
+
+2026/03/10 11:33:59 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/log_handler.go:20
+[0m[33m[17.714ms] [34;1m[rows:33][0m SELECT * FROM `activity_logs` WHERE `activity_logs`.`deleted_at` IS NULL ORDER BY created_at DESC LIMIT 100
+[GIN] 2026/03/10 - 11:33:59 | 200 |   18.826375ms |             ::1 | GET      "/api/logs"
+
+2026/03/10 11:33:59 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/log_handler.go:20
+[0m[33m[2.017ms] [34;1m[rows:3][0m SELECT * FROM `users` WHERE `users`.`id` IN (2,9,8) AND `users`.`deleted_at` IS NULL
+
+2026/03/10 11:33:59 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/log_handler.go:20
+[0m[33m[4.870ms] [34;1m[rows:33][0m SELECT * FROM `activity_logs` WHERE `activity_logs`.`deleted_at` IS NULL ORDER BY created_at DESC LIMIT 100
+[GIN] 2026/03/10 - 11:33:59 | 200 |    5.191209ms |             ::1 | GET      "/api/logs"
+
+2026/03/10 11:34:01 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/user_handler.go:35
+[0m[33m[1.897ms] [34;1m[rows:3][0m SELECT * FROM `users` WHERE `users`.`deleted_at` IS NULL ORDER BY id desc
+[GIN] 2026/03/10 - 11:34:01 | 200 |       2.559ms |             ::1 | GET      "/api/users"
+
+2026/03/10 11:34:01 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/user_handler.go:35
+[0m[33m[1.109ms] [34;1m[rows:3][0m SELECT * FROM `users` WHERE `users`.`deleted_at` IS NULL ORDER BY id desc
+[GIN] 2026/03/10 - 11:34:01 | 200 |    1.326958ms |             ::1 | GET      "/api/users"
+
+2026/03/10 11:40:27 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/brand_handler.go:31
+[0m[33m[23.243ms] [34;1m[rows:138][0m SELECT * FROM `brands` ORDER BY name ASC
+[GIN] 2026/03/10 - 11:40:27 | 200 |   34.621916ms |             ::1 | GET      "/api/brands"
+
+2026/03/10 11:40:27 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/category_handler.go:31
+[0m[33m[26.654ms] [34;1m[rows:1][0m SELECT * FROM `categories` ORDER BY name ASC
+[GIN] 2026/03/10 - 11:40:27 | 200 |   35.056292ms |             ::1 | GET      "/api/categories"
+
+2026/03/10 11:40:27 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/category_handler.go:31
+[0m[33m[0.924ms] [34;1m[rows:1][0m SELECT * FROM `categories` ORDER BY name ASC
+[GIN] 2026/03/10 - 11:40:27 | 200 |    1.624583ms |             ::1 | GET      "/api/categories"
+
+2026/03/10 11:40:27 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/brand_handler.go:31
+[0m[33m[1.619ms] [34;1m[rows:138][0m SELECT * FROM `brands` ORDER BY name ASC
+[GIN] 2026/03/10 - 11:40:27 | 200 |    2.884167ms |             ::1 | GET      "/api/brands"
+
+2026/03/10 11:40:27 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/product_handler.go:87
+[0m[33m[1.631ms] [34;1m[rows:138][0m SELECT * FROM `brands` WHERE `brands`.`id` IN (138,137,136,135,134,133,132,131,130,129,128,127,126,125,124,123,122,121,120,119,118,117,116,115,114,113,112,111,110,109,108,107,106,105,104,103,102,101,100,99,98,97,96,95,94,93,92,91,90,89,88,87,86,85,84,83,82,81,80,79,78,77,76,75,74,73,72,71,70,69,68,67,66,65,64,63,62,61,60,59,58,57,56,55,54,53,52,51,50,49,48,47,46,45,44,43,42,41,40,39,38,37,36,35,34,33,32,31,30,29,28,27,26,25,24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1)
+
+2026/03/10 11:40:27 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/product_handler.go:87
+[0m[33m[0.587ms] [34;1m[rows:1][0m SELECT * FROM `categories` WHERE `categories`.`id` = 1
+
+2026/03/10 11:40:27 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/product_handler.go:87
+[0m[33m[71.133ms] [34;1m[rows:2113][0m SELECT * FROM `products` WHERE `products`.`deleted_at` IS NULL ORDER BY created_at DESC
+[GIN] 2026/03/10 - 11:40:27 | 200 |   86.199125ms |             ::1 | GET      "/api/products?all=1"
+
+2026/03/10 11:40:27 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/product_handler.go:87
+[0m[33m[1.585ms] [34;1m[rows:138][0m SELECT * FROM `brands` WHERE `brands`.`id` IN (138,137,136,135,134,133,132,131,130,129,128,127,126,125,124,123,122,121,120,119,118,117,116,115,114,113,112,111,110,109,108,107,106,105,104,103,102,101,100,99,98,97,96,95,94,93,92,91,90,89,88,87,86,85,84,83,82,81,80,79,78,77,76,75,74,73,72,71,70,69,68,67,66,65,64,63,62,61,60,59,58,57,56,55,54,53,52,51,50,49,48,47,46,45,44,43,42,41,40,39,38,37,36,35,34,33,32,31,30,29,28,27,26,25,24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1)
+
+2026/03/10 11:40:27 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/product_handler.go:87
+[0m[33m[0.864ms] [34;1m[rows:1][0m SELECT * FROM `categories` WHERE `categories`.`id` = 1
+
+2026/03/10 11:40:27 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/product_handler.go:87
+[0m[33m[23.670ms] [34;1m[rows:2113][0m SELECT * FROM `products` WHERE `products`.`deleted_at` IS NULL ORDER BY created_at DESC
+[GIN] 2026/03/10 - 11:40:27 | 200 |   30.708166ms |             ::1 | GET      "/api/products?all=1"
+
+2026/03/10 11:40:27 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/product_handler.go:87
+[0m[33m[1.130ms] [34;1m[rows:138][0m SELECT * FROM `brands` WHERE `brands`.`id` IN (138,137,136,135,134,133,132,131,130,129,128,127,126,125,124,123,122,121,120,119,118,117,116,115,114,113,112,111,110,109,108,107,106,105,104,103,102,101,100,99,98,97,96,95,94,93,92,91,90,89,88,87,86,85,84,83,82,81,80,79,78,77,76,75,74,73,72,71,70,69,68,67,66,65,64,63,62,61,60,59,58,57,56,55,54,53,52,51,50,49,48,47,46,45,44,43,42,41,40,39,38,37,36,35,34,33,32,31,30,29,28,27,26,25,24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1)
+
+2026/03/10 11:40:27 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/product_handler.go:87
+[0m[33m[0.634ms] [34;1m[rows:1][0m SELECT * FROM `categories` WHERE `categories`.`id` = 1
+
+2026/03/10 11:40:27 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/product_handler.go:87
+[0m[33m[17.904ms] [34;1m[rows:2113][0m SELECT * FROM `products` WHERE `products`.`deleted_at` IS NULL ORDER BY created_at DESC
+[GIN] 2026/03/10 - 11:40:27 | 200 |     25.1825ms |             ::1 | GET      "/api/products?all=1"
+
+2026/03/10 11:40:56 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/category_handler.go:31
+[0m[33m[14.024ms] [34;1m[rows:1][0m SELECT * FROM `categories` ORDER BY name ASC
+[GIN] 2026/03/10 - 11:40:56 | 200 |   15.344167ms |             ::1 | GET      "/api/categories"
+
+2026/03/10 11:40:56 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/brand_handler.go:31
+[0m[33m[15.952ms] [34;1m[rows:138][0m SELECT * FROM `brands` ORDER BY name ASC
+[GIN] 2026/03/10 - 11:40:56 | 200 |   16.948125ms |             ::1 | GET      "/api/brands"
+
+2026/03/10 11:40:56 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/product_handler.go:87
+[0m[33m[1.231ms] [34;1m[rows:138][0m SELECT * FROM `brands` WHERE `brands`.`id` IN (138,137,136,135,134,133,132,131,130,129,128,127,126,125,124,123,122,121,120,119,118,117,116,115,114,113,112,111,110,109,108,107,106,105,104,103,102,101,100,99,98,97,96,95,94,93,92,91,90,89,88,87,86,85,84,83,82,81,80,79,78,77,76,75,74,73,72,71,70,69,68,67,66,65,64,63,62,61,60,59,58,57,56,55,54,53,52,51,50,49,48,47,46,45,44,43,42,41,40,39,38,37,36,35,34,33,32,31,30,29,28,27,26,25,24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1)
+
+2026/03/10 11:40:56 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/product_handler.go:87
+[0m[33m[0.587ms] [34;1m[rows:1][0m SELECT * FROM `categories` WHERE `categories`.`id` = 1
+
+2026/03/10 11:40:56 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/product_handler.go:87
+[0m[33m[50.069ms] [34;1m[rows:2113][0m SELECT * FROM `products` WHERE `products`.`deleted_at` IS NULL ORDER BY created_at DESC
+[GIN] 2026/03/10 - 11:40:56 | 200 |   56.436084ms |             ::1 | GET      "/api/products?all=1"
+
+2026/03/10 11:40:57 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/product_handler.go:87
+[0m[33m[0.949ms] [34;1m[rows:138][0m SELECT * FROM `brands` WHERE `brands`.`id` IN (138,137,136,135,134,133,132,131,130,129,128,127,126,125,124,123,122,121,120,119,118,117,116,115,114,113,112,111,110,109,108,107,106,105,104,103,102,101,100,99,98,97,96,95,94,93,92,91,90,89,88,87,86,85,84,83,82,81,80,79,78,77,76,75,74,73,72,71,70,69,68,67,66,65,64,63,62,61,60,59,58,57,56,55,54,53,52,51,50,49,48,47,46,45,44,43,42,41,40,39,38,37,36,35,34,33,32,31,30,29,28,27,26,25,24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1)
+
+2026/03/10 11:40:57 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/product_handler.go:87
+[0m[33m[0.453ms] [34;1m[rows:1][0m SELECT * FROM `categories` WHERE `categories`.`id` = 1
+
+2026/03/10 11:40:57 [32m/Users/dinglasanefren/Desktop/SMSytem/backend/internal/handlers/product_handler.go:87
+[0m[33m[21.405ms] [34;1m[rows:2113][0m SELECT * FROM `products` WHERE `products`.`deleted_at` IS NULL ORDER BY created_at DESC
+[GIN] 2026/03/10 - 11:40:57 | 200 |   28.282375ms |             ::1 | GET      "/api/products?all=1"

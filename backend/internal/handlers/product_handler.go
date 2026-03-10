@@ -41,6 +41,8 @@ type productInput struct {
 	LoadIndex   string `json:"load_index"`
 	DOTCode     string `json:"dot_code"`
 	PlyRating   string `json:"ply_rating"`
+
+	IsService bool `json:"is_service"`
 }
 
 // List returns all products with optional filters.
@@ -148,6 +150,7 @@ func (h *ProductHandler) Create(c *gin.Context) {
 		LoadIndex:   input.LoadIndex,
 		DOTCode:     input.DOTCode,
 		PlyRating:   input.PlyRating,
+		IsService:   input.IsService,
 	}
 
 	if err := database.DB.Create(&product).Error; err != nil {
@@ -205,6 +208,7 @@ func (h *ProductHandler) Update(c *gin.Context) {
 	product.LoadIndex = input.LoadIndex
 	product.DOTCode = input.DOTCode
 	product.PlyRating = input.PlyRating
+	product.IsService = input.IsService
 
 	if err := database.DB.Save(&product).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update product"})
