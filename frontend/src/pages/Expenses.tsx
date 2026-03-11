@@ -23,6 +23,7 @@ interface Product {
 
 export default function Expenses() {
   const { user } = useAuth();
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,7 +87,7 @@ export default function Expenses() {
           <h1 className="text-2xl font-semibold text-gray-900">Expenses</h1>
           <p className="text-sm text-gray-500">Manage your overhead costs and business spending.</p>
         </div>
-        {user?.role === 'admin' && (
+        {isAdmin && (
           <button
             onClick={() => setIsModalOpen(true)}
             className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 rounded-md cursor-pointer"

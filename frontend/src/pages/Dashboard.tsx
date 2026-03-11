@@ -6,6 +6,7 @@ import { useAuth } from '../hooks/useAuth';
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [timeRange, setTimeRange] = useState(30);
@@ -204,7 +205,7 @@ export default function Dashboard() {
       )}
 
       {/* Key Metrics Grid - Admin Only */}
-      {user?.role === 'admin' && (
+      {isAdmin && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         {[
           { label: 'Total Sales', value: stats.total_sales, color: 'blue', icon:PhilippinePeso, trend: '+12%' },
@@ -231,7 +232,7 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         {/* Sales Chart - Admin Only */}
-        {user?.role === 'admin' && (
+        {isAdmin && (
         <div className="lg:col-span-2 bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
           <div className="flex items-center justify-between mb-8">
             <div>
@@ -324,7 +325,7 @@ export default function Dashboard() {
             </div>
             <h2 className="text-xl font-bold mb-2 relative z-10">Export Data</h2>
             <p className="text-sm text-gray-400 mb-6 relative z-10">Generate professional CSV reports for external auditing.</p>
-            {user?.role === 'admin' ? (
+            {isAdmin ? (
               <button 
                 onClick={exportToCSV}
                 disabled={exporting}
@@ -340,7 +341,7 @@ export default function Dashboard() {
           </div>
 
           {/* Today's Top Advisors */}
-          {user?.role === 'admin' && (
+          {isAdmin && (
             <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
               <div className="flex items-center justify-between mb-8">
                 <div className="flex items-center gap-3">
@@ -392,7 +393,7 @@ export default function Dashboard() {
           )}
 
           {/* Today's Top Products */}
-          {user?.role === 'admin' && (
+          {isAdmin && (
             <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
               <div className="flex items-center justify-between mb-8">
                 <div className="flex items-center gap-3">

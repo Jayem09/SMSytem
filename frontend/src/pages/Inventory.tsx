@@ -42,7 +42,7 @@ interface MovementLog {
 
 export default function Inventory() {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const [activeTab, setActiveTab] = useState<'levels' | 'in' | 'out' | 'logs'>('levels');
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   
