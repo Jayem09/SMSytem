@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import api from '../api/axios';
+import * as XLSX from 'xlsx';
 import { 
   Package, 
   ArrowDownToLine, 
@@ -8,12 +9,21 @@ import {
   History,
   AlertOctagon,
   Search,
-  Warehouse
+  Warehouse,
+  MoreVertical,
+  FileDown,
+  X
 } from 'lucide-react';
 
 interface Warehouse {
   id: number;
   name: string;
+}
+
+interface Product {
+  id: number;
+  name: string;
+  size: string;
 }
 
 interface StockLevel {
@@ -29,6 +39,7 @@ interface StockLevel {
 
 interface MovementLog {
   id: number;
+  batch_id: number;
   product_id: number;
   warehouse_id: number;
   type: string;
@@ -40,11 +51,21 @@ interface MovementLog {
   user: { name: string } | null;
 }
 
+// Input for creating PO items
+interface ItemInput {
+  product_id: number;
+  quantity: number;
+  unit_cost: number;
+}
+
 export default function Inventory() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const [activeTab, setActiveTab] = useState<'levels' | 'in' | 'out' | 'logs'>('levels');
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [productSearch, setProductSearch] = useState('');
   
   // Data states
   const [stockLevels, setStockLevels] = useState<StockLevel[]>([]);
@@ -53,19 +74,40 @@ export default function Inventory() {
   
   // Form states
   const [search, setSearch] = useState('');
-  const [productId, setProductId] = useState('');
+  const [supplierId, setSupplierId] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
-  const [quantity, setQuantity] = useState('');
   const [reference, setReference] = useState('');
+  
+  // Stock In (PO) specific states
+  const [items, setItems] = useState<ItemInput[]>([{ product_id: 0, quantity: 1, unit_cost: 0 }]);
+  const [orderDate, setOrderDate] = useState(new Date().toISOString().split('T')[0]);
+
+  // Stock Out specific states
+  const [productId, setProductId] = useState('');
+  const [quantity, setQuantity] = useState('');
   const [batchNumber, setBatchNumber] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
   const [submitError, setSubmitError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // Kebab menu & edit modal state
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+  const [editLog, setEditLog] = useState<MovementLog | null>(null);
+  const [editQty, setEditQty] = useState('');
+  const [editRef, setEditRef] = useState('');
+  const [editError, setEditError] = useState('');
+  const [editSubmitting, setEditSubmitting] = useState(false);
+
   useEffect(() => {
     fetchWarehouses();
+    fetchSuppliers();
+    fetchProducts('');
   }, []);
+
+  useEffect(() => {
+    fetchProducts(productSearch);
+  }, [productSearch]);
 
   useEffect(() => {
     if (activeTab === 'levels') fetchStockLevels();
@@ -79,6 +121,24 @@ export default function Inventory() {
       if (res.data.warehouses.length > 0) {
         setWarehouseId(res.data.warehouses[0].id.toString());
       }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchSuppliers = async () => {
+    try {
+      const res = await api.get('/api/suppliers');
+      setSuppliers(res.data.suppliers || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchProducts = async (search: string) => {
+    try {
+      const res = await api.get(`/api/products?search=${search}&all=1`);
+      setProducts(res.data.products || []);
     } catch (err) {
       console.error(err);
     }
@@ -108,6 +168,52 @@ export default function Inventory() {
     }
   };
 
+  const exportToExcel = () => {
+    const rows = logs.map(log => ({
+      'Date': new Date(log.created_at).toLocaleString(),
+      'Product': log.product?.name || '',
+      'Size': log.product?.size || '',
+      'Type': log.type,
+      'Qty Change': log.quantity,
+      'Warehouse': log.warehouse?.name || '',
+      'Reference': log.reference,
+      'User': log.user ? log.user.name : 'System',
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Movement Logs');
+    XLSX.writeFile(wb, `stock-movements-${new Date().toISOString().slice(0,10)}.xlsx`);
+  };
+
+  const handleAdjust = async () => {
+    if (!editLog) return;
+    setEditError('');
+    setEditSubmitting(true);
+    try {
+      await api.post('/api/inventory/adjust', {
+        batch_id: editLog.batch_id,
+        new_quantity: Math.abs(editLog.quantity) + (parseInt(editQty) - Math.abs(editLog.quantity)),
+        reference: editRef,
+      });
+      setEditLog(null);
+      fetchLogs();
+    } catch (err: any) {
+      setEditError(err.response?.data?.error || 'Failed to update');
+    } finally {
+      setEditSubmitting(false);
+    }
+  };
+
+  // PO Item management helpers
+  const addItem = () => setItems([...items, { product_id: 0, quantity: 1, unit_cost: 0 }]);
+  const removeItem = (index: number) => setItems(items.filter((_, i) => i !== index));
+  const updateItem = (index: number, field: keyof ItemInput, value: number) => {
+    const updated = [...items];
+    updated[index] = { ...updated[index], [field]: value };
+    setItems(updated);
+  };
+  const totalCost = items.reduce((sum, item) => sum + (item.quantity * item.unit_cost), 0);
+
   const handleStockSubmit = async (e: React.FormEvent, type: 'in' | 'out') => {
     e.preventDefault();
     setSubmitError('');
@@ -115,26 +221,49 @@ export default function Inventory() {
     setSubmitting(true);
 
     try {
-      const payload = {
-        product_id: parseInt(productId),
-        warehouse_id: parseInt(warehouseId),
-        quantity: parseInt(quantity),
-        reference,
-        batch_number: batchNumber || undefined,
-        expiry_date: expiryDate ? new Date(expiryDate).toISOString() : undefined,
-      };
+      if (type === 'in') {
+        const validItems = items.filter(item => item.product_id > 0 && item.quantity > 0);
+        if (validItems.length === 0) {
+          setSubmitError('Add at least one complete item (product and quantity).');
+          setSubmitting(false);
+          return;
+        }
 
-      await api.post(`/api/inventory/${type}`, payload);
-      setSuccessMsg(`Successfully logged stock ${type}!`);
-      
-      // Reset form
-      setProductId('');
-      setQuantity('');
-      setReference('');
-      setBatchNumber('');
-      setExpiryDate('');
+        const payload = {
+          supplier_id: supplierId ? parseInt(supplierId) : null,
+          order_date: orderDate,
+          notes: reference,
+          items: validItems
+        };
+        await api.post('/api/purchase-orders', payload);
+        setSuccessMsg('Successfully created a new Pending Purchase Order!');
+        
+        // Reset form
+        setSupplierId('');
+        setOrderDate(new Date().toISOString().split('T')[0]);
+        setReference('');
+        setItems([{ product_id: 0, quantity: 1, unit_cost: 0 }]);
+      } else {
+        const payload = {
+          product_id: parseInt(productId),
+          warehouse_id: parseInt(warehouseId),
+          quantity: parseInt(quantity),
+          reference,
+          batch_number: batchNumber || undefined,
+          expiry_date: expiryDate ? new Date(expiryDate).toISOString() : undefined,
+        };
+        await api.post(`/api/inventory/out`, payload);
+        setSuccessMsg(`Successfully logged stock out!`);
+        
+        // Reset form
+        setProductId('');
+        setQuantity('');
+        setReference('');
+        setBatchNumber('');
+        setExpiryDate('');
+      }
     } catch (err: any) {
-      setSubmitError(err.response?.data?.error || 'Failed to submit movement');
+      setSubmitError(err.response?.data?.error || 'Failed to submit');
     } finally {
       setSubmitting(false);
     }
@@ -248,45 +377,110 @@ export default function Inventory() {
             {successMsg && <div className="mb-4 p-3 bg-green-50 text-green-600 text-sm rounded-lg border border-green-100">{successMsg}</div>}
 
             <form onSubmit={(e) => handleStockSubmit(e, 'in')} className="space-y-5">
+              <div className="bg-blue-50 text-blue-800 text-sm p-4 rounded-lg border border-blue-100 flex items-start gap-2">
+                <span className="text-xl">ℹ️</span>
+                <p><strong>Note:</strong> Receiving stock here will create a <strong>Pending Purchase Order</strong>. You will need to go to the Purchase Orders page to Mark as Received when the goods physically arrive.</p>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Product ID</label>
-                  <input required type="number" min="1" value={productId} onChange={e => setProductId(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2 outline-none focus:border-indigo-500" />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Optional Supplier</label>
+                  <select value={supplierId} onChange={e => setSupplierId(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2.5 text-sm  outline-none focus:border-indigo-500 bg-white">
+                    <option value="">-- No Supplier --</option>
+                    {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
-                  <input required type="number" min="1" value={quantity} onChange={e => setQuantity(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2 outline-none focus:border-indigo-500" />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Order Date <span className="text-red-500">*</span></label>
+                  <input required type="date" value={orderDate} onChange={e => setOrderDate(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500 bg-white" />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Destination Warehouse</label>
-                <select required value={warehouseId} onChange={e => setWarehouseId(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2 outline-none focus:border-indigo-500 bg-white">
-                  {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                </select>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Reference Notes</label>
+                <input type="text" value={reference} onChange={e => setReference(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500" placeholder="Optional notes" />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Reference (PO Number, Supplier, etc.)</label>
-                <input required type="text" value={reference} onChange={e => setReference(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2 outline-none focus:border-indigo-500" placeholder="e.g. PO-2023-11A" />
-              </div>
+              {/* Dynamic Items Array */}
+              <div className="pt-2">
+                <div className="flex items-center justify-between mb-3 border-b border-gray-200 pb-2">
+                  <label className="text-sm font-semibold text-gray-900">Purchase Order Items</label>
+                  <button type="button" onClick={addItem} className="text-sm font-medium text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-3 py-1 rounded-md transition-colors">
+                    + Add Item
+                  </button>
+                </div>
 
-              <div className="border-t border-gray-100 pt-5 mt-5">
-                <h3 className="text-sm font-semibold text-gray-900 mb-4">Optional Batch Tracking</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Batch Number</label>
-                    <input type="text" value={batchNumber} onChange={e => setBatchNumber(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2 outline-none focus:border-indigo-500" placeholder="BATCH-123" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Expiry Date</label>
-                    <input type="date" value={expiryDate} onChange={e => setExpiryDate(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2 outline-none focus:border-indigo-500" />
+                <div className="space-y-3">
+                  {items.map((item, index) => (
+                    <div key={index} className="flex gap-3 items-start bg-gray-50/50 p-3 rounded-lg border border-gray-100 relative group">
+                      <div className="flex-1">
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Product</label>
+                        <select
+                          required
+                          value={item.product_id}
+                          onChange={(e) => updateItem(index, 'product_id', parseInt(e.target.value))}
+                          className="w-full px-3 py-2 rounded-md border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 bg-white"
+                        >
+                          <option value={0}>Select product...</option>
+                          {products.map((p) => (
+                            <option key={p.id} value={p.id}>{p.name}{p.size ? ` (${p.size})` : ''}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="w-20 lg:w-24">
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Qty</label>
+                        <input
+                          required
+                          type="number"
+                          min={1}
+                          value={item.quantity}
+                          onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 1)}
+                          className="w-full px-3 py-2 rounded-md border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 bg-white"
+                        />
+                      </div>
+                      <div className="w-24 lg:w-32">
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Unit Cost</label>
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          value={item.unit_cost}
+                          onChange={(e) => updateItem(index, 'unit_cost', parseFloat(e.target.value) || 0)}
+                          className="w-full px-3 py-2 rounded-md border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 bg-white"
+                        />
+                      </div>
+                      <div className="w-24 text-right pt-1 hidden md:block">
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Subtotal</label>
+                        <span className="text-sm font-medium text-gray-900 block mt-2">
+                          ₱{(item.quantity * item.unit_cost).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                      {items.length > 1 && (
+                        <button 
+                          type="button" 
+                          onClick={() => removeItem(index)} 
+                          className="absolute -right-2 -top-2 bg-red-100 text-red-600 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-200 shadow-sm"
+                          title="Remove item"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex justify-end mt-4 pt-4 border-t border-gray-200">
+                  <div className="text-right">
+                    <span className="text-sm text-gray-500 mr-2">Total Estimated Cost:</span>
+                    <span className="text-lg font-bold text-gray-900">
+                      ₱{totalCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </span>
                   </div>
                 </div>
               </div>
 
               <button disabled={submitting} type="submit" className="w-full bg-indigo-600 text-white font-medium py-2.5 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 mt-4">
-                {submitting ? 'Processing...' : 'Receive Stock Ledger'}
+                {submitting ? 'Processing...' : 'Create Pending Purchase Order'}
               </button>
             </form>
           </div>
@@ -305,20 +499,30 @@ export default function Inventory() {
             {successMsg && <div className="mb-4 p-3 bg-green-50 text-green-600 text-sm rounded-lg border border-green-100">{successMsg}</div>}
 
             <form onSubmit={(e) => handleStockSubmit(e, 'out')} className="space-y-5">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Product ID</label>
-                  <input required type="number" min="1" value={productId} onChange={e => setProductId(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2 outline-none focus:border-indigo-500" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Quantity to Remove</label>
-                  <input required type="number" min="1" value={quantity} onChange={e => setQuantity(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2 outline-none focus:border-indigo-500" />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Product</label>
+                <input
+                  type="text"
+                  placeholder="Search product name..."
+                  value={productSearch}
+                  onChange={e => { setProductSearch(e.target.value); setProductId(''); }}
+                  className="w-full border border-gray-300 rounded-lg p-2 outline-none focus:border-indigo-500 mb-1"
+                />
+                <select required value={productId} onChange={e => setProductId(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2 outline-none focus:border-indigo-500 bg-white">
+                  <option value="">-- Select a product --</option>
+                  {products.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}{p.size ? ` (${p.size})` : ''}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Quantity to Remove</label>
+                <input required type="number" min="1" value={quantity} onChange={e => setQuantity(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2 outline-none focus:border-indigo-500" />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Source Warehouse</label>
-                <select required value={warehouseId} onChange={e => setWarehouseId(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2 outline-none focus:border-indigo-500 bg-white">
+                <select required value={warehouseId} onChange={e => setWarehouseId(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500 bg-white">
                   {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                 </select>
               </div>
@@ -338,7 +542,17 @@ export default function Inventory() {
         {/* TAB: LOGS */}
         {activeTab === 'logs' && (
           <div className="p-0">
-            {loading ? <div className="p-12 text-center text-gray-500">Loading immutable movement logs...</div> : (
+            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+              <p className="text-sm text-gray-500">Full audit trail of all stock movements.</p>
+              <button
+                onClick={exportToExcel}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors"
+              >
+                <FileDown className="w-4 h-4" />
+                Export Excel
+              </button>
+            </div>
+            {loading ? <div className="p-12 text-center text-gray-500">Loading movement logs...</div> : (
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
@@ -348,36 +562,76 @@ export default function Inventory() {
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Qty Change</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Reference</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">User</th>
+                    <th className="px-6 py-3"></th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-100">
                   {logs.length === 0 ? (
-                    <tr><td colSpan={6} className="p-6 text-center text-gray-500 text-sm">No movement logs found.</td></tr>
+                    <tr><td colSpan={7} className="p-6 text-center text-gray-500 text-sm">No movement logs found.</td></tr>
                   ) : logs.map((log) => (
                     <tr key={log.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 text-xs text-gray-500">
-                        {new Date(log.created_at).toLocaleString()}
-                      </td>
+                      <td className="px-6 py-4 text-xs text-gray-500">{new Date(log.created_at).toLocaleString()}</td>
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">
                         {log.product?.name}
+                        {log.product?.size && <span className="text-xs text-gray-400 ml-1">({log.product.size})</span>}
                       </td>
                       <td className="px-6 py-4">
                         <span className={`px-2 py-1 text-xs font-bold rounded ${
                           log.type === 'IN' ? 'bg-indigo-100 text-indigo-700' :
                           log.type === 'OUT' ? 'bg-rose-100 text-rose-700' :
                           'bg-amber-100 text-amber-700'
-                        }`}>
-                          {log.type}
-                        </span>
+                        }`}>{log.type}</span>
                       </td>
                       <td className="px-6 py-4 font-mono font-bold text-sm">
                         {log.quantity > 0 ? <span className="text-indigo-600">+{log.quantity}</span> : <span className="text-rose-600">{log.quantity}</span>}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">
-                        {log.reference}
-                      </td>
-                      <td className="px-6 py-4 text-xs text-gray-500">
-                        {log.user ? log.user.name : 'System Generated'}
+                      <td className="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">{log.reference}</td>
+                      <td className="px-6 py-4 text-xs text-gray-500">{log.user ? log.user.name : 'System Generated'}</td>
+                      <td className="px-4 py-4 text-right relative">
+                        <button
+                          onClick={() => setOpenMenuId(openMenuId === log.id ? null : log.id)}
+                          className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
+                        >
+                          <MoreVertical className="w-4 h-4" />
+                        </button>
+                        {openMenuId === log.id && (
+                          <div className="absolute right-8 top-8 z-50 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[160px]">
+                            <button
+                              onClick={() => {
+                                setEditLog(log);
+                                setEditQty(String(Math.abs(log.quantity)));
+                                setEditRef(log.reference);
+                                setEditError('');
+                                setOpenMenuId(null);
+                              }}
+                              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                            >
+                              ✏️ Edit Entry
+                            </button>
+                            <button
+                              onClick={() => {
+                                const row = [{
+                                  'Date': new Date(log.created_at).toLocaleString(),
+                                  'Product': log.product?.name || '',
+                                  'Size': log.product?.size || '',
+                                  'Type': log.type,
+                                  'Qty Change': log.quantity,
+                                  'Warehouse': log.warehouse?.name || '',
+                                  'Reference': log.reference,
+                                  'User': log.user ? log.user.name : 'System',
+                                }];
+                                const ws = XLSX.utils.json_to_sheet(row);
+                                const wb = XLSX.utils.book_new();
+                                XLSX.utils.book_append_sheet(wb, ws, 'Movement');
+                                XLSX.writeFile(wb, `stock-entry-${log.id}.xlsx`);
+                                setOpenMenuId(null);
+                              }}
+                              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                            >
+                              📥 Download Excel
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -388,6 +642,55 @@ export default function Inventory() {
         )}
 
       </div>
+
+      {/* Edit / Adjust Modal */}
+      {editLog && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900">Edit Stock Entry</h3>
+              <button onClick={() => setEditLog(null)} className="p-1 rounded hover:bg-gray-100">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <p className="text-sm text-gray-500 mb-4">
+              Product: <strong>{editLog.product?.name}</strong> — This creates an adjustment log entry.
+            </p>
+            {editError && <div className="mb-3 p-3 bg-red-50 text-red-600 text-sm rounded-lg">{editError}</div>}
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">New Quantity</label>
+                <input
+                  type="number" min="0" value={editQty}
+                  onChange={e => setEditQty(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg p-2 outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Reason for Edit</label>
+                <input
+                  type="text" value={editRef}
+                  onChange={e => setEditRef(e.target.value)}
+                  placeholder="e.g. Correction - counted wrong"
+                  className="w-full border border-gray-300 rounded-lg p-2 outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setEditLog(null)} className="flex-1 border border-gray-300 text-gray-700 rounded-lg py-2 text-sm hover:bg-gray-50">
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAdjust}
+                  disabled={editSubmitting}
+                  className="flex-1 bg-indigo-600 text-white rounded-lg py-2 text-sm hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {editSubmitting ? 'Saving...' : 'Save Adjustment'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

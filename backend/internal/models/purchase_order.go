@@ -7,9 +7,10 @@ import (
 // PurchaseOrder represents an order placed to a supplier for products.
 type PurchaseOrder struct {
 	ID           uint       `gorm:"primaryKey" json:"id"`
-	SupplierID   uint       `gorm:"index;not null" json:"supplier_id"`
+	SupplierID   *uint      `gorm:"index" json:"supplier_id"`                       // nullable — Stock In requests may not have a supplier
 	UserID       uint       `gorm:"index;not null" json:"user_id"`                  // who created the PO
 	Status       string     `gorm:"size:50;not null;default:pending" json:"status"` // pending, received, cancelled
+	PONumber     string     `gorm:"size:100" json:"po_number"`                      // supplier receipt/PO number, filled when received
 	TotalCost    float64    `gorm:"not null;default:0" json:"total_cost"`
 	OrderDate    time.Time  `gorm:"not null" json:"order_date"`
 	ReceivedDate *time.Time `json:"received_date"`
@@ -18,7 +19,7 @@ type PurchaseOrder struct {
 	UpdatedAt    time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
 
 	// Relationships
-	Supplier Supplier            `gorm:"foreignKey:SupplierID" json:"supplier,omitempty"`
+	Supplier *Supplier           `gorm:"foreignKey:SupplierID" json:"supplier,omitempty"`
 	User     User                `gorm:"foreignKey:UserID" json:"user,omitempty"`
 	Items    []PurchaseOrderItem `gorm:"foreignKey:PurchaseOrderID" json:"items,omitempty"`
 }

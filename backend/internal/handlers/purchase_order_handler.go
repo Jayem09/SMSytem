@@ -11,6 +11,7 @@ import (
 	"smsystem-backend/internal/services"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type PurchaseOrderHandler struct {
@@ -28,7 +29,7 @@ type purchaseOrderItemInput struct {
 }
 
 type purchaseOrderInput struct {
-	SupplierID uint                     `json:"supplier_id" binding:"required"`
+	SupplierID *uint                    `json:"supplier_id"`
 	OrderDate  string                   `json:"order_date" binding:"required"`
 	Notes      string                   `json:"notes"`
 	Items      []purchaseOrderItemInput `json:"items" binding:"required,min=1,dive"`
@@ -151,16 +152,76 @@ func (h *PurchaseOrderHandler) Receive(c *gin.Context) {
 	// Start transaction
 	tx := database.DB.Begin()
 
-	// Update stock for each item and update cost price
+	// Accept po_number from request body
+	var receiveInput struct {
+		PONumber string `json:"po_number"`
+	}
+	if errJSON := c.ShouldBindJSON(&receiveInput); errJSON != nil {
+		fmt.Printf("Purchase Order Receive JSON bind error: %v\n", errJSON)
+	}
+	fmt.Printf("Purchase Order Receive payload: po_number='%s'\n", receiveInput.PONumber)
+
+	// Update stock for each item and create inventory batch + movement
+	branchIDValue, _ := c.Get("branchID")
+	userIDCtx, _ := c.Get("userID")
+	branchID := branchIDValue.(uint)
+
 	for _, item := range po.Items {
+		// 1. Increment product stock using gorm.Expr (atomic SQL)
 		if err := tx.Model(&models.Product{}).
 			Where("id = ?", item.ProductID).
 			Updates(map[string]interface{}{
-				"stock":      database.DB.Raw("stock + ?", item.Quantity),
+				"stock":      gorm.Expr("stock + ?", item.Quantity),
 				"cost_price": item.UnitCost,
 			}).Error; err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update product stock"})
+			return
+		}
+
+		// 2. Find or create a warehouse for this branch then create a batch + movement
+		var warehouse models.Warehouse
+		whQuery := tx.Model(&models.Warehouse{})
+		if branchID != 0 {
+			whQuery = whQuery.Where("branch_id = ?", branchID)
+		}
+		if err := whQuery.First(&warehouse).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "No warehouse assigned to store stock for this branch."})
+			return
+		}
+
+		batch := models.Batch{
+			ProductID:   item.ProductID,
+			WarehouseID: warehouse.ID,
+			BranchID:    warehouse.BranchID,
+			BatchNumber: fmt.Sprintf("PO-%d", po.ID),
+			Quantity:    item.Quantity,
+		}
+		if err := tx.Create(&batch).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create inventory batch"})
+			return
+		}
+
+		var uid *uint
+		if userIDCtx != nil {
+			u := userIDCtx.(uint)
+			uid = &u
+		}
+		movement := models.StockMovement{
+			ProductID:   item.ProductID,
+			BatchID:     &batch.ID,
+			WarehouseID: warehouse.ID,
+			BranchID:    warehouse.BranchID,
+			UserID:      uid,
+			Type:        models.MovementTypeIn,
+			Quantity:    item.Quantity,
+			Reference:   fmt.Sprintf("Purchase Order #%d received", po.ID),
+		}
+		if err := tx.Create(&movement).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create inventory movement"})
 			return
 		}
 	}
@@ -169,6 +230,7 @@ func (h *PurchaseOrderHandler) Receive(c *gin.Context) {
 	now := time.Now()
 	po.Status = "received"
 	po.ReceivedDate = &now
+	po.PONumber = receiveInput.PONumber
 	if err := tx.Save(&po).Error; err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update purchase order"})

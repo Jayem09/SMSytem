@@ -121,4 +121,22 @@ func Connect(cfg *config.Config) {
 		DB.Create(&defaultBranch)
 		log.Println(" Default branch seeded")
 	}
+
+	// Seed a default warehouse for every branch that doesn't have one
+	var branches []models.Branch
+	DB.Find(&branches)
+	for _, branch := range branches {
+		var warehouseCount int64
+		DB.Model(&models.Warehouse{}).Where("branch_id = ?", branch.ID).Count(&warehouseCount)
+		if warehouseCount == 0 {
+			defaultWarehouse := models.Warehouse{
+				Name:     "Main Warehouse",
+				Address:  "",
+				Contact:  "",
+				BranchID: branch.ID,
+			}
+			DB.Create(&defaultWarehouse)
+			log.Printf(" Default warehouse seeded for branch: %s", branch.Name)
+		}
+	}
 }

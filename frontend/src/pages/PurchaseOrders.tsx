@@ -1,7 +1,6 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect } from 'react';
 import api from '../api/axios';
 import Modal from '../components/Modal';
-import FormField from '../components/FormField';
 
 interface Supplier {
   id: number;
@@ -29,6 +28,7 @@ interface PurchaseOrder {
   id: number;
   supplier_id: number;
   status: string;
+  po_number: string;
   total_cost: number;
   order_date: string;
   received_date: string | null;
@@ -38,28 +38,22 @@ interface PurchaseOrder {
   items: PurchaseOrderItem[];
 }
 
-// Input for creating PO items
-interface ItemInput {
-  product_id: number;
-  quantity: number;
-  unit_cost: number;
-}
+// Removed ItemInput interface since it's moving to Inventory.tsx
 
 export default function PurchaseOrders() {
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [createModalOpen, setCreateModalOpen] = useState(false);
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<PurchaseOrder | null>(null);
   const [error, setError] = useState('');
-
-  // Create form state
-  const [supplierId, setSupplierId] = useState('');
-  const [orderDate, setOrderDate] = useState(new Date().toISOString().split('T')[0]);
-  const [notes, setNotes] = useState('');
-  const [items, setItems] = useState<ItemInput[]>([{ product_id: 0, quantity: 1, unit_cost: 0 }]);
+  
+  // Custom Confirm / Receive Modal State
+  const [confirmModal, setConfirmModal] = useState<{ 
+    message: string; 
+    onConfirm: (poNumber?: string) => void;
+    requirePoNumber?: boolean;
+  } | null>(null);
+  const [receivePoNumber, setReceivePoNumber] = useState('');
 
   const fetchOrders = async () => {
     try {
@@ -72,97 +66,53 @@ export default function PurchaseOrders() {
     }
   };
 
-  const fetchSuppliers = async () => {
-    try {
-      const res = await api.get('/api/suppliers');
-      setSuppliers(res.data.suppliers || []);
-    } catch { /* ignore */ }
-  };
-
-  const fetchProducts = async () => {
-    try {
-      const res = await api.get('/api/products');
-      setProducts(res.data.products || []);
-    } catch { /* ignore */ }
-  };
-
   useEffect(() => {
     fetchOrders();
-    fetchSuppliers();
-    fetchProducts();
   }, []);
-
-  const openCreate = () => {
-    setSupplierId('');
-    setOrderDate(new Date().toISOString().split('T')[0]);
-    setNotes('');
-    setItems([{ product_id: 0, quantity: 1, unit_cost: 0 }]);
-    setError('');
-    setCreateModalOpen(true);
-  };
 
   const openView = (po: PurchaseOrder) => {
     setSelectedOrder(po);
     setViewModalOpen(true);
   };
 
-  // Item management
-  const addItem = () => setItems([...items, { product_id: 0, quantity: 1, unit_cost: 0 }]);
-  const removeItem = (index: number) => setItems(items.filter((_, i) => i !== index));
-  const updateItem = (index: number, field: keyof ItemInput, value: number) => {
-    const updated = [...items];
-    updated[index] = { ...updated[index], [field]: value };
-    setItems(updated);
-  };
-
-  const totalCost = items.reduce((sum, item) => sum + (item.quantity * item.unit_cost), 0);
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setError('');
-
-    const validItems = items.filter(item => item.product_id > 0 && item.quantity > 0);
-    if (validItems.length === 0) {
-      setError('Add at least one item');
-      return;
-    }
-
-    try {
-      await api.post('/api/purchase-orders', {
-        supplier_id: parseInt(supplierId),
-        order_date: orderDate,
-        notes,
-        items: validItems,
-      });
-      setCreateModalOpen(false);
-      fetchOrders();
-    } catch (err: unknown) {
-      const axiosError = err as { response?: { data?: { error?: string } } };
-      setError(axiosError.response?.data?.error || 'Failed to create purchase order');
-    }
-  };
-
   const handleReceive = async (po: PurchaseOrder) => {
-    if (!confirm(`Mark PO #${po.id} as received? This will add stock to all items.`)) return;
-    try {
-      await api.put(`/api/purchase-orders/${po.id}/receive`);
-      fetchOrders();
-      setViewModalOpen(false);
-    } catch (err: unknown) {
-      const axiosError = err as { response?: { data?: { error?: string } } };
-      alert(axiosError.response?.data?.error || 'Failed to receive purchase order');
-    }
+    setReceivePoNumber('');
+    setConfirmModal({
+      message: `Mark order #${po.id} as received? This will add stock to all items. Please enter the supplier's Receipt/PO Number below.`,
+      requirePoNumber: true,
+      onConfirm: async (enteredPoNumber?: string) => {
+        if (!enteredPoNumber) {
+          alert("Supplier Receipt / PO Number is required to receive goods.");
+          return;
+        }
+        try {
+          await api.put(`/api/purchase-orders/${po.id}/receive`, { po_number: enteredPoNumber });
+          fetchOrders();
+          setViewModalOpen(false);
+        } catch (err: unknown) {
+          const axiosError = err as { response?: { data?: { error?: string } } };
+          alert(axiosError.response?.data?.error || 'Failed to receive purchase order');
+        }
+      },
+    });
   };
 
   const handleDelete = async (po: PurchaseOrder) => {
-    if (!confirm(`Delete PO #${po.id}?`)) return;
-    try {
-      await api.delete(`/api/purchase-orders/${po.id}`);
-      fetchOrders();
-    } catch (err: unknown) {
-      const axiosError = err as { response?: { data?: { error?: string } } };
-      alert(axiosError.response?.data?.error || 'Failed to delete');
-    }
+    setConfirmModal({
+      message: `Delete PO #${po.id}? This cannot be undone.`,
+      onConfirm: async () => {
+        try {
+          await api.delete(`/api/purchase-orders/${po.id}`);
+          fetchOrders();
+        } catch (err: unknown) {
+          const axiosError = err as { response?: { data?: { error?: string } } };
+          setConfirmModal({
+            message: axiosError.response?.data?.error || 'Failed to delete',
+            onConfirm: () => setConfirmModal(null),
+          });
+        }
+      },
+    });
   };
 
   const statusBadge = (status: string) => {
@@ -179,22 +129,21 @@ export default function PurchaseOrders() {
   };
 
   return (
+    <>
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-semibold text-gray-900">Purchase Orders</h1>
-        <button onClick={openCreate} className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 rounded-md cursor-pointer">
-          New Purchase Order
-        </button>
       </div>
 
-      {error && !createModalOpen && <p className="text-red-600 text-sm mb-4">{error}</p>}
+      {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
 
       {/* Purchase Orders Table */}
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50">
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">PO #</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">System ID</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Receipt/PO #</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Supplier</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Items</th>
@@ -212,7 +161,8 @@ export default function PurchaseOrders() {
               orders.map((po) => (
                 <tr key={po.id} className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer" onClick={() => openView(po)}>
                   <td className="px-4 py-3 font-medium text-gray-900">#{po.id}</td>
-                  <td className="px-4 py-3 text-gray-700">{po.supplier?.name}</td>
+                  <td className="px-4 py-3 text-gray-700 font-mono">{po.po_number || <span className="text-gray-400 italic">Pending...</span>}</td>
+                  <td className="px-4 py-3 text-gray-700">{po.supplier?.name || <span className="text-gray-400 italic">None</span>}</td>
                   <td className="px-4 py-3 text-gray-500">{new Date(po.order_date).toLocaleDateString()}</td>
                   <td className="px-4 py-3 text-gray-500">{po.items?.length || 0} items</td>
                   <td className="px-4 py-3 font-medium text-gray-900">₱{po.total_cost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
@@ -307,102 +257,53 @@ export default function PurchaseOrders() {
         )}
       </Modal>
 
-      {/* Create PO Modal */}
-      <Modal open={createModalOpen} onClose={() => setCreateModalOpen(false)} title="New Purchase Order" wide>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && <p className="text-red-600 text-sm">{error}</p>}
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-1">Supplier</label>
-              <select
-                value={supplierId}
-                onChange={(e) => setSupplierId(e.target.value)}
-                required
-                className="w-full px-3 py-2 rounded-md border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 cursor-pointer"
-              >
-                <option value="">Select supplier...</option>
-                {suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
-            </div>
-            <FormField label="Order Date" value={orderDate} onChange={setOrderDate} type="date" required />
-          </div>
-
-          <FormField label="Notes" value={notes} onChange={setNotes} placeholder="Optional notes" />
-
-          {/* Items */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium text-gray-900">Items</label>
-              <button type="button" onClick={addItem} className="text-xs text-indigo-600 hover:text-indigo-500 cursor-pointer">
-                + Add Item
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              {items.map((item, index) => (
-                <div key={index} className="flex gap-2 items-end">
-                  <div className="flex-1">
-                    {index === 0 && <label className="block text-xs text-gray-500 mb-1">Product</label>}
-                    <select
-                      value={item.product_id}
-                      onChange={(e) => updateItem(index, 'product_id', parseInt(e.target.value))}
-                      className="w-full px-2 py-1.5 rounded-md border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 cursor-pointer"
-                    >
-                      <option value={0}>Select product...</option>
-                      {products.map((p) => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="w-20">
-                    {index === 0 && <label className="block text-xs text-gray-500 mb-1">Qty</label>}
-                    <input
-                      type="number"
-                      min={1}
-                      value={item.quantity}
-                      onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 1)}
-                      className="w-full px-2 py-1.5 rounded-md border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-                    />
-                  </div>
-                  <div className="w-28">
-                    {index === 0 && <label className="block text-xs text-gray-500 mb-1">Unit Cost</label>}
-                    <input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={item.unit_cost}
-                      onChange={(e) => updateItem(index, 'unit_cost', parseFloat(e.target.value) || 0)}
-                      className="w-full px-2 py-1.5 rounded-md border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-                    />
-                  </div>
-                  <div className="w-24 text-right">
-                    {index === 0 && <label className="block text-xs text-gray-500 mb-1">Subtotal</label>}
-                    <span className="text-sm font-medium text-gray-700 leading-[36px]">
-                      ₱{(item.quantity * item.unit_cost).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                  {items.length > 1 && (
-                    <button type="button" onClick={() => removeItem(index)} className="text-red-400 hover:text-red-600 text-lg cursor-pointer pb-1">×</button>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <div className="flex justify-end mt-3 pt-3 border-t border-gray-200">
-              <span className="text-sm font-bold text-gray-900">
-                Total: ₱{totalCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-              </span>
-            </div>
-          </div>
-
-          <button type="submit" className="w-full py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 rounded-md cursor-pointer">
-            Create Purchase Order
-          </button>
-        </form>
-      </Modal>
+      {/* Create PO Modal Removed (moved to Inventory) */}
     </div>
+
+    {/* Custom Confirm Modal (replaces window.confirm for Tauri) */}
+    {confirmModal && (
+      <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
+        <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
+          <p className="text-gray-800 text-sm mb-4 leading-relaxed">{confirmModal.message}</p>
+          
+          {confirmModal.requirePoNumber && (
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Supplier Receipt / PO Number <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                autoFocus
+                required
+                value={receivePoNumber}
+                onChange={(e) => setReceivePoNumber(e.target.value)}
+                placeholder="e.g. INV-12345"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+          )}
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => setConfirmModal(null)}
+              className="flex-1 border border-gray-300 text-gray-700 rounded-lg py-2 text-sm hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              disabled={confirmModal.requirePoNumber && !receivePoNumber.trim()}
+              onClick={() => { 
+                confirmModal.onConfirm(receivePoNumber); 
+                setConfirmModal(null); 
+              }}
+              className="flex-1 bg-green-600 text-white rounded-lg py-2 text-sm hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Confirm
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+  </>
   );
 }

@@ -24,10 +24,28 @@ func NewInventoryHandler(logService *services.LogService) *InventoryHandler {
 
 // GetWarehouses returns all configured physical locations
 func (h *InventoryHandler) GetWarehouses(c *gin.Context) {
-	branchID, _ := c.Get("branchID")
+	branchIDVal, exists := c.Get("branchID")
+	var branchID uint
+	if exists && branchIDVal != nil {
+		switch v := branchIDVal.(type) {
+		case uint:
+			branchID = v
+		case float64:
+			branchID = uint(v)
+		case int:
+			branchID = uint(v)
+		}
+	}
+
 	var warehouses []models.Warehouse
-	if err := database.DB.Where("branch_id = ?", branchID).Find(&warehouses).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch warehouses"})
+	query := database.DB.Model(&models.Warehouse{})
+
+	if branchID != 0 {
+		query = query.Where("branch_id = ?", branchID)
+	}
+
+	if err := query.Find(&warehouses).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch warehouses", "details": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"warehouses": warehouses})
@@ -47,15 +65,30 @@ func (h *InventoryHandler) GetStockLevels(c *gin.Context) {
 	}
 
 	var results []StockLevelResult
-	branchID, _ := c.Get("branchID")
+	branchIDVal, exists := c.Get("branchID")
+	var branchID uint
+	if exists && branchIDVal != nil {
+		switch v := branchIDVal.(type) {
+		case uint:
+			branchID = v
+		case float64:
+			branchID = uint(v)
+		case int:
+			branchID = uint(v)
+		}
+	}
 
 	// Aggregate from the batches table. We only care about products that have stock or had stock.
 	query := database.DB.Table("batches").
 		Select("batches.product_id, products.name as product_name, products.size as product_size, batches.warehouse_id, warehouses.name as warehouse_name, SUM(batches.quantity) as total_stock, MIN(batches.expiry_date) as closest_expiry, COUNT(batches.id) as expiring_batches").
-		Joins("JOIN products ON batches.product_id = products.id").
-		Joins("JOIN warehouses ON batches.warehouse_id = warehouses.id").
-		Where("batches.branch_id = ?", branchID).
-		Group("batches.product_id, batches.warehouse_id")
+		Joins("LEFT JOIN products ON batches.product_id = products.id").
+		Joins("LEFT JOIN warehouses ON batches.warehouse_id = warehouses.id")
+
+	if branchID != 0 {
+		query = query.Where("batches.branch_id = ?", branchID)
+	}
+
+	query = query.Group("batches.product_id, batches.warehouse_id")
 
 	if search := c.Query("search"); search != "" {
 		query = query.Where("products.name LIKE ?", "%"+search+"%")
@@ -71,10 +104,26 @@ func (h *InventoryHandler) GetStockLevels(c *gin.Context) {
 
 // GetMovementLogs returns the immutable history of inventory changes
 func (h *InventoryHandler) GetMovementLogs(c *gin.Context) {
-	branchID, _ := c.Get("branchID")
+	branchIDVal, exists := c.Get("branchID")
+	var branchID uint
+	if exists && branchIDVal != nil {
+		switch v := branchIDVal.(type) {
+		case uint:
+			branchID = v
+		case float64:
+			branchID = uint(v)
+		case int:
+			branchID = uint(v)
+		}
+	}
+
 	var logs []models.StockMovement
-	query := database.DB.Where("branch_id = ?", branchID).Preload("Product").Preload("Batch").Preload("Warehouse").Preload("User").
+	query := database.DB.Preload("Product").Preload("Batch").Preload("Warehouse").Preload("User").
 		Order("created_at DESC")
+
+	if branchID != 0 {
+		query = query.Where("branch_id = ?", branchID)
+	}
 
 	if productID := c.Query("product_id"); productID != "" {
 		query = query.Where("product_id = ?", productID)
@@ -115,13 +164,27 @@ func (h *InventoryHandler) StockIn(c *gin.Context) {
 	userID := userIDValue.(uint)
 	branchID := branchIDValue.(uint)
 
+	// 0. Ensure we grab the actual branch ID mapping for the selected warehouse
+	var wh models.Warehouse
+	if err := database.DB.First(&wh, input.WarehouseID).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid warehouse ID"})
+		return
+	}
+	actualBranchID := wh.BranchID
+
+	// Security: Prevent normal users from altering other branches
+	if branchID != 0 && actualBranchID != branchID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Cannot stock in to a warehouse belonging to another branch"})
+		return
+	}
+
 	tx := database.DB.Begin()
 
 	// 1. Create the new Batch
 	batch := models.Batch{
 		ProductID:   input.ProductID,
 		WarehouseID: input.WarehouseID,
-		BranchID:    branchID,
+		BranchID:    actualBranchID,
 		BatchNumber: input.BatchNumber,
 		Quantity:    input.Quantity,
 		ExpiryDate:  input.ExpiryDate,
@@ -138,7 +201,7 @@ func (h *InventoryHandler) StockIn(c *gin.Context) {
 		ProductID:   input.ProductID,
 		BatchID:     &batch.ID,
 		WarehouseID: input.WarehouseID,
-		BranchID:    branchID,
+		BranchID:    actualBranchID,
 		UserID:      &userID,
 		Type:        models.MovementTypeIn,
 		Quantity:    input.Quantity, // Positive
@@ -185,11 +248,13 @@ func (h *InventoryHandler) StockOut(c *gin.Context) {
 
 	tx := database.DB.Begin()
 
-	// Find available batches for this product in this warehouse for THIS branch, ordered by expiry (oldest first)
+	// Find available batches for this product in this warehouse, ordered by expiry (oldest first)
 	var batches []models.Batch
-	if err := tx.Where("product_id = ? AND warehouse_id = ? AND branch_id = ? AND quantity > 0", input.ProductID, input.WarehouseID, branchID).
-		Order("expiry_date ASC, created_at ASC").
-		Find(&batches).Error; err != nil {
+	batchQuery := tx.Where("product_id = ? AND warehouse_id = ? AND quantity > 0", input.ProductID, input.WarehouseID)
+	if branchID != 0 {
+		batchQuery = batchQuery.Where("branch_id = ?", branchID)
+	}
+	if err := batchQuery.Order("expiry_date ASC, created_at ASC").Find(&batches).Error; err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find available batches"})
 		return
@@ -219,7 +284,7 @@ func (h *InventoryHandler) StockOut(c *gin.Context) {
 			ProductID:   input.ProductID,
 			BatchID:     &batches[i].ID,
 			WarehouseID: input.WarehouseID,
-			BranchID:    branchID,
+			BranchID:    batches[i].BranchID,
 			UserID:      &userID,
 			Type:        models.MovementTypeOut,
 			Quantity:    -deduct, // Negative for OUT
@@ -283,6 +348,13 @@ func (h *InventoryHandler) AdjustStock(c *gin.Context) {
 		return
 	}
 
+	// Security: Prevent normal users from altering other branches
+	if branchID != 0 && batch.BranchID != branchID {
+		tx.Rollback()
+		c.JSON(http.StatusForbidden, gin.H{"error": "Cannot adjust stock for a batch belonging to another branch"})
+		return
+	}
+
 	difference := input.NewQuantity - batch.Quantity
 	if difference == 0 {
 		tx.Rollback()
@@ -303,7 +375,7 @@ func (h *InventoryHandler) AdjustStock(c *gin.Context) {
 		ProductID:   batch.ProductID,
 		BatchID:     &batch.ID,
 		WarehouseID: batch.WarehouseID,
-		BranchID:    branchID,
+		BranchID:    batch.BranchID,
 		UserID:      &userID,
 		Type:        models.MovementTypeAdjustment,
 		Quantity:    difference,
