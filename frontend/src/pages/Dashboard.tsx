@@ -248,8 +248,8 @@ export default function Dashboard() {
               <option value={7}>Last 7 Days</option>
             </select>
           </div>
-          <div className="h-[320px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-[320px] w-full min-h-[320px]">
+            <ResponsiveContainer width="100%" height="100%" minHeight={320} minWidth={0}>
               <AreaChart data={filteredSalesTrend}>
                 <defs>
                   <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
