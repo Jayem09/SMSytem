@@ -88,10 +88,23 @@ func (h *ProductHandler) List(c *gin.Context) {
 	}
 
 	var products []models.Product
-	branchID, _ := c.Get("branchID")
+	branchIDValue, _ := c.Get("branchID")
+	var branchID uint
+	if branchIDValue != nil {
+		branchID = branchIDValue.(uint)
+	}
 
-	// Use a subquery to calculate branch-specific stock
-	if err := query.Select("products.*, (SELECT COALESCE(SUM(quantity), 0) FROM batches WHERE product_id = products.id AND branch_id = ?) as stock", branchID).
+	// Use a subquery to calculate stock. 
+	// If branchID is 0 (super admin), show global stock across all branches.
+	stockSubquery := "(SELECT COALESCE(SUM(quantity), 0) FROM batches WHERE product_id = products.id"
+	var queryArgs []interface{}
+	if branchID != 0 {
+		stockSubquery += " AND branch_id = ?"
+		queryArgs = append(queryArgs, branchID)
+	}
+	stockSubquery += ") as stock"
+
+	if err := query.Select("products.*, "+stockSubquery, queryArgs...).
 		Order("created_at DESC").Find(&products).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch products"})
 		return
@@ -108,10 +121,22 @@ func (h *ProductHandler) GetByID(c *gin.Context) {
 	}
 
 	var product models.Product
-	branchID, _ := c.Get("branchID")
+	branchIDValue, _ := c.Get("branchID")
+	var branchID uint
+	if branchIDValue != nil {
+		branchID = branchIDValue.(uint)
+	}
+
+	stockSubquery := "(SELECT COALESCE(SUM(quantity), 0) FROM batches WHERE product_id = products.id"
+	var queryArgs []interface{}
+	if branchID != 0 {
+		stockSubquery += " AND branch_id = ?"
+		queryArgs = append(queryArgs, branchID)
+	}
+	stockSubquery += ") as stock"
 
 	if err := database.DB.Preload("Category").Preload("Brand").
-		Select("products.*, (SELECT COALESCE(SUM(quantity), 0) FROM batches WHERE product_id = products.id AND branch_id = ?) as stock", branchID).
+		Select("products.*, "+stockSubquery, queryArgs...).
 		First(&product, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
 		return
