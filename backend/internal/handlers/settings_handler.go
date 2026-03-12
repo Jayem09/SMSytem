@@ -61,10 +61,19 @@ func (h *SettingsHandler) UpdateBulk(c *gin.Context) {
 		}
 
 		setting := models.Setting{Key: key, Value: strValue}
-		if err := tx.Save(&setting).Error; err != nil {
-			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save settings"})
-			return
+		var existing models.Setting
+		if err := tx.First(&existing, "key = ?", key).Error; err != nil {
+			if err := tx.Create(&setting).Error; err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save settings"})
+				return
+			}
+		} else {
+			if err := tx.Model(&existing).Update("value", strValue).Error; err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save settings"})
+				return
+			}
 		}
 	}
 	tx.Commit()
