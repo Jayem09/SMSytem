@@ -230,10 +230,9 @@ export default function Dashboard() {
       </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        {/* Sales Chart - Admin Only */}
-        {isAdmin && (
-        <div className="lg:col-span-2 bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
+      {/* Sales Chart - Admin Only */}
+      {isAdmin && (
+        <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm mb-8">
           <div className="flex items-center justify-between mb-8">
             <div>
               <h2 className="text-xl font-bold text-gray-900">Revenue Stream</h2>
@@ -293,10 +292,10 @@ export default function Dashboard() {
             </ResponsiveContainer>
           </div>
         </div>
-        )}
+      )}
 
-        {/* Operational Quick Stats - Visible to all */}
-        <div className={`flex flex-col gap-6 ${user?.role !== 'admin' ? 'lg:col-span-3' : ''}`}>
+      {/* Operational Quick Stats - Visible to all */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
             <h2 className="text-xl font-bold text-gray-900 mb-6">Inventory Summary</h2>
             <div className="space-y-6">
@@ -443,7 +442,6 @@ export default function Dashboard() {
               </div>
             </div>
           )}
-        </div>
       </div>
     </div>
   );
