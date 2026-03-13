@@ -202,7 +202,7 @@ export default function Customers() {
         </form>
       </Modal>
 
-      {/* History Modal */}
+      {}
       <Modal open={historyModalOpen} onClose={() => setHistoryModalOpen(false)} title="Purchase History">
         <div className="p-4">
           <div className="mb-6 pb-6 border-b border-gray-100">

@@ -41,7 +41,7 @@ export default function Layout() {
     
     if (user) {
       fetchCounts();
-      // Poll every 30 seconds
+      
       const interval = setInterval(fetchCounts, 30000);
       window.addEventListener('transfer_updated', fetchCounts);
       return () => {
@@ -56,12 +56,12 @@ export default function Layout() {
     navigate('/login');
   };
 
-  // Default to 'user' if role is missing just in case
+  
   const currentRole = user?.role || 'user';
 
   return (
     <div className="min-h-screen flex bg-gray-50">
-      {/* Sidebar */}
+      {}
       <aside className="w-56 bg-white border-r border-gray-200 flex flex-col fixed h-screen no-print">
         <div className="px-4 py-4 border-b border-gray-200 flex justify-between items-center">
           <h1 className="text-lg font-semibold text-gray-900">SMSystem</h1>
@@ -116,7 +116,7 @@ export default function Layout() {
         </div>
       </aside>
 
-      {/* Main content */}
+      {}
       <main className="flex-1 ml-56 min-h-screen">
         <Outlet />
       </main>

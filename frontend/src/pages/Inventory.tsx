@@ -51,7 +51,7 @@ interface MovementLog {
   user: { name: string } | null;
 }
 
-// Input for creating PO items
+
 interface ItemInput {
   product_id: number;
   quantity: number;
@@ -67,22 +67,22 @@ export default function Inventory() {
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [productSearch, setProductSearch] = useState('');
   
-  // Data states
+  
   const [stockLevels, setStockLevels] = useState<StockLevel[]>([]);
   const [logs, setLogs] = useState<MovementLog[]>([]);
   const [loading, setLoading] = useState(false);
   
-  // Form states
+  
   const [search, setSearch] = useState('');
   const [supplierId, setSupplierId] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
   const [reference, setReference] = useState('');
   
-  // Stock In (PO) specific states
+  
   const [items, setItems] = useState<ItemInput[]>([{ product_id: 0, quantity: 1, unit_cost: 0 }]);
   const [orderDate, setOrderDate] = useState(new Date().toISOString().split('T')[0]);
 
-  // Stock Out specific states
+  
   const [productId, setProductId] = useState('');
   const [quantity, setQuantity] = useState('');
   const [batchNumber, setBatchNumber] = useState('');
@@ -91,7 +91,7 @@ export default function Inventory() {
   const [successMsg, setSuccessMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // Kebab menu & edit modal state
+  
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const [editLog, setEditLog] = useState<MovementLog | null>(null);
   const [editQty, setEditQty] = useState('');
@@ -204,7 +204,7 @@ export default function Inventory() {
     }
   };
 
-  // PO Item management helpers
+  
   const addItem = () => setItems([...items, { product_id: 0, quantity: 1, unit_cost: 0 }]);
   const removeItem = (index: number) => setItems(items.filter((_, i) => i !== index));
   const updateItem = (index: number, field: keyof ItemInput, value: number) => {
@@ -238,7 +238,7 @@ export default function Inventory() {
         await api.post('/api/purchase-orders', payload);
         setSuccessMsg('Successfully created a new Pending Purchase Order!');
         
-        // Reset form
+        
         setSupplierId('');
         setOrderDate(new Date().toISOString().split('T')[0]);
         setReference('');
@@ -255,7 +255,7 @@ export default function Inventory() {
         await api.post(`/api/inventory/out`, payload);
         setSuccessMsg(`Successfully logged stock out!`);
         
-        // Reset form
+        
         setProductId('');
         setQuantity('');
         setReference('');
@@ -282,7 +282,7 @@ export default function Inventory() {
         </div>
       </div>
 
-      {/* Tabs */}
+      {}
       <div className="flex space-x-1 border-b border-gray-200">
         {[
           { id: 'levels', label: 'Stock Levels', icon: Package },
@@ -307,7 +307,7 @@ export default function Inventory() {
 
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm min-h-[500px]">
         
-        {/* TAB: STOCK LEVELS */}
+        {}
         {activeTab === 'levels' && (
           <div className="p-0">
             <div className="p-4 border-b border-gray-100 flex items-center justify-between">
@@ -365,7 +365,7 @@ export default function Inventory() {
           </div>
         )}
 
-        {/* TAB: STOCK IN */}
+        {}
         {activeTab === 'in' && (
           <div className="max-w-xl mx-auto p-8">
             <h2 className="text-2xl font-bold mb-6 text-gray-900 flex items-center gap-2">
@@ -401,7 +401,7 @@ export default function Inventory() {
                 <input type="text" value={reference} onChange={e => setReference(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500" placeholder="Optional notes" />
               </div>
 
-              {/* Dynamic Items Array */}
+              {}
               <div className="pt-2">
                 <div className="flex items-center justify-between mb-3 border-b border-gray-200 pb-2">
                   <label className="text-sm font-semibold text-gray-900">Purchase Order Items</label>
@@ -486,7 +486,7 @@ export default function Inventory() {
           </div>
         )}
 
-        {/* TAB: STOCK OUT */}
+        {}
         {activeTab === 'out' && (
           <div className="max-w-xl mx-auto p-8">
             <h2 className="text-2xl font-bold mb-6 text-gray-900 flex items-center gap-2">
@@ -539,7 +539,7 @@ export default function Inventory() {
           </div>
         )}
 
-        {/* TAB: LOGS */}
+        {}
         {activeTab === 'logs' && (
           <div className="p-0">
             <div className="p-4 border-b border-gray-100 flex items-center justify-between">
@@ -643,7 +643,7 @@ export default function Inventory() {
 
       </div>
 
-      {/* Edit / Adjust Modal */}
+      {}
       {editLog && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">

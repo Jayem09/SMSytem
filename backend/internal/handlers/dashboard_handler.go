@@ -41,11 +41,11 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 		branchID = branchIDValue.(uint)
 	}
 
-	// Super Admin override
+	
 	if userRole == "super_admin" {
 		branchQuery := c.Query("branch_id")
 		if branchQuery == "ALL" {
-			branchID = 0 // 0 will skip the branch WHERE clause entirely
+			branchID = 0 
 		} else if branchQuery != "" {
 			var bID uint
 			fmt.Sscanf(branchQuery, "%d", &bID)
@@ -61,7 +61,7 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 	var orderCount int64
 	var customerCount int64
 
-	// Base queries
+	
 	ordersQuery := database.DB.Model(&models.Order{})
 	expensesQuery := database.DB.Model(&models.Expense{})
 	if branchID != 0 {
@@ -123,13 +123,13 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 		Limit(5).
 		Scan(&topProducts)
 
-	// Calculate current month and previous month stats for growth percentages
+	
 	var currentSales, prevSales float64
 	var currentExpenses, prevExpenses float64
 
-	// Current Month: 1st of DM to NOW
+	
 	cmStart := "DATE_FORMAT(NOW() ,'%Y-%m-01')"
-	// Previous Month: 1st of PM to end of PM
+	
 	pmStart := "DATE_FORMAT(DATE_SUB(NOW(), INTERVAL 1 MONTH) ,'%Y-%m-01')"
 	pmEnd := "LAST_DAY(DATE_SUB(NOW(), INTERVAL 1 MONTH))"
 

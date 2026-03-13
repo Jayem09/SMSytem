@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-// Category groups products into logical sections.
+
 type Category struct {
 	ID          uint      `gorm:"primaryKey" json:"id"`
 	Name        string    `gorm:"size:255;not null;uniqueIndex" json:"name"`

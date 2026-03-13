@@ -4,13 +4,13 @@ import (
 	"time"
 )
 
-// PurchaseOrder represents an order placed to a supplier for products.
+
 type PurchaseOrder struct {
 	ID           uint       `gorm:"primaryKey" json:"id"`
-	SupplierID   *uint      `gorm:"index" json:"supplier_id"`                       // nullable — Stock In requests may not have a supplier
-	UserID       uint       `gorm:"index;not null" json:"user_id"`                  // who created the PO
-	Status       string     `gorm:"size:50;not null;default:pending" json:"status"` // pending, received, cancelled
-	PONumber     string     `gorm:"size:100" json:"po_number"`                      // supplier receipt/PO number, filled when received
+	SupplierID   *uint      `gorm:"index" json:"supplier_id"`                       
+	UserID       uint       `gorm:"index;not null" json:"user_id"`                  
+	Status       string     `gorm:"size:50;not null;default:pending" json:"status"` 
+	PONumber     string     `gorm:"size:100" json:"po_number"`                      
 	TotalCost    float64    `gorm:"not null;default:0" json:"total_cost"`
 	OrderDate    time.Time  `gorm:"not null" json:"order_date"`
 	ReceivedDate *time.Time `json:"received_date"`
@@ -18,7 +18,7 @@ type PurchaseOrder struct {
 	CreatedAt    time.Time  `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt    time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
 
-	// Relationships
+	
 	Supplier *Supplier           `gorm:"foreignKey:SupplierID" json:"supplier,omitempty"`
 	User     User                `gorm:"foreignKey:UserID" json:"user,omitempty"`
 	Items    []PurchaseOrderItem `gorm:"foreignKey:PurchaseOrderID" json:"items,omitempty"`
@@ -28,7 +28,7 @@ func (PurchaseOrder) TableName() string {
 	return "purchase_orders"
 }
 
-// PurchaseOrderItem represents a single line item in a purchase order.
+
 type PurchaseOrderItem struct {
 	ID              uint    `gorm:"primaryKey" json:"id"`
 	PurchaseOrderID uint    `gorm:"index;not null" json:"purchase_order_id"`
@@ -37,7 +37,7 @@ type PurchaseOrderItem struct {
 	UnitCost        float64 `gorm:"not null;default:0" json:"unit_cost"`
 	Subtotal        float64 `gorm:"not null;default:0" json:"subtotal"`
 
-	// Relationships
+	
 	Product Product `gorm:"foreignKey:ProductID" json:"product,omitempty"`
 }
 

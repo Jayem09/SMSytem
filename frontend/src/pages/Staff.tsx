@@ -27,11 +27,11 @@ export default function Staff() {
   const [searchTerm, setSearchTerm] = useState('');
   const [branches, setBranches] = useState<{id: number, name: string}[]>([]);
   
-  // Delete Modal state
+  
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<StaffUser | null>(null);
 
-  // Reset Password Modal state
+  
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [userToReset, setUserToReset] = useState<StaffUser | null>(null);
   const [newPassword, setNewPassword] = useState('');
@@ -296,7 +296,7 @@ export default function Staff() {
         </div>
       </Modal>
 
-      {/* Password Reset Modal */}
+      {}
       <Modal
         open={isResetModalOpen}
         onClose={() => setIsResetModalOpen(false)}

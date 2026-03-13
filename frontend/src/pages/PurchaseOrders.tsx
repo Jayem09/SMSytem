@@ -38,7 +38,7 @@ interface PurchaseOrder {
   items: PurchaseOrderItem[];
 }
 
-// Removed ItemInput interface since it's moving to Inventory.tsx
+
 
 export default function PurchaseOrders() {
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
@@ -47,7 +47,7 @@ export default function PurchaseOrders() {
   const [selectedOrder, setSelectedOrder] = useState<PurchaseOrder | null>(null);
   const [error, setError] = useState('');
   
-  // Custom Confirm / Receive Modal State
+  
   const [confirmModal, setConfirmModal] = useState<{ 
     message: string; 
     onConfirm: (poNumber?: string) => void;
@@ -137,7 +137,7 @@ export default function PurchaseOrders() {
 
       {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
 
-      {/* Purchase Orders Table */}
+      {}
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         <table className="w-full text-sm">
           <thead>
@@ -188,7 +188,7 @@ export default function PurchaseOrders() {
         </table>
       </div>
 
-      {/* View PO Details Modal */}
+      {}
       <Modal open={viewModalOpen} onClose={() => setViewModalOpen(false)} title={`Purchase Order #${selectedOrder?.id}`} wide>
         {selectedOrder && (
           <div className="space-y-4">
@@ -257,10 +257,10 @@ export default function PurchaseOrders() {
         )}
       </Modal>
 
-      {/* Create PO Modal Removed (moved to Inventory) */}
+      {}
     </div>
 
-    {/* Custom Confirm Modal (replaces window.confirm for Tauri) */}
+    {}
     {confirmModal && (
       <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
         <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">

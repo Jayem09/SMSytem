@@ -25,7 +25,7 @@ type brandInput struct {
 	LogoURL string `json:"logo_url" binding:"max=500"`
 }
 
-// List returns all brands.
+
 func (h *BrandHandler) List(c *gin.Context) {
 	var brands []models.Brand
 	if err := database.DB.Order("name ASC").Find(&brands).Error; err != nil {
@@ -35,7 +35,7 @@ func (h *BrandHandler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"brands": brands})
 }
 
-// GetByID returns a single brand by ID.
+
 func (h *BrandHandler) GetByID(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -51,7 +51,7 @@ func (h *BrandHandler) GetByID(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"brand": brand})
 }
 
-// Create creates a new brand.
+
 func (h *BrandHandler) Create(c *gin.Context) {
 	var input brandInput
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -77,7 +77,7 @@ func (h *BrandHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "Brand created", "brand": brand})
 }
 
-// Update updates an existing brand.
+
 func (h *BrandHandler) Update(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -113,7 +113,7 @@ func (h *BrandHandler) Update(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Brand updated", "brand": brand})
 }
 
-// Delete deletes a brand.
+
 func (h *BrandHandler) Delete(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {

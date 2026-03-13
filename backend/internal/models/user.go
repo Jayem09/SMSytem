@@ -19,7 +19,7 @@ type User struct {
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
-// TableName sets the MySQL table name.
+
 func (User) TableName() string {
 	return "users"
 }

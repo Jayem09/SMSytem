@@ -28,7 +28,7 @@ export default function Dashboard() {
   
   const [dropdownOpen, setDropdownOpen] = useState<'advisors' | 'products' | null>(null);
 
-  // Close dropdowns when clicking outside
+  
   useEffect(() => {
     const handleClickOutside = () => setDropdownOpen(null);
     document.addEventListener('click', handleClickOutside);
@@ -66,7 +66,7 @@ export default function Dashboard() {
     
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - timeRange);
-    cutoff.setHours(0, 0, 0, 0); // Exact midnight cutoff
+    cutoff.setHours(0, 0, 0, 0); 
     
     return stats.sales_trend.filter(d => new Date(d.date) >= cutoff);
   }, [stats.sales_trend, timeRange]);
@@ -170,7 +170,7 @@ export default function Dashboard() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      {/* Header */}
+      {}
       <div className="mb-8 flex justify-between items-end">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-3">
@@ -189,7 +189,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Low Stock Notification */}
+      {}
       {stats.low_stock_products?.length > 0 && (
         <div className="mb-8 p-4 bg-orange-50 border border-orange-100 rounded-2xl flex items-center shadow-sm">
           <div className="p-2 bg-orange-100 rounded-lg mr-4">
@@ -207,7 +207,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Key Metrics Grid - Admin Only */}
+      {}
       {isAdmin && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         {[
@@ -239,7 +239,7 @@ export default function Dashboard() {
       </div>
       )}
 
-      {/* Sales Chart - Admin Only */}
+      {}
       {isAdmin && (
         <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm mb-8">
           <div className="flex items-center justify-between mb-8">
@@ -303,7 +303,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Operational Quick Stats - Visible to all */}
+      {}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
             <h2 className="text-xl font-bold text-gray-900 mb-6">Inventory Summary</h2>
@@ -348,7 +348,7 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* Today's Top Advisors */}
+          {}
           {isAdmin && (
             <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
               <div className="flex items-center justify-between mb-8">
@@ -400,7 +400,7 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Today's Top Products */}
+          {}
           {isAdmin && (
             <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
               <div className="flex items-center justify-between mb-8">

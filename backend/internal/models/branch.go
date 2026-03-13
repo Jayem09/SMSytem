@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-// Branch represents a physical shop location.
+
 type Branch struct {
 	ID        uint      `gorm:"primaryKey" json:"id"`
 	Name      string    `gorm:"size:255;not null" json:"name"`

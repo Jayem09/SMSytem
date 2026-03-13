@@ -50,18 +50,18 @@ export default function Transfers() {
   const [activeTab, setActiveTab] = useState<'sender' | 'receiver' | 'all'>('sender');
   const [branchFilter, setBranchFilter] = useState('ALL');
 
-  // Request Transfer Modal
+  
   const [requestModalOpen, setRequestModalOpen] = useState(false);
   const [targetBranchId, setTargetBranchId] = useState('');
   const [notes, setNotes] = useState('');
   const [requestItems, setRequestItems] = useState<{product_id: number, quantity: number, product?: Product}[]>([]);
   const [productSearch, setProductSearch] = useState('');
   
-  // View Details Modal
+  
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [selectedTransfer, setSelectedTransfer] = useState<Transfer | null>(null);
 
-  // Feedback Modal
+  
   const [feedback, setFeedback] = useState<{
     open: boolean;
     title: string;
@@ -208,39 +208,39 @@ export default function Transfers() {
     setRequestItems(requestItems.filter(i => i.product_id !== productId));
   };
 
-  // 1. FILTER THE LIST FOR THE CURRENT TAB
+  
   const filteredTransfers = transfers.filter(t => {
     if (activeTab === 'all') return true;
     
-    // NETWORK-WIDE VIEW (Super Admin + 'ALL' filter)
+    
     if (isSuperAdmin && branchFilter === 'ALL') {
       if (activeTab === 'sender') {
-        // Master "Outgoing" list - Someone needs to Approve or Ship
-        // NEW: Exclude items where the CURRENT user's branch is the destination (they are the receiver)
+        
+        
         const isActionable = t.status === 'pending' || t.status === 'approved';
         if (!isActionable) return false;
         if (myBranchId && Number(t.destination_branch_id) === myBranchId) return false;
         return true;
       } else {
-        // Master "Incoming" list - Someone needs to Receive
-        // NEW: Include anything I (or anyone) requested that hasn't arrived yet
+        
+        
         return t.status === 'in_transit' || t.status === 'pending' || t.status === 'approved';
       }
     }
 
-    // BRANCH-SPECIFIC VIEW (Regular User OR Super Admin filtered to 1 branch)
-    if (!focusBranchId) return true; // Safety
+    
+    if (!focusBranchId) return true; 
 
     if (activeTab === 'sender') {
-      // Show if THIS branch is the one SENDING (Source)
+      
       return Number(t.source_branch_id) === focusBranchId;
     } else {
-      // Show if THIS branch is the one RECEIVING (Destination)
+      
       return Number(t.destination_branch_id) === focusBranchId;
     }
   });
 
-  // Log for debugging
+  
   console.log('TRANSFERS DEBUG:', {
     role: user?.role,
     isSuperAdmin,
@@ -256,16 +256,16 @@ export default function Transfers() {
       status: t.status
     }))
   });
-  // 2. CALCULATE ACTIONABLE BADGE COUNTS (Notifications)
+  
   const senderActionCount = transfers.filter(t => {
     const isActionable = t.status === 'pending' || t.status === 'approved';
     if (!isActionable) return false;
     
-    // For specific branch: only count if they are the source
+    
     if (focusBranchId) return Number(t.source_branch_id) === focusBranchId;
 
-    // For ALL network (Super Admin):
-    // Count everything BUT exclude my own requests (I am the destination)
+    
+    
     if (myBranchId && Number(t.destination_branch_id) === myBranchId) return false;
     return true;
   }).length;
@@ -274,15 +274,15 @@ export default function Transfers() {
     const isActionable = t.status === 'in_transit';
     if (!isActionable) return false;
     
-    // For specific branch: only count if they are the destination
+    
     if (focusBranchId) return Number(t.destination_branch_id) === focusBranchId;
 
-    // For ALL network (Super Admin):
-    // Count anything currently in transit that needs receiving anywhere
+    
+    
     return true;
   }).length;
 
-  // Log for debugging
+  
   console.log('TRANSFERS DEBUG:', {
     role: user?.role,
     isSuperAdmin,
@@ -417,7 +417,7 @@ export default function Transfers() {
         )}
       </div>
 
-      {/* NEW/REQUEST MODAL */}
+      {}
       <Modal open={requestModalOpen} onClose={() => setRequestModalOpen(false)} title="REQUEST STOCK TRANSFER" maxWidth="max-w-2xl">
         <div className="space-y-6">
           <div className="bg-blue-50 text-blue-800 p-4 rounded-xl text-sm font-medium border border-blue-100 flex items-start gap-3">
@@ -449,7 +449,7 @@ export default function Transfers() {
                <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest">Requested Items</h3>
              </div>
              
-             {/* Search Area */}
+             {}
              <div className="p-4 border-b border-gray-100 relative">
                <div className="relative">
                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -519,7 +519,7 @@ export default function Transfers() {
         </div>
       </Modal>
 
-      {/* VIEW DETAILS MODAL */}
+      {}
       <Modal open={viewModalOpen} onClose={() => setViewModalOpen(false)} title={`TRANSFER ${selectedTransfer?.reference_number}`} maxWidth="max-w-2xl">
         {selectedTransfer && (
           <div className="space-y-6">
@@ -559,9 +559,9 @@ export default function Transfers() {
                </div>
             </div>
 
-            {/* ACTION BUTTONS */}
+            {}
             <div className="pt-4 border-t border-gray-100 flex flex-wrap gap-3 justify-end">
-              {/* SOURCE BRANCH CAPABILITIES (Fulfilling the request) */}
+              {}
               {(isSuperAdmin || myBranchId === selectedTransfer.source_branch_id) && selectedTransfer.status === 'pending' && (
                 <>
                   <button onClick={() => handleUpdateStatus(selectedTransfer.id, 'rejected')} className="px-4 py-3 bg-red-50 text-red-600 font-black text-xs rounded-xl uppercase tracking-widest flex items-center gap-2 hover:bg-red-100 transition-colors"><XCircle className="w-4 h-4"/> REJECT</button>
@@ -573,12 +573,12 @@ export default function Transfers() {
                 <button onClick={() => handleUpdateStatus(selectedTransfer.id, 'in_transit')} className="px-6 py-3 bg-purple-600 text-white font-black text-xs rounded-xl uppercase tracking-widest flex items-center gap-2 hover:bg-purple-500 transition-colors shadow-xl shadow-purple-200"><Truck className="w-4 h-4"/> SHIP INVENTORY</button>
               )}
 
-              {/* DESTINATION BRANCH CAPABILITIES (Receiving the request) */}
+              {}
               {(isSuperAdmin || myBranchId === selectedTransfer.destination_branch_id) && selectedTransfer.status === 'in_transit' && (
                 <button onClick={() => handleUpdateStatus(selectedTransfer.id, 'completed')} className="px-6 py-3 bg-green-600 text-white font-black text-xs rounded-xl uppercase tracking-widest flex items-center gap-2 hover:bg-green-500 transition-colors shadow-xl shadow-green-200"><Inbox className="w-4 h-4"/> CONFIRM RECEIPT (ADD TO STOCK)</button>
               )}
 
-              {/* CANCELLATION CAPABILITIES */}
+              {}
               {(isSuperAdmin || myBranchId === selectedTransfer.destination_branch_id) && selectedTransfer.status === 'pending' && (
                 <button onClick={() => handleUpdateStatus(selectedTransfer.id, 'cancelled')} className="px-4 py-3 bg-white border border-gray-200 text-gray-500 font-black text-xs rounded-xl uppercase tracking-widest hover:bg-gray-50 transition-colors">CANCEL REQUEST</button>
               )}

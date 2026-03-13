@@ -89,7 +89,7 @@ export default function CRM() {
         <p className="text-gray-500 mt-1">Customer relationship, behavioral analysis, and retention metrics.</p>
       </div>
 
-      {/* KPI Cards */}
+      {}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
           <div>
@@ -135,7 +135,7 @@ export default function CRM() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Top Spenders (Left: 2 Cols) */}
+        {}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden lg:col-span-2">
           <div className="p-6 border-b border-gray-100 flex items-center justify-between">
             <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
@@ -186,7 +186,7 @@ export default function CRM() {
           </div>
         </div>
 
-        {/* Popular Categories (Right: 1 Col) */}
+        {}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
           <div className="p-6 border-b border-gray-100">
             <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
@@ -221,7 +221,7 @@ export default function CRM() {
         </div>
       </div>
 
-      {/* At-Risk Customers */}
+      {}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-gray-200 flex items-center justify-between">
           <div>

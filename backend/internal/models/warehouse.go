@@ -6,7 +6,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// Warehouse represents a physical storage location.
+
 type Warehouse struct {
 	ID        uint           `gorm:"primaryKey" json:"id"`
 	Name      string         `gorm:"size:255;not null" json:"name"`

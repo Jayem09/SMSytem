@@ -31,20 +31,20 @@ function App() {
       <BrowserRouter>
         <AuthProvider>
           <Routes>
-          {/* Public */}
+          {}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/receipt-test" element={<ReceiptTest />} />
 
-          {/* Protected with sidebar layout */}
+          {}
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-            {/* Shared roles (Admin & Cashier) */}
+            {}
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/pos" element={<POS />} />
             <Route path="/customers" element={<Customers />} />
             <Route path="/orders" element={<Orders />} />
 
-            {/* Admin only */}
+            {}
             <Route path="/crm" element={<ProtectedRoute requiredRole="admin"><CRM /></ProtectedRoute>} />
             <Route path="/products" element={<ProtectedRoute requiredRole="admin"><Products /></ProtectedRoute>} />
             <Route path="/daily-report" element={<ProtectedRoute requiredRole="admin"><DailyReport /></ProtectedRoute>} />

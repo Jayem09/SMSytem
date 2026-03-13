@@ -55,7 +55,7 @@ export default function POS() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // Checkout State
+  
   const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
   const [customerId, setCustomerId] = useState('');
   const [serviceAdvisorName, setServiceAdvisorName] = useState('');
@@ -65,7 +65,7 @@ export default function POS() {
   const [businessAddress, setBusinessAddress] = useState('');
   const [withholdingTaxRate, setWithholdingTaxRate] = useState('0');
   const [paymentMethod, setPaymentMethod] = useState('cash');
-  const [receiptType, setReceiptType] = useState<'SI' | 'DR'>('SI'); // Added Receipt Type
+  const [receiptType, setReceiptType] = useState<'SI' | 'DR'>('SI'); 
   const [discount, setDiscount] = useState('0');
   const [successModalOpen, setSuccessModalOpen] = useState(false);
   const [lastOrder, setLastOrder] = useState<Order | null>(null);
@@ -89,7 +89,7 @@ export default function POS() {
       setCategories(cRes.data.categories || []);
       setCustomers(custRes.data.customers || []);
       
-      // Parse SA list from settings
+      
       if (settingsRes.data?.service_advisors) {
         try {
           const parsed = Array.isArray(settingsRes.data.service_advisors)
@@ -157,14 +157,14 @@ export default function POS() {
       if (paymentMethod === 'card') {
         setIsProcessingTerminal(true);
         try {
-          // 1. Call the Terminal Service
+          
           const terminalRes = await api.post('/api/terminal/payment', { amount: finalTotal });
           if (terminalRes.data.status !== "APPROVED") {
             alert(`Terminal Error: ${terminalRes.data.error_message || "Transaction Declined"}`);
             setIsProcessingTerminal(false);
             return;
           }
-          // The terminal approved the transaction. Proceed to save the order.
+          
         } catch (termErr: any) {
           alert(`Failed to communicate with terminal: ${termErr.message}`);
           setIsProcessingTerminal(false);
@@ -207,8 +207,8 @@ export default function POS() {
       setTin('');
       setBusinessAddress('');
       setWithholdingTaxRate('0');
-      // Keep selected print mechanism
-      fetchData(); // Refresh stock and meta
+      
+      fetchData(); 
     } catch (err: unknown) {
       const axiosError = err as { response?: { data?: { error?: string, details?: string } } };
       const errorMessage = axiosError.response?.data?.error || 'Checkout failed';
@@ -225,7 +225,7 @@ export default function POS() {
 
   return (
     <div className="flex h-screen bg-gray-100 overflow-hidden">
-      {/* Left Column: Product Selection */}
+      {}
       <div className="flex-1 flex flex-col min-w-0">
         <header className="bg-white border-b border-gray-200 p-4">
           <div className="flex items-center gap-4">
@@ -294,14 +294,14 @@ export default function POS() {
             </div>
           ) : (
             <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
-              {/* Table Header */}
+              {}
               <div className="grid grid-cols-[2fr_1fr_auto_auto] gap-0 border-b border-gray-100 bg-gray-50">
                 <div className="px-4 py-2.5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Product</div>
                 <div className="px-4 py-2.5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Price</div>
                 <div className="px-4 py-2.5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Stock</div>
                 <div className="px-4 py-2.5 text-[10px] font-black text-gray-400 uppercase tracking-widest"></div>
               </div>
-              {/* Table Rows */}
+              {}
               {filteredProducts.map((p, idx) => {
                 const outOfStock = !p.is_service && p.stock <= 0;
                 return (
@@ -358,7 +358,7 @@ export default function POS() {
         </main>
       </div>
 
-      {/* Right Column: Cart & Summary */}
+      {}
       <div className="w-96 bg-white border-l border-gray-200 flex flex-col">
         <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
           <div className="flex items-center gap-2">
@@ -445,10 +445,10 @@ export default function POS() {
         </div>
       </div>
 
-      {/* Checkout Modal */}
+      {}
       <Modal open={checkoutModalOpen} onClose={() => setCheckoutModalOpen(false)} title="Finalize Sale" maxWidth="max-w-4xl">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-2">
-          {/* Left Column: Customer & Service Info */}
+          {}
           <div className="space-y-5">
             <div>
               <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2 mb-4">Customer Details</h3>
@@ -485,7 +485,7 @@ export default function POS() {
             </div>
           </div>
 
-          {/* Right Column: Record & Payment Protocol */}
+          {}
           <div className="space-y-5 md:pl-6 md:border-l border-gray-100">
              <div>
               <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2 mb-4">Paperwork & Payment</h3>
@@ -554,7 +554,7 @@ export default function POS() {
           </div>
         </div>
 
-        {/* Footer Actions */}
+        {}
         <div className="mt-8 pt-6 border-t border-gray-100">
           <div className="flex items-center justify-between px-6 py-4 bg-gray-50 rounded-2xl border border-gray-100 mb-6">
             <span className="text-[11px] font-black text-gray-500 uppercase tracking-widest">Final Amount Due</span>
@@ -593,7 +593,7 @@ export default function POS() {
         </div>
       </Modal>
 
-      {/* Success Modal */}
+      {}
       <Modal open={successModalOpen} onClose={() => setSuccessModalOpen(false)} title="Success">
         <div className="text-center py-6">
           <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">

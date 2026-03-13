@@ -8,25 +8,25 @@ import (
 	"github.com/joho/godotenv"
 )
 
-// Config holds all configuration for the application.
+
 type Config struct {
 	DBHost      string
 	DBPort      string
 	DBUser      string
 	DBPassword  string
 	DBName      string
-	DatabaseURL string // New: supports full mysql:// strings
+	DatabaseURL string 
 	ServerPort  string
 	JWTSecret   string
 	JWTExpiry   string
 }
 
-// Load reads configuration from .env file and environment variables.
+
 func Load() *Config {
-	// Try loading .env from:
-	// 1. Current working directory
-	// 2. Parent directory
-	// 3. Executable directory (robust for bundled apps like Tauri)
+	
+	
+	
+	
 	paths := []string{".env", "../.env"}
 
 	if execPath, err := os.Executable(); err == nil {

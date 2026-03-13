@@ -1,11 +1,4 @@
-/**
- * Sales Invoice Receipt — prints TEXT ONLY onto pre-printed LETTER (8.5" x 11") invoice paper.
- * All positions use absolute positioning (in inches) to align with form fields.
- * No borders or boxes are printed — those are already on the paper.
- *
- * PREVIEW MODE: Shows scanned form as background so you can visually align text.
- * The background is hidden when printing (@media print).
- */
+
 
 interface ReceiptOrderItem {
   id: number;
@@ -32,23 +25,23 @@ export function generateDeliveryReceiptHTML(order: ReceiptOrder, _tin?: string, 
   const date = new Date(order.created_at);
   const dateStr = date.toLocaleDateString('en-PH', { year: 'numeric', month: '2-digit', day: '2-digit' });
 
-  // Customer info
+  
   const customerName = order.customer?.name || order.guest_name || 'WALK-IN';
   const custAddress = (order.customer?.address || businessAddress || '').toUpperCase();
 
-  // Simple total (No Tax)
+  
   const totalAmount = order.total_amount || 0;
   const fmt = (n: number | undefined | null) => (n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  // Build item rows using absolute positioning for columns
-  // Request: qty, unit, desc, unit price, amount
+  
+  
   const items = order.items || [];
   const itemRows = items.map((item, index) => {
     const unitPrice = item.unit_price ?? item.price ?? (item.subtotal && item.quantity ? item.subtotal / item.quantity : 0);
     const subtotal = item.subtotal ?? 0;
-    const unit = "PCS"; // Default unit as it's not in the data model yet
+    const unit = "PCS"; 
     
-    // Calculate the Y position for this row.
+    
     const baseTop = 3.47; 
     const rowHeight = 0.29;
     const topPos = baseTop + (index * rowHeight);
@@ -81,16 +74,11 @@ export function generateDeliveryReceiptHTML(order: ReceiptOrder, _tin?: string, 
           width: 8.27in;
           height: 11.69in;
           position: relative;
-          /* ★ PRINTER OFFSET — adjust this single value to shift ALL text up/down ★
-             Negative = move UP, Positive = move DOWN
-             Change this when switching printers */
+          
           --printer-offset: 0in;
         }
 
-        /* ═══════════════════════════════════════════════
-           BACKGROUND TEMPLATE — visible on screen only
-           Hidden when printing on actual pre-printed paper
-           ═══════════════════════════════════════════════ */
+        
         .bg-template {
           position: absolute;
           top: 0;
@@ -107,9 +95,9 @@ export function generateDeliveryReceiptHTML(order: ReceiptOrder, _tin?: string, 
           object-fit: fill;
         }
 
-        /* Hide background + toolbar when actually printing */
+        
         @media print {
-          /* TEMP: Allow background image on print for alignment verification */
+          
            .bg-template { 
              display: block !important; 
              opacity: 0.25 !important; 
@@ -123,7 +111,7 @@ export function generateDeliveryReceiptHTML(order: ReceiptOrder, _tin?: string, 
           .toolbar { display: none !important; }
         }
 
-        /* All text fields sit above the background */
+        
         .date-field, .reg-name, .tin-field, .address,
         .items-table, .vatable-sales, .vat-amount-left,
         .zero-rated, .vat-exempt, .total-vat-incl,
@@ -132,18 +120,14 @@ export function generateDeliveryReceiptHTML(order: ReceiptOrder, _tin?: string, 
           z-index: 1;
         }
 
-        /* ══════════════════════════════════════════════
-           POSITION GUIDE — calibrated from scanned form
-           Paper: Letter 8.5" × 11"
-           All values are in inches from top-left corner.
-           ══════════════════════════════════════════════ */
+        
 
-        /* ---------- Customer Info Section ---------- */
+        
         .date-field { position: absolute; top: calc(1.60in + var(--printer-offset));  left: 5.80in;  font-size: 15px; }
         .reg-name   { position: absolute; top: calc(2.15in + var(--printer-offset));  left: 1.90in;  font-size: 15px; }
         .address    { position: absolute; top: calc(2.55in + var(--printer-offset));  left: 1.05in;  font-size: 14px; width: 4.5in; line-height: 1.2; }
 
-        /* ---------- Items (Absolute Layout) ---------- */
+        
         .col-qty, .col-unit, .col-desc, .col-price, .col-amt {
           position: absolute;
           font-size: 15px;
@@ -159,10 +143,10 @@ export function generateDeliveryReceiptHTML(order: ReceiptOrder, _tin?: string, 
         .col-price { width: 1.0in; text-align: right; }
         .col-amt   { width: 1.0in; text-align: right; }
 
-        /* ---------- Total Summary ---------- */
+        
         .total-due { position: absolute; top: calc(8.75in + var(--printer-offset)); left: 6.20in; font-size: 18px; font-weight: bold; text-align: right; width: 1.5in; border-top: 1px solid #000; padding-top: 5px; }
 
-        /* ---------- Toolbar ---------- */
+        
         .toolbar {
           position: fixed;
           top: 10px;

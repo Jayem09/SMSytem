@@ -7,7 +7,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
   const [isLoading, setIsLoading] = useState(true);
 
-  // On mount, verify token and fetch user
+  
   useEffect(() => {
     const initAuth = async () => {
       const savedToken = localStorage.getItem('token');

@@ -14,18 +14,18 @@ import (
 )
 
 func main() {
-	// Load configuration
+	
 	cfg := config.Load()
 	log.Println("Configuration loaded")
 
-	// Connect to database
+	
 	database.Connect(cfg)
 	log.Println("Database ready")
 
-	// Initialize services and handlers
+	
 	authService := services.NewAuthService(cfg)
 	logService := services.NewLogService()
-	// Initialize terminal service in Simulation Mode (true) for now.
+	
 	terminalService := services.NewTerminalService(true, "COM1")
 
 	h := &routes.Handlers{
@@ -50,11 +50,11 @@ func main() {
 		Transfer:      handlers.NewTransferHandler(logService),
 	}
 
-	// Setup Gin router
+	
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
 
-	// CORS configuration
+	
 	router.Use(func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
 		if origin != "" {
@@ -74,10 +74,10 @@ func main() {
 		c.Next()
 	})
 
-	// Setup routes
+	
 	routes.Setup(router, cfg, h)
 
-	// Start server
+	
 	addr := fmt.Sprintf(":%s", cfg.ServerPort)
 	log.Printf("Server starting on http://localhost%s", addr)
 	if err := router.Run(addr); err != nil {

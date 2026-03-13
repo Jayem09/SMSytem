@@ -10,7 +10,7 @@ const data = utils.sheet_to_json(worksheet, { header: 1 });
 
 const validRows = data.filter(row => row && row.length >= 8 && row[0] && row[3] && row[4]);
 
-// Investigate if there are any columns that might be stock
+
 console.log("Headers:");
 console.dir(data[0], { depth: null });
 

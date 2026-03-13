@@ -26,8 +26,8 @@ func (h *TerminalHandler) ProcessPayment(c *gin.Context) {
 		return
 	}
 
-	// Trigger terminal processing
-	// This will block until terminal responds or times out
+	
+	
 	resp, err := h.TerminalService.ProcessPayment(req.Amount)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Terminal communication failed", "details": err.Error()})

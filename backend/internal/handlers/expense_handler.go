@@ -18,7 +18,7 @@ func NewExpenseHandler(logService *services.LogService) *ExpenseHandler {
 	return &ExpenseHandler{LogService: logService}
 }
 
-// Create handles POST /api/expenses
+
 func (h *ExpenseHandler) Create(c *gin.Context) {
 	var expense models.Expense
 	if err := c.ShouldBindJSON(&expense); err != nil {
@@ -31,7 +31,7 @@ func (h *ExpenseHandler) Create(c *gin.Context) {
 	expense.UserID = userID.(uint)
 	expense.BranchID = branchID.(uint)
 
-	// Start Transaction
+	
 	tx := database.DB.Begin()
 
 	if err := tx.Create(&expense).Error; err != nil {
@@ -40,7 +40,7 @@ func (h *ExpenseHandler) Create(c *gin.Context) {
 		return
 	}
 
-	// If it's an inventory procurement, update stock
+	
 	if expense.ProductID != nil && expense.Quantity > 0 {
 		if err := tx.Model(&models.Product{}).Where("id = ?", *expense.ProductID).
 			Update("stock", database.DB.Raw("stock + ?", expense.Quantity)).Error; err != nil {
@@ -60,7 +60,7 @@ func (h *ExpenseHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, expense)
 }
 
-// List handles GET /api/expenses
+
 func (h *ExpenseHandler) List(c *gin.Context) {
 	branchID, _ := c.Get("branchID")
 	var expenses []models.Expense
@@ -71,7 +71,7 @@ func (h *ExpenseHandler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, expenses)
 }
 
-// Update handles PUT /api/expenses/:id
+
 func (h *ExpenseHandler) Update(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
 	var expense models.Expense
@@ -98,7 +98,7 @@ func (h *ExpenseHandler) Update(c *gin.Context) {
 	c.JSON(http.StatusOK, expense)
 }
 
-// Delete handles DELETE /api/expenses/:id
+
 func (h *ExpenseHandler) Delete(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
 	if err := database.DB.Delete(&models.Expense{}, id).Error; err != nil {

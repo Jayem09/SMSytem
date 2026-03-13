@@ -11,7 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Handlers holds all handler instances.
+
 type Handlers struct {
 	Auth          *handlers.AuthHandler
 	Category      *handlers.CategoryHandler
@@ -34,9 +34,9 @@ type Handlers struct {
 	Transfer      *handlers.TransferHandler
 }
 
-// Setup configures all API routes.
+
 func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
-	// Health check
+	
 	router.GET("/api/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status":  "ok",
@@ -44,45 +44,45 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 		})
 	})
 
-	// ─── Public auth routes ───
+	
 	auth := router.Group("/api/auth")
 	{
 		auth.POST("/register", h.Auth.Register)
 		auth.POST("/login", h.Auth.Login)
 	}
 
-	// ─── Protected routes (require valid JWT) ───
+	
 	protected := router.Group("/api")
 	protected.Use(middleware.AuthMiddleware(cfg))
 	{
-		// Auth
+		
 		protected.GET("/auth/me", h.Auth.GetMe)
 
-		// Dashboard
+		
 		protected.GET("/dashboard", h.Dashboard.GetStats)
 
-		// ─── Categories ───
+		
 		categories := protected.Group("/categories")
 		{
 			categories.GET("", h.Category.List)
 			categories.GET("/:id", h.Category.GetByID)
 		}
 
-		// ─── Brands ───
+		
 		brands := protected.Group("/brands")
 		{
 			brands.GET("", h.Brand.List)
 			brands.GET("/:id", h.Brand.GetByID)
 		}
 
-		// ─── Products ───
+		
 		products := protected.Group("/products")
 		{
 			products.GET("", h.Product.List)
 			products.GET("/:id", h.Product.GetByID)
 		}
 
-		// ─── Customers ───
+		
 		customers := protected.Group("/customers")
 		{
 			customers.GET("", h.Customer.List)
@@ -92,7 +92,7 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 			customers.PUT("/:id", h.Customer.Update)
 		}
 
-		// ─── Orders ───
+		
 		orders := protected.Group("/orders")
 		{
 			orders.GET("", h.Order.List)
@@ -101,61 +101,61 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 			orders.PATCH("/:id/status", h.Order.UpdateStatus)
 		}
 
-		// ─── Inventory ───
+		
 		inventory := protected.Group("/inventory")
 		{
 			inventory.GET("/warehouses", h.Inventory.GetWarehouses)
 			inventory.GET("/levels", h.Inventory.GetStockLevels)
 			inventory.GET("/logs", h.Inventory.GetMovementLogs)
-			// Modifications require admin
+			
 		}
 
-		// ─── Branches (Listing for transfers) ───
+		
 		protected.GET("/branches", h.Branch.List)
 
-		// ─── Transfers ───
+		
 		transfers := protected.Group("/transfers")
 		{
 			transfers.GET("", h.Transfer.List)
 			transfers.GET("/pending-counts", h.Transfer.GetPendingCounts)
 			transfers.POST("", h.Transfer.Create)
-			// Only allow updating status (approving, shipping, receiving)
+			
 			transfers.PUT("/:id/status", h.Transfer.UpdateStatus)
 		}
 
-		// ─── Admin/SuperAdmin shared routes ───
+		
 		admin := protected.Group("")
 		admin.Use(middleware.RequireRole("admin", "super_admin"))
 		{
-			// Category CUD
+			
 			admin.POST("/categories", h.Category.Create)
 			admin.PUT("/categories/:id", h.Category.Update)
 			admin.DELETE("/categories/:id", h.Category.Delete)
 
-			// Brand CUD
+			
 			admin.POST("/brands", h.Brand.Create)
 			admin.PUT("/brands/:id", h.Brand.Update)
 			admin.DELETE("/brands/:id", h.Brand.Delete)
 
-			// Product CUD & Import
+			
 			admin.POST("/products", h.Product.Create)
 			admin.PUT("/products/:id", h.Product.Update)
 			admin.DELETE("/products/:id", h.Product.Delete)
 			admin.POST("/products/import", h.Import.ImportProducts)
 
-			// Customer delete
+			
 			admin.DELETE("/customers/:id", h.Customer.Delete)
 
-			// Order management
+			
 			admin.DELETE("/orders/:id", h.Order.Delete)
 
-			// Activity Logs
+			
 			admin.GET("/logs", h.Log.List)
 
-			// Terminal
+			
 			admin.POST("/terminal/payment", h.Terminal.ProcessPayment)
 
-			// ─── Expenses ───
+			
 			expenses := admin.Group("/expenses")
 			{
 				expenses.GET("", h.Expense.List)
@@ -164,7 +164,7 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 				expenses.DELETE("/:id", h.Expense.Delete)
 			}
 
-			// ─── Inventory (Admin only modifications) ───
+			
 			inventoryAdmin := admin.Group("/inventory")
 			{
 				inventoryAdmin.POST("/in", h.Inventory.StockIn)
@@ -172,7 +172,7 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 				inventoryAdmin.POST("/adjust", h.Inventory.AdjustStock)
 			}
 
-			// ─── Suppliers ───
+			
 			suppliers := admin.Group("/suppliers")
 			{
 				suppliers.GET("", h.Supplier.List)
@@ -182,7 +182,7 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 				suppliers.DELETE("/:id", h.Supplier.Delete)
 			}
 
-			// ─── Purchase Orders ───
+			
 			purchaseOrders := admin.Group("/purchase-orders")
 			{
 				purchaseOrders.GET("", h.PurchaseOrder.List)
@@ -191,7 +191,7 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 				purchaseOrders.PUT("/:id/receive", h.PurchaseOrder.Receive)
 				purchaseOrders.DELETE("/:id", h.PurchaseOrder.Delete)
 			}
-			// ─── Users (Staff Management) ───
+			
 			users := admin.Group("/users")
 			{
 				users.GET("", h.User.List)
@@ -201,27 +201,27 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 				users.DELETE("/:id", h.User.Delete)
 			}
 
-			// ─── Settings ───
+			
 			settings := admin.Group("/settings")
 			{
 				settings.GET("", h.Settings.GetAll)
 				settings.POST("", h.Settings.UpdateBulk)
 			}
 
-			// ─── Reports ───
+			
 			reports := admin.Group("/reports")
 			{
 				reports.GET("/daily-summary", h.Report.GetDailySummary)
 			}
 
-			// ─── Super Admin ONLY routes ───
+			
 			superAdmin := admin.Group("")
 			superAdmin.Use(middleware.RequireRole("super_admin"))
 			{
-				// ─── Branches (Management) ───
+				
 				branches := superAdmin.Group("/branches")
 				{
-					// List is already available to all authenticated users/admins above
+					
 					branches.POST("", h.Branch.Create)
 					branches.PUT("/:id", h.Branch.Update)
 				}
@@ -229,11 +229,11 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 		}
 	}
 
-	// ─── Serve Frontend ───
-	// Serve static files from the "public" directory
+	
+	
 	router.Use(static.Serve("/", static.LocalFile("./public", true)))
 
-	// Fallback to index.html for React Router
+	
 	router.NoRoute(func(c *gin.Context) {
 		c.File("./public/index.html")
 	})

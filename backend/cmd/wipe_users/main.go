@@ -13,7 +13,7 @@ func main() {
 
 	log.Println("Wiping users table...")
 
-	// Disable FK checks and delete all users
+	
 	database.DB.Exec("SET FOREIGN_KEY_CHECKS = 0;")
 
 	if err := database.DB.Unscoped().Where("1 = 1").Delete(&models.User{}).Error; err != nil {

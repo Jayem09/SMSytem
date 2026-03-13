@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-	// Load .env from current directory
+	
 	_ = godotenv.Load(".env")
 	dbUser := os.Getenv("DB_USER")
 	dbPass := os.Getenv("DB_PASS")
@@ -33,7 +33,7 @@ func main() {
 		log.Fatalf("Failed to fetch products: %v", err)
 	}
 
-	// Ensure we have at least one warehouse to put legacy stock into
+	
 	var mainWarehouse models.Warehouse
 	if err := db.First(&mainWarehouse).Error; err != nil {
 		fmt.Println("No warehouse found in database. Please create a warehouse first.")
@@ -46,11 +46,11 @@ func main() {
 			continue
 		}
 
-		// Calculate total quantity from batches
+		
 		var batchSum int
 		db.Model(&models.Batch{}).Where("product_id = ?", p.ID).Select("COALESCE(SUM(quantity), 0)").Scan(&batchSum)
 
-		// 1. Check for missing batches (Legacy Data)
+		
 		if p.Stock > batchSum {
 			missingQty := p.Stock - batchSum
 			fmt.Printf("Product '%s' (ID: %d) has %d missing units in batches. Creating legacy batch...\n", p.Name, p.ID, missingQty)
@@ -67,7 +67,7 @@ func main() {
 				continue
 			}
 			
-			// Log the movement
+			
 			movement := models.StockMovement{
 				ProductID:   p.ID,
 				BatchID:     &legacyBatch.ID,
@@ -79,11 +79,11 @@ func main() {
 			}
 			db.Create(&movement)
 			
-			// Update batchSum to match reality now
+			
 			batchSum = p.Stock
 		}
 
-		// 2. Re-sync Cache
+		
 		if p.Stock != batchSum {
 			fmt.Printf("Syncing cache for '%s' (ID: %d): %d -> %d\n", p.Name, p.ID, p.Stock, batchSum)
 			if err := db.Model(&p).Update("stock", batchSum).Error; err != nil {

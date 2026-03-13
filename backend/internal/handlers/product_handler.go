@@ -33,7 +33,7 @@ type productInput struct {
 	CategoryID  uint    `json:"category_id" binding:"required"`
 	BrandID     uint    `json:"brand_id" binding:"required"`
 
-	// Tech Specs
+	
 	PCD         string `json:"pcd"`
 	OffsetET    string `json:"offset_et"`
 	Width       string `json:"width"`
@@ -47,22 +47,22 @@ type productInput struct {
 	IsService bool `json:"is_service"`
 }
 
-// List returns all products with optional filters.
-// Query params: category_id, brand_id, search, min_price, max_price
+
+
 func (h *ProductHandler) List(c *gin.Context) {
 	query := database.DB.Preload("Category").Preload("Brand")
 
-	// Filter by category
+	
 	if categoryID := c.Query("category_id"); categoryID != "" {
 		query = query.Where("category_id = ?", categoryID)
 	}
 
-	// Filter by brand
+	
 	if brandID := c.Query("brand_id"); brandID != "" {
 		query = query.Where("brand_id = ?", brandID)
 	}
 
-	// Search by name and specialized fields
+	
 	if search := c.Query("search"); search != "" {
 		s := "%" + search + "%"
 		query = query.Where(
@@ -71,7 +71,7 @@ func (h *ProductHandler) List(c *gin.Context) {
 		)
 	}
 
-	// Price range
+	
 	if minPrice := c.Query("min_price"); minPrice != "" {
 		query = query.Where("price >= ?", minPrice)
 	}
@@ -79,11 +79,11 @@ func (h *ProductHandler) List(c *gin.Context) {
 		query = query.Where("price <= ?", maxPrice)
 	}
 
-	// Filter by parent (for variants)
+	
 	if parentID := c.Query("parent_id"); parentID != "" {
 		query = query.Where("parent_id = ?", parentID)
 	} else if c.Query("all") == "" {
-		// By default, only show top-level products (not variants)
+		
 		query = query.Where("parent_id IS NULL")
 	}
 
@@ -94,7 +94,7 @@ func (h *ProductHandler) List(c *gin.Context) {
 		branchID = branchIDValue.(uint)
 	}
 
-	// Use a robust subquery for stock: prioritize batches sum, fallback to products.stock if no batches exist.
+	
 	stockSubquery := "COALESCE((SELECT SUM(quantity) FROM batches WHERE batches.product_id = products.id"
 	var queryArgs []interface{}
 	if branchID != 0 {
@@ -111,7 +111,7 @@ func (h *ProductHandler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"products": products})
 }
 
-// GetByID returns a single product with its category and brand.
+
 func (h *ProductHandler) GetByID(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -143,7 +143,7 @@ func (h *ProductHandler) GetByID(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"product": product})
 }
 
-// Create creates a new product.
+
 func (h *ProductHandler) Create(c *gin.Context) {
 	var input productInput
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -151,14 +151,14 @@ func (h *ProductHandler) Create(c *gin.Context) {
 		return
 	}
 
-	// Verify category exists
+	
 	var category models.Category
 	if err := database.DB.First(&category, input.CategoryID).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Category not found"})
 		return
 	}
 
-	// Verify brand exists
+	
 	var brand models.Brand
 	if err := database.DB.First(&brand, input.BrandID).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Brand not found"})
@@ -169,7 +169,7 @@ func (h *ProductHandler) Create(c *gin.Context) {
 		Name:        input.Name,
 		Description: input.Description,
 		Price:       input.Price,
-		Stock:       0, // We set 0 here because actual stock is handled via Batch if > 0
+		Stock:       0, 
 		Size:        input.Size,
 		ParentID:    input.ParentID,
 		ImageURL:    input.ImageURL,
@@ -190,13 +190,13 @@ func (h *ProductHandler) Create(c *gin.Context) {
 	branchID, _ := c.Get("branchID")
 	userIDValue, _ := c.Get("userID")
 
-	// Start transaction to create product and initial batch atomicaly
+	
 	err := database.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&product).Error; err != nil {
 			return err
 		}
 
-		// If stock is specified and it's not a service, create an initial batch in the default warehouse
+		
 		if input.Stock > 0 && !input.IsService {
 			var warehouse models.Warehouse
 			if err := tx.Where("branch_id = ?", branchID).First(&warehouse).Error; err != nil {
@@ -242,7 +242,7 @@ func (h *ProductHandler) Create(c *gin.Context) {
 		return
 	}
 
-	// Reload with relationships AND calculated stock
+	
 	database.DB.Preload("Category").Preload("Brand").
 		Select("products.*, (SELECT COALESCE(SUM(quantity), 0) FROM batches WHERE product_id = products.id AND branch_id = ?) as stock", branchID).
 		First(&product, product.ID)
@@ -254,7 +254,7 @@ func (h *ProductHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "Product created", "product": product})
 }
 
-// Update updates an existing product.
+
 func (h *ProductHandler) Update(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -297,9 +297,9 @@ func (h *ProductHandler) Update(c *gin.Context) {
 	branchID, _ := c.Get("branchID")
 	userIDValue, _ := c.Get("userID")
 
-	// Start transaction to handle metadata update and potential stock adjustment
+	
 	err = database.DB.Transaction(func(tx *gorm.DB) error {
-		// Calculate current stock from ledger BEFORE saving anything
+		
 		var currentStock int
 		tx.Model(&models.Batch{}).
 			Where("product_id = ? AND branch_id = ?", product.ID, branchID).
@@ -310,7 +310,7 @@ func (h *ProductHandler) Update(c *gin.Context) {
 			return err
 		}
 
-		// Smart Stock Sync: If requested stock differs from ledger, create adjustment
+		
 		if !input.IsService && input.Stock != currentStock {
 			diff := input.Stock - currentStock
 
@@ -319,7 +319,7 @@ func (h *ProductHandler) Update(c *gin.Context) {
 				return fmt.Errorf("no warehouse found for this branch to store adjustment")
 			}
 
-			// Create an adjustment batch
+			
 			batch := models.Batch{
 				ProductID:   product.ID,
 				WarehouseID: warehouse.ID,
@@ -368,7 +368,7 @@ func (h *ProductHandler) Update(c *gin.Context) {
 		}
 	}
 
-	// Reload with relationships AND calculated stock
+	
 	database.DB.Preload("Category").Preload("Brand").
 		Select("products.*, (SELECT COALESCE(SUM(quantity), 0) FROM batches WHERE product_id = products.id AND branch_id = ?) as stock", branchID).
 		First(&product, product.ID)
@@ -376,7 +376,7 @@ func (h *ProductHandler) Update(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Product updated", "product": product})
 }
 
-// Delete deletes a product.
+
 func (h *ProductHandler) Delete(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {

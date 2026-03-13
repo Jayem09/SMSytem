@@ -19,7 +19,7 @@ func NewBranchHandler(logSvc *services.LogService) *BranchHandler {
 	return &BranchHandler{LogService: logSvc}
 }
 
-// List returns all branches
+
 func (h *BranchHandler) List(c *gin.Context) {
 	var branches []models.Branch
 	if err := database.DB.Find(&branches).Error; err != nil {
@@ -29,7 +29,7 @@ func (h *BranchHandler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"branches": branches})
 }
 
-// Create creates a new branch
+
 func (h *BranchHandler) Create(c *gin.Context) {
 	var branch models.Branch
 	if err := c.ShouldBindJSON(&branch); err != nil {
@@ -37,7 +37,7 @@ func (h *BranchHandler) Create(c *gin.Context) {
 		return
 	}
 
-	// Start transaction to create branch and its default warehouse
+	
 	err := database.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&branch).Error; err != nil {
 			return err
@@ -67,7 +67,7 @@ func (h *BranchHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, branch)
 }
 
-// Update updates a branch
+
 func (h *BranchHandler) Update(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
 	var branch models.Branch

@@ -13,38 +13,38 @@ import (
 	"gorm.io/gorm"
 )
 
-// AuthService handles authentication business logic.
+
 type AuthService struct {
 	Config *config.Config
 }
 
-// NewAuthService creates a new AuthService instance.
+
 func NewAuthService(cfg *config.Config) *AuthService {
 	return &AuthService{Config: cfg}
 }
 
-// RegisterInput holds data needed to register a new user.
+
 type RegisterInput struct {
 	Name     string `json:"name" binding:"required,min=2,max=100"`
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required,min=6"`
 }
 
-// LoginInput holds data needed to log in.
+
 type LoginInput struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required"`
 }
 
-// AuthResponse is returned after successful login/register.
+
 type AuthResponse struct {
 	Token string      `json:"token"`
 	User  models.User `json:"user"`
 }
 
-// Register creates a new user account.
+
 func (s *AuthService) Register(input RegisterInput) (*AuthResponse, error) {
-	// Check if email already exists
+	
 	var existing models.User
 	result := database.DB.Where("email = ?", input.Email).First(&existing)
 	if result.Error == nil {
@@ -54,16 +54,16 @@ func (s *AuthService) Register(input RegisterInput) (*AuthResponse, error) {
 		return nil, result.Error
 	}
 
-	// Hash password
+	
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, errors.New("failed to hash password")
 	}
 
-	// Default role is always 'user' (unverified)
+	
 	role := "user"
 
-	// Fetch first available branch
+	
 	var firstBranch models.Branch
 	if err := database.DB.First(&firstBranch).Error; err != nil {
 		return nil, errors.New("failed to find a default branch: " + err.Error())
@@ -81,7 +81,7 @@ func (s *AuthService) Register(input RegisterInput) (*AuthResponse, error) {
 		return nil, errors.New("failed to create user record: " + err.Error())
 	}
 
-	// Generate token
+	
 	token, err := s.GenerateToken(user)
 	if err != nil {
 		return nil, err
@@ -90,7 +90,7 @@ func (s *AuthService) Register(input RegisterInput) (*AuthResponse, error) {
 	return &AuthResponse{Token: token, User: user}, nil
 }
 
-// Login authenticates a user and returns a JWT token.
+
 func (s *AuthService) Login(input LoginInput) (*AuthResponse, error) {
 	var user models.User
 	result := database.DB.Where("email = ?", input.Email).First(&user)
@@ -101,12 +101,12 @@ func (s *AuthService) Login(input LoginInput) (*AuthResponse, error) {
 		return nil, result.Error
 	}
 
-	// Compare passwords
+	
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(input.Password)); err != nil {
 		return nil, errors.New("invalid email or password")
 	}
 
-	// Generate token
+	
 	token, err := s.GenerateToken(user)
 	if err != nil {
 		return nil, err
@@ -115,7 +115,7 @@ func (s *AuthService) Login(input LoginInput) (*AuthResponse, error) {
 	return &AuthResponse{Token: token, User: user}, nil
 }
 
-// GetUserByID retrieves a user by their ID.
+
 func (s *AuthService) GetUserByID(userID uint) (*models.User, error) {
 	var user models.User
 	if err := database.DB.Preload("Branch").First(&user, userID).Error; err != nil {
@@ -124,7 +124,7 @@ func (s *AuthService) GetUserByID(userID uint) (*models.User, error) {
 	return &user, nil
 }
 
-// GenerateToken creates a JWT token for the given user.
+
 func (s *AuthService) GenerateToken(user models.User) (string, error) {
 	duration, err := time.ParseDuration(s.Config.JWTExpiry)
 	if err != nil {

@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-// Supplier represents a vendor/company that provides products.
+
 type Supplier struct {
 	ID            uint      `gorm:"primaryKey" json:"id"`
 	Name          string    `gorm:"size:255;not null;uniqueIndex" json:"name"`

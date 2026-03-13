@@ -22,7 +22,7 @@ export default function ActivityLogs() {
       const res = await api.get('/api/logs');
       setLogs(res.data.logs || []);
     } catch {
-      // error
+      
     } finally {
       setLoading(false);
     }

@@ -34,7 +34,7 @@ type orderInput struct {
 	ServiceAdvisorName string           `json:"service_advisor_name"`
 	PaymentMethod      string           `json:"payment_method" binding:"required"`
 	DiscountAmount     float64          `json:"discount_amount"`
-	DiscountType       string           `json:"discount_type"` // "fixed" or "percentage"
+	DiscountType       string           `json:"discount_type"` 
 	TaxAmount          float64          `json:"tax_amount"`
 	IsTaxInclusive     bool             `json:"is_tax_inclusive"`
 	Items              []orderItemInput `json:"items" binding:"required,min=1,dive"`
@@ -53,17 +53,17 @@ type checkoutInput struct {
 	WithholdingTaxRate float64 `json:"withholding_tax_rate"`
 }
 
-// List returns all orders with their items, customer, and user.
+
 func (h *OrderHandler) List(c *gin.Context) {
 	branchID, _ := c.Get("branchID")
 	query := database.DB.Where("branch_id = ?", branchID).Preload("Customer").Preload("User").Preload("Items.Product")
 
-	// Filter by status
+	
 	if status := c.Query("status"); status != "" {
 		query = query.Where("status = ?", status)
 	}
 
-	// Filter by customer
+	
 	if customerID := c.Query("customer_id"); customerID != "" {
 		query = query.Where("customer_id = ?", customerID)
 	}
@@ -76,7 +76,7 @@ func (h *OrderHandler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"orders": orders})
 }
 
-// GetByID returns a single order with full details.
+
 func (h *OrderHandler) GetByID(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -92,8 +92,8 @@ func (h *OrderHandler) GetByID(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"order": order})
 }
 
-// Create creates a new order with items inside a database transaction.
-// It validates stock, calculates totals, and reduces product stock atomically (unless status is pending).
+
+
 func (h *OrderHandler) Create(c *gin.Context) {
 	var input checkoutInput
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -101,13 +101,13 @@ func (h *OrderHandler) Create(c *gin.Context) {
 		return
 	}
 
-	// Default status to completed if not provided
+	
 	orderStatus := "completed"
 	if input.Status != "" {
 		orderStatus = input.Status
 	}
 
-	// Get the authenticated user ID and branch ID
+	
 	userID, exists := c.Get("userID")
 	branchID, _ := c.Get("branchID")
 	if !exists {
@@ -115,7 +115,7 @@ func (h *OrderHandler) Create(c *gin.Context) {
 		return
 	}
 
-	// Verify customer exists if ID provided
+	
 	if input.CustomerID != nil && *input.CustomerID > 0 {
 		var customer models.Customer
 		if err := database.DB.First(&customer, *input.CustomerID).Error; err != nil {
@@ -124,7 +124,7 @@ func (h *OrderHandler) Create(c *gin.Context) {
 		}
 	}
 
-	// Run everything in a transaction
+	
 	var order models.Order
 	order.BranchID = branchID.(uint)
 	uID := userID.(uint)
@@ -133,7 +133,7 @@ func (h *OrderHandler) Create(c *gin.Context) {
 		var totalAmount float64
 		var orderItems []models.OrderItem
 
-		// First pass: validate and calculate
+		
 		for _, item := range input.Items {
 			var product models.Product
 			if err := tx.First(&product, item.ProductID).Error; err != nil {
@@ -156,7 +156,7 @@ func (h *OrderHandler) Create(c *gin.Context) {
 			})
 		}
 
-		// Calculate final total
+		
 		finalTotal := totalAmount
 		if input.DiscountType == "percentage" {
 			finalTotal -= totalAmount * (input.DiscountAmount / 100)
@@ -167,7 +167,7 @@ func (h *OrderHandler) Create(c *gin.Context) {
 			finalTotal += input.TaxAmount
 		}
 
-		// Create the order first to get an ID
+		
 		order = models.Order{
 			CustomerID:         input.CustomerID,
 			GuestName:          input.GuestName,
@@ -193,7 +193,7 @@ func (h *OrderHandler) Create(c *gin.Context) {
 			return fmt.Errorf("failed to create order: %v", err)
 		}
 
-		// Second pass: Deduct stock if completed
+		
 		if orderStatus == "completed" {
 			for _, item := range orderItems {
 				var product models.Product
@@ -238,8 +238,8 @@ func (h *OrderHandler) Create(c *gin.Context) {
 					remainingToDeduct -= deduct
 				}
 
-				// SELF-HEALING: If we still need to deduct but have no more batches,
-				// check if the product has legacy cached stock.
+				
+				
 				if remainingToDeduct > 0 && product.Stock >= remainingToDeduct {
 					fmt.Printf("🔧 Self-healing: Creating legacy batch for product %d to satisfy order #%d\n", product.ID, order.ID)
 					var warehouse models.Warehouse
@@ -253,7 +253,7 @@ func (h *OrderHandler) Create(c *gin.Context) {
 							WarehouseID: warehouse.ID,
 							BranchID:    warehouse.BranchID,
 							BatchNumber: "LEGACY-SYNC",
-							Quantity:    product.Stock - remainingToDeduct, // Initialize with remaining legacy stock
+							Quantity:    product.Stock - remainingToDeduct, 
 						}
 						tx.Create(&legacyBatch)
 						
@@ -277,7 +277,7 @@ func (h *OrderHandler) Create(c *gin.Context) {
 					return fmt.Errorf("insufficient batch stock for %s during final deduction", product.Name)
 				}
 
-				// Update cache
+				
 				tx.Model(&product).Update("stock", product.Stock-item.Quantity)
 			}
 		}
@@ -290,7 +290,7 @@ func (h *OrderHandler) Create(c *gin.Context) {
 		return
 	}
 
-	// Reload with all relationships
+	
 	database.DB.Preload("Customer").Preload("User").Preload("Items.Product").First(&order, order.ID)
 
 	h.LogService.Record(userID.(uint), "CREATE", "Order", strconv.Itoa(int(order.ID)), fmt.Sprintf("Checked out POS Order #%d", order.ID), c.ClientIP())
@@ -298,7 +298,7 @@ func (h *OrderHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "Order created", "order": order})
 }
 
-// UpdateStatus updates an order's status.
+
 func (h *OrderHandler) UpdateStatus(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -320,10 +320,10 @@ func (h *OrderHandler) UpdateStatus(c *gin.Context) {
 
 	oldStatus := order.Status
 
-	// If transitioning from pending to completed, deduct stock
+	
 	if oldStatus == "pending" && input.Status == "completed" {
 		err := database.DB.Transaction(func(tx *gorm.DB) error {
-			// Fetch items
+			
 			var items []models.OrderItem
 			if err := tx.Where("order_id = ?", id).Find(&items).Error; err != nil {
 				return err
@@ -339,11 +339,11 @@ func (h *OrderHandler) UpdateStatus(c *gin.Context) {
 				}
 
 				if !product.IsService {
-					// FIFO Deduction from Batches
+					
 					remainingToDeduct := item.Quantity
 					var batches []models.Batch
 					
-					// Deduct from batches belonging to this branch
+					
 					batchQuery := tx.Where("product_id = ? AND quantity > 0", product.ID)
 					if order.BranchID != 0 {
 						batchQuery = batchQuery.Where("branch_id = ?", order.BranchID)
@@ -363,12 +363,12 @@ func (h *OrderHandler) UpdateStatus(c *gin.Context) {
 							deductFromBatch = batches[i].Quantity
 						}
 
-						// Update batch
+						
 						if err := tx.Model(&batches[i]).Update("quantity", batches[i].Quantity - deductFromBatch).Error; err != nil {
 							return fmt.Errorf("failed to update batch for %s", product.Name)
 						}
 
-						// Record Stock Movement
+						
 						movement := models.StockMovement{
 							ProductID:   product.ID,
 							BatchID:     &batches[i].ID,
@@ -387,7 +387,7 @@ func (h *OrderHandler) UpdateStatus(c *gin.Context) {
 						remainingToDeduct -= deductFromBatch
 					}
 
-					// SELF-HEALING: Legacy sync
+					
 					if remainingToDeduct > 0 && product.Stock >= remainingToDeduct {
 						var warehouse models.Warehouse
 						whQuery := tx.Model(&models.Warehouse{})
@@ -424,7 +424,7 @@ func (h *OrderHandler) UpdateStatus(c *gin.Context) {
 						return fmt.Errorf("insufficient batch stock for %s (need %d more)", product.Name, remainingToDeduct)
 					}
 
-					// Update product cache
+					
 					if err := tx.Model(&product).Update("stock", product.Stock-item.Quantity).Error; err != nil {
 						return errors.New("failed to update product stock cache for " + product.Name)
 					}
@@ -440,7 +440,7 @@ func (h *OrderHandler) UpdateStatus(c *gin.Context) {
 			return
 		}
 	} else {
-		// Just update the status normally (e.g. to cancelled)
+		
 		order.Status = input.Status
 		if err := database.DB.Save(&order).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update order status"})
@@ -457,7 +457,7 @@ func (h *OrderHandler) UpdateStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Order status updated", "order": order})
 }
 
-// Delete deletes an order and its items.
+
 func (h *OrderHandler) Delete(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -471,7 +471,7 @@ func (h *OrderHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	// Delete items first, then order in a transaction
+	
 	err = database.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("order_id = ?", id).Delete(&models.OrderItem{}).Error; err != nil {
 			return err

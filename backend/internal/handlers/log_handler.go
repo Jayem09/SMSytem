@@ -14,7 +14,7 @@ func NewLogHandler() *LogHandler {
 	return &LogHandler{}
 }
 
-// List handles GET /api/logs
+
 func (h *LogHandler) List(c *gin.Context) {
 	var logs []models.ActivityLog
 	if err := database.DB.Preload("User").Order("created_at DESC").Limit(100).Find(&logs).Error; err != nil {

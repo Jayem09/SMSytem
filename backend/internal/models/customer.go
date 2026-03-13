@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-// Customer represents a buyer or client.
+
 type Customer struct {
 	ID        uint      `gorm:"primaryKey" json:"id"`
 	Name      string    `gorm:"size:255;not null" json:"name"`

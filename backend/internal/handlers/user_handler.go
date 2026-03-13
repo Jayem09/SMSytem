@@ -20,7 +20,7 @@ func NewUserHandler(logService *services.LogService) *UserHandler {
 	return &UserHandler{LogService: logService}
 }
 
-// UserResponse is used to return user data without the hash
+
 type UserResponse struct {
 	ID         uint   `json:"id"`
 	Name       string `json:"name"`
@@ -46,7 +46,7 @@ func (h *UserHandler) List(c *gin.Context) {
 		return
 	}
 
-	// Mask passwords before sending to frontend
+	
 	var response []UserResponse
 	for _, u := range users {
 		response = append(response, UserResponse{
@@ -63,7 +63,7 @@ func (h *UserHandler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"users": response})
 }
 
-// GetStaffList fetches all users (ID and Name only) for selection dropdowns
+
 func (h *UserHandler) GetStaffList(c *gin.Context) {
 	var users []models.User
 	if err := database.DB.Select("id", "name").Find(&users).Error; err != nil {
@@ -82,7 +82,7 @@ func (h *UserHandler) GetStaffList(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"staff": response})
 }
 
-// UpdateRole changes a specific user's role (admin or cashier)
+
 func (h *UserHandler) UpdateRole(c *gin.Context) {
 	id := c.Param("id")
 	var req struct {
@@ -105,7 +105,7 @@ func (h *UserHandler) UpdateRole(c *gin.Context) {
 		return
 	}
 
-	// Prevent removing the last admin (basic safety check)
+	
 	if user.Role == "admin" && req.Role != "admin" {
 		var adminCount int64
 		database.DB.Model(&models.User{}).Where("role = ? AND branch_id = ?", "admin", user.BranchID).Count(&adminCount)
@@ -115,7 +115,7 @@ func (h *UserHandler) UpdateRole(c *gin.Context) {
 		}
 	}
 
-	// Branch check for non-super-admins
+	
 	isSuperAdmin, _ := c.Get("isSuperAdmin")
 	if isSuperAdmin != true {
 		branchID, _ := c.Get("branchID")
@@ -138,7 +138,7 @@ func (h *UserHandler) UpdateRole(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "User role updated successfully"})
 }
 
-// ResetPassword allows admins to force reset a user's password
+
 func (h *UserHandler) ResetPassword(c *gin.Context) {
 	id := c.Param("id")
 	var req struct {
@@ -156,7 +156,7 @@ func (h *UserHandler) ResetPassword(c *gin.Context) {
 		return
 	}
 
-	// Prevent admin from resetting their own password here (they should use a standard profile update)
+	
 	currentUserID, exists := c.Get("userID")
 	if exists && currentUserID.(uint) == user.ID {
 		c.JSON(http.StatusConflict, gin.H{"error": "You should use your profile settings to change your own password."})
@@ -182,7 +182,7 @@ func (h *UserHandler) ResetPassword(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "User password reset successfully"})
 }
 
-// UpdateBranch changes a specific user's branch
+
 func (h *UserHandler) UpdateBranch(c *gin.Context) {
 	id := c.Param("id")
 	var req struct {
@@ -194,7 +194,7 @@ func (h *UserHandler) UpdateBranch(c *gin.Context) {
 		return
 	}
 
-	// Only super_admin can change branches
+	
 	isSuperAdmin, _ := c.Get("isSuperAdmin")
 	if isSuperAdmin != true {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Only Super Admin can reassign staff to different branches"})
@@ -220,7 +220,7 @@ func (h *UserHandler) UpdateBranch(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "User branch updated successfully"})
 }
 
-// Delete permanently removes a user account
+
 func (h *UserHandler) Delete(c *gin.Context) {
 	id := c.Param("id")
 
@@ -230,7 +230,7 @@ func (h *UserHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	// Branch check for non-super-admins
+	
 	isSuperAdmin, _ := c.Get("isSuperAdmin")
 	if isSuperAdmin != true {
 		branchID, _ := c.Get("branchID")
@@ -240,7 +240,7 @@ func (h *UserHandler) Delete(c *gin.Context) {
 		}
 	}
 
-	// Prevent admin self-deletion
+	
 	currentUserID, exists := c.Get("userID")
 	if exists && currentUserID.(uint) == user.ID {
 		c.JSON(http.StatusConflict, gin.H{"error": "You cannot delete your own account."})

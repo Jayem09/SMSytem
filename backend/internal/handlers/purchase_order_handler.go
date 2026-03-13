@@ -35,7 +35,7 @@ type purchaseOrderInput struct {
 	Items      []purchaseOrderItemInput `json:"items" binding:"required,min=1,dive"`
 }
 
-// List returns all purchase orders with supplier and items.
+
 func (h *PurchaseOrderHandler) List(c *gin.Context) {
 	var orders []models.PurchaseOrder
 	if err := database.DB.
@@ -50,7 +50,7 @@ func (h *PurchaseOrderHandler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"purchase_orders": orders})
 }
 
-// GetByID returns a single purchase order with all details.
+
 func (h *PurchaseOrderHandler) GetByID(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -70,7 +70,7 @@ func (h *PurchaseOrderHandler) GetByID(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"purchase_order": po})
 }
 
-// Create creates a new purchase order with items.
+
 func (h *PurchaseOrderHandler) Create(c *gin.Context) {
 	var input purchaseOrderInput
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -78,17 +78,17 @@ func (h *PurchaseOrderHandler) Create(c *gin.Context) {
 		return
 	}
 
-	// Parse order date
+	
 	orderDate, err := time.Parse("2006-01-02", input.OrderDate)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid order date format. Use YYYY-MM-DD"})
 		return
 	}
 
-	// Get user ID from context
+	
 	userID, _ := c.Get("userID")
 
-	// Build items and calculate total
+	
 	var totalCost float64
 	var items []models.PurchaseOrderItem
 	for _, item := range input.Items {
@@ -117,7 +117,7 @@ func (h *PurchaseOrderHandler) Create(c *gin.Context) {
 		return
 	}
 
-	// Reload with relations
+	
 	database.DB.Preload("Supplier").Preload("User").Preload("Items.Product").First(&po, po.ID)
 
 	h.LogService.Record(userID.(uint), "CREATE", "Purchase Order", strconv.Itoa(int(po.ID)), fmt.Sprintf("Created PO to supplier #%d", po.SupplierID), c.ClientIP())
@@ -125,7 +125,7 @@ func (h *PurchaseOrderHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "Purchase order created", "purchase_order": po})
 }
 
-// Receive marks a purchase order as received and updates product stock.
+
 func (h *PurchaseOrderHandler) Receive(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -149,10 +149,10 @@ func (h *PurchaseOrderHandler) Receive(c *gin.Context) {
 		return
 	}
 
-	// Start transaction
+	
 	tx := database.DB.Begin()
 
-	// Accept po_number from request body
+	
 	var receiveInput struct {
 		PONumber string `json:"po_number"`
 	}
@@ -161,13 +161,13 @@ func (h *PurchaseOrderHandler) Receive(c *gin.Context) {
 	}
 	fmt.Printf("Purchase Order Receive payload: po_number='%s'\n", receiveInput.PONumber)
 
-	// Update stock for each item and create inventory batch + movement
+	
 	branchIDValue, _ := c.Get("branchID")
 	userIDCtx, _ := c.Get("userID")
 	branchID := branchIDValue.(uint)
 
 	for _, item := range po.Items {
-		// 1. Increment product stock using gorm.Expr (atomic SQL)
+		
 		if err := tx.Model(&models.Product{}).
 			Where("id = ?", item.ProductID).
 			Updates(map[string]interface{}{
@@ -179,7 +179,7 @@ func (h *PurchaseOrderHandler) Receive(c *gin.Context) {
 			return
 		}
 
-		// 2. Find or create a warehouse for this branch then create a batch + movement
+		
 		var warehouse models.Warehouse
 		whQuery := tx.Model(&models.Warehouse{})
 		if branchID != 0 {
@@ -226,7 +226,7 @@ func (h *PurchaseOrderHandler) Receive(c *gin.Context) {
 		}
 	}
 
-	// Mark PO as received
+	
 	now := time.Now()
 	po.Status = "received"
 	po.ReceivedDate = &now
@@ -239,7 +239,7 @@ func (h *PurchaseOrderHandler) Receive(c *gin.Context) {
 
 	tx.Commit()
 
-	// Reload with relations
+	
 	database.DB.Preload("Supplier").Preload("User").Preload("Items.Product").First(&po, po.ID)
 
 	userIDValue, _ := c.Get("userID")
@@ -250,7 +250,7 @@ func (h *PurchaseOrderHandler) Receive(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Purchase order received. Stock updated.", "purchase_order": po})
 }
 
-// Delete deletes a purchase order (only if pending).
+
 func (h *PurchaseOrderHandler) Delete(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -269,7 +269,7 @@ func (h *PurchaseOrderHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	// Delete items first, then the PO
+	
 	database.DB.Where("purchase_order_id = ?", id).Delete(&models.PurchaseOrderItem{})
 	database.DB.Delete(&po)
 

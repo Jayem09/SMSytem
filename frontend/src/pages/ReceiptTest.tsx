@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { generateReceiptHTML } from '../components/Receipt';
 import { generateDeliveryReceiptHTML } from '../components/DeliveryReceipt';
 
-// Dummy data for testing the receipt alignment
+
 const dummyOrder = {
   id: 12345,
   total_amount: 15000,
@@ -68,7 +68,7 @@ export default function ReceiptTest() {
       </div>
 
       <div className="flex-1 w-full max-w-5xl bg-white shadow-xl overflow-hidden rounded-lg">
-        {/* We use an iframe with srcDoc so the HTML renders isolated with its own styles */}
+        {}
         <iframe 
           title="Receipt Preview" 
           srcDoc={htmlDoc} 

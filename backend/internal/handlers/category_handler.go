@@ -25,7 +25,7 @@ type categoryInput struct {
 	Description string `json:"description" binding:"max=500"`
 }
 
-// ListCategories returns all categories.
+
 func (h *CategoryHandler) List(c *gin.Context) {
 	var categories []models.Category
 	if err := database.DB.Order("name ASC").Find(&categories).Error; err != nil {
@@ -35,7 +35,7 @@ func (h *CategoryHandler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"categories": categories})
 }
 
-// GetCategory returns a single category by ID.
+
 func (h *CategoryHandler) GetByID(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -51,7 +51,7 @@ func (h *CategoryHandler) GetByID(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"category": category})
 }
 
-// CreateCategory creates a new category.
+
 func (h *CategoryHandler) Create(c *gin.Context) {
 	var input categoryInput
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -77,7 +77,7 @@ func (h *CategoryHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "Category created", "category": category})
 }
 
-// UpdateCategory updates an existing category.
+
 func (h *CategoryHandler) Update(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -113,7 +113,7 @@ func (h *CategoryHandler) Update(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Category updated", "category": category})
 }
 
-// DeleteCategory deletes a category.
+
 func (h *CategoryHandler) Delete(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {

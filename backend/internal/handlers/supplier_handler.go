@@ -29,7 +29,7 @@ type supplierInput struct {
 	Notes         string `json:"notes"`
 }
 
-// List returns all suppliers.
+
 func (h *SupplierHandler) List(c *gin.Context) {
 	var suppliers []models.Supplier
 	if err := database.DB.Order("name ASC").Find(&suppliers).Error; err != nil {
@@ -39,7 +39,7 @@ func (h *SupplierHandler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"suppliers": suppliers})
 }
 
-// GetByID returns a single supplier by ID.
+
 func (h *SupplierHandler) GetByID(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -55,7 +55,7 @@ func (h *SupplierHandler) GetByID(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"supplier": supplier})
 }
 
-// Create creates a new supplier.
+
 func (h *SupplierHandler) Create(c *gin.Context) {
 	var input supplierInput
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -85,7 +85,7 @@ func (h *SupplierHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "Supplier created", "supplier": supplier})
 }
 
-// Update updates an existing supplier.
+
 func (h *SupplierHandler) Update(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -125,7 +125,7 @@ func (h *SupplierHandler) Update(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Supplier updated", "supplier": supplier})
 }
 
-// Delete deletes a supplier.
+
 func (h *SupplierHandler) Delete(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {

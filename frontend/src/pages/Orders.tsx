@@ -163,7 +163,7 @@ export default function Orders() {
         )}
       />
 
-      {/* Items Modal */}
+      {}
       <Modal open={itemsModalOpen} onClose={() => setItemsModalOpen(false)} title={`Order #${selectedOrder?.id || ''} Details`} maxWidth="max-w-3xl">
         {selectedOrder && (
           <div className="space-y-6">

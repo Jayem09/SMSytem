@@ -12,7 +12,7 @@ func NewLogService() *LogService {
 	return &LogService{}
 }
 
-// Record logs an activity to the database
+
 func (s *LogService) Record(userID uint, action, entity, entityID, details, ip string) {
 	entry := models.ActivityLog{
 		UserID:    userID,

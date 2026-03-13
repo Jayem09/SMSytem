@@ -19,7 +19,7 @@ func NewSettingsHandler(logService *services.LogService) *SettingsHandler {
 	return &SettingsHandler{LogService: logService}
 }
 
-// GetAll fetches all settings and returns them as a key-value map
+
 func (h *SettingsHandler) GetAll(c *gin.Context) {
 	var settings []models.Setting
 	if err := database.DB.Find(&settings).Error; err != nil {
@@ -30,7 +30,7 @@ func (h *SettingsHandler) GetAll(c *gin.Context) {
 	result := make(map[string]interface{})
 	for _, s := range settings {
 		var parsed interface{}
-		// Attempt to parse JSON strings (like arrays), fallback to raw string
+		
 		if err := json.Unmarshal([]byte(s.Value), &parsed); err == nil {
 			result[s.Key] = parsed
 		} else {
@@ -41,7 +41,7 @@ func (h *SettingsHandler) GetAll(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
-// UpdateBulk saves multiple settings from a JSON payload
+
 func (h *SettingsHandler) UpdateBulk(c *gin.Context) {
 	var input map[string]interface{}
 	if err := c.ShouldBindJSON(&input); err != nil {

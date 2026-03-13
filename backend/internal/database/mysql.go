@@ -16,23 +16,23 @@ import (
 
 var DB *gorm.DB
 
-// Connect initializes the MySQL database connection and runs auto-migrations.
+
 func Connect(cfg *config.Config) {
 	var dsn string
 
 	if cfg.DatabaseURL != "" {
-		// Use the full URL if provided (standard for cloud)
+		
 		dsn = cfg.DatabaseURL
-		// Railway and other providers often give mysql://... strings.
-		// Go's MySQL driver prefers: user:pass@tcp(host:port)/db
+		
+		
 		if strings.HasPrefix(dsn, "mysql://") {
 			dsn = strings.TrimPrefix(dsn, "mysql://")
-			// Split user:pass and host:port/db
+			
 			parts := strings.SplitN(dsn, "@", 2)
 			if len(parts) == 2 {
 				credentials := parts[0]
 				remainder := parts[1]
-				// Split host:port and db
+				
 				subParts := strings.SplitN(remainder, "/", 2)
 				if len(subParts) == 2 {
 					hostPort := subParts[0]
@@ -42,7 +42,7 @@ func Connect(cfg *config.Config) {
 			}
 		}
 	} else {
-		// Fallback to individual fields
+		
 		dsn = fmt.Sprintf("%s:%s@tcp(%s:%s)/%s",
 			cfg.DBUser,
 			cfg.DBPassword,
@@ -52,7 +52,7 @@ func Connect(cfg *config.Config) {
 		)
 	}
 
-	// Always ensure required parameters are present
+	
 	if !strings.Contains(dsn, "parseTime=True") {
 		if strings.Contains(dsn, "?") {
 			dsn += "&parseTime=True"
@@ -75,7 +75,7 @@ func Connect(cfg *config.Config) {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	// Configure Connection Pool to prevent TiDB idle timeouts
+	
 	sqlDB, err := DB.DB()
 	if err == nil {
 		sqlDB.SetMaxIdleConns(10)
@@ -85,7 +85,7 @@ func Connect(cfg *config.Config) {
 
 	log.Println(" Database connected successfully")
 
-	// Auto-migrate models
+	
 	if err := DB.AutoMigrate(
 		&models.Branch{},
 		&models.User{},
@@ -112,7 +112,7 @@ func Connect(cfg *config.Config) {
 
 	log.Println(" Database migration completed")
 
-	// Seed default branch if none exist
+	
 	var count int64
 	DB.Model(&models.Branch{}).Count(&count)
 	if count == 0 {
@@ -124,7 +124,7 @@ func Connect(cfg *config.Config) {
 		log.Println(" Default branch seeded")
 	}
 
-	// Seed a default warehouse for every branch that doesn't have one
+	
 	var branches []models.Branch
 	DB.Find(&branches)
 	for _, branch := range branches {

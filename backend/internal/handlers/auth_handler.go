@@ -10,19 +10,19 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// AuthHandler handles HTTP requests for authentication.
+
 type AuthHandler struct {
 	AuthService *services.AuthService
 	LogService  *services.LogService
 }
 
-// NewAuthHandler creates a new AuthHandler.
+
 func NewAuthHandler(authService *services.AuthService, logService *services.LogService) *AuthHandler {
 	return &AuthHandler{AuthService: authService, LogService: logService}
 }
 
-// Register handles user registration.
-// POST /api/auth/register
+
+
 func (h *AuthHandler) Register(c *gin.Context) {
 	var input services.RegisterInput
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -51,8 +51,8 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	})
 }
 
-// Login handles user authentication.
-// POST /api/auth/login
+
+
 func (h *AuthHandler) Login(c *gin.Context) {
 	var input services.LoginInput
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -69,7 +69,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	// Log the login action
+	
 	h.LogService.Record(response.User.ID, "LOGIN", "System", strconv.Itoa(int(response.User.ID)), "User logged in", c.ClientIP())
 
 	c.JSON(http.StatusOK, gin.H{
@@ -79,8 +79,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	})
 }
 
-// GetMe returns the current authenticated user.
-// GET /api/auth/me
+
+
 func (h *AuthHandler) GetMe(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {

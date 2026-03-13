@@ -28,11 +28,11 @@ type customerInput struct {
 	Address string `json:"address"`
 }
 
-// List returns all customers.
+
 func (h *CustomerHandler) List(c *gin.Context) {
 	query := database.DB.Model(&models.Customer{})
 
-	// Search by name or phone
+	
 	if search := c.Query("search"); search != "" {
 		query = query.Where("name LIKE ? OR phone LIKE ? OR email LIKE ?", "%"+search+"%", "%"+search+"%", "%"+search+"%")
 	}
@@ -45,7 +45,7 @@ func (h *CustomerHandler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"customers": customers})
 }
 
-// GetByID returns a single customer.
+
 func (h *CustomerHandler) GetByID(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -61,7 +61,7 @@ func (h *CustomerHandler) GetByID(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"customer": customer})
 }
 
-// Create creates a new customer.
+
 func (h *CustomerHandler) Create(c *gin.Context) {
 	var input customerInput
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -89,7 +89,7 @@ func (h *CustomerHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "Customer created", "customer": customer})
 }
 
-// Update updates an existing customer.
+
 func (h *CustomerHandler) Update(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -127,7 +127,7 @@ func (h *CustomerHandler) Update(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Customer updated", "customer": customer})
 }
 
-// Delete deletes a customer.
+
 func (h *CustomerHandler) Delete(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -149,12 +149,12 @@ func (h *CustomerHandler) Delete(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Customer deleted"})
 }
 
-// GetCRMStats returns aggregated CRM data: Total Customers, Top Spenders, Recent Buyers, and At-Risk Customers
+
 func (h *CustomerHandler) GetCRMStats(c *gin.Context) {
 	var totalCustomers int64
 	database.DB.Model(&models.Customer{}).Count(&totalCustomers)
 
-	// Top Spenders
+	
 	type TopSpender struct {
 		ID          uint    `json:"id"`
 		Name        string  `json:"name"`
@@ -174,7 +174,7 @@ func (h *CustomerHandler) GetCRMStats(c *gin.Context) {
 		Limit(5).
 		Scan(&topSpenders)
 
-	// Recent Buyers (last 30 days)
+	
 	thirtyDaysAgo := time.Now().AddDate(0, 0, -30)
 	var recentBuyers []TopSpender
 	database.DB.Table("customers").
@@ -185,7 +185,7 @@ func (h *CustomerHandler) GetCRMStats(c *gin.Context) {
 		Order("last_payment DESC").
 		Scan(&recentBuyers)
 
-	// At-Risk Customers (no purchases in the last 60 days, but have bought before)
+	
 	sixtyDaysAgo := time.Now().AddDate(0, 0, -60)
 	var atRiskCustomers []TopSpender
 	database.DB.Table("customers").
@@ -197,7 +197,7 @@ func (h *CustomerHandler) GetCRMStats(c *gin.Context) {
 		Order("last_payment DESC").
 		Scan(&atRiskCustomers)
 
-	// Frequently bought categories (Overall system health view)
+	
 	type CategoryStat struct {
 		Category string `json:"category"`
 		Count    int    `json:"count"`

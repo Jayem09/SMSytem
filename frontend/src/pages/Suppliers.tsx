@@ -21,7 +21,7 @@ export default function Suppliers() {
   const [editing, setEditing] = useState<Supplier | null>(null);
   const [error, setError] = useState('');
 
-  // Form state
+  
   const [name, setName] = useState('');
   const [contactPerson, setContactPerson] = useState('');
   const [phone, setPhone] = useState('');

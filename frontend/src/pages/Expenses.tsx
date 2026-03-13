@@ -42,7 +42,7 @@ export default function Expenses() {
       const res = await api.get('/api/expenses');
       setExpenses(res.data);
     } catch {
-      // error
+      
     } finally {
       setLoading(false);
     }
