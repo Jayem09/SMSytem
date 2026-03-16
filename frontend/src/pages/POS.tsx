@@ -361,7 +361,7 @@ export default function POS() {
       </div>
 
       {}
-      <div className="w-96 bg-white border-l border-gray-200 flex flex-col">
+      <div className="w-96 bg-white border-l border-gray-200 flex flex-col h-full overflow-hidden">
         <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
           <div className="flex items-center gap-2">
             <ShoppingCart className="w-5 h-5 text-gray-900" />
@@ -372,7 +372,7 @@ export default function POS() {
 
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {cart.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center space-y-4 opacity-30">
+            <div className="flex-1 flex flex-col items-center justify-center text-center space-y-4 opacity-30">
               <div className="w-16 h-16 rounded-3xl bg-gray-100 flex items-center justify-center">
                 <ShoppingCart className="w-8 h-8 text-gray-400" />
               </div>
@@ -407,7 +407,7 @@ export default function POS() {
           )}
         </div>
 
-        <div className="p-6 bg-gray-50 border-t border-gray-200 space-y-4">
+        <div className="flex-none p-6 bg-gray-50 border-t border-gray-200 space-y-4">
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-gray-500 font-medium tracking-tight">Processing Subtotal</span>
@@ -598,7 +598,7 @@ export default function POS() {
       {}
       <Modal open={successModalOpen} onClose={() => setSuccessModalOpen(false)} title="Success">
         <div className="text-center py-6">
-          <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
+          <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4 animate-in zoom-in spin-in-12 duration-500">
             <CheckCircle className="w-12 h-12 text-green-500" />
           </div>
           <h3 className="text-2xl font-black text-gray-900 tracking-tighter mb-2 uppercase">

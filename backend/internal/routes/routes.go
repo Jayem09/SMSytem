@@ -32,6 +32,7 @@ type Handlers struct {
 	Report        *handlers.ReportHandler
 	Branch        *handlers.BranchHandler
 	Transfer      *handlers.TransferHandler
+	Search        *handlers.SearchHandler
 }
 
 
@@ -60,6 +61,7 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 
 		
 		protected.GET("/dashboard", h.Dashboard.GetStats)
+		protected.GET("/search", h.Search.GlobalSearch)
 
 		
 		categories := protected.Group("/categories")
@@ -107,6 +109,10 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 			inventory.GET("/warehouses", h.Inventory.GetWarehouses)
 			inventory.GET("/levels", h.Inventory.GetStockLevels)
 			inventory.GET("/logs", h.Inventory.GetMovementLogs)
+			inventory.GET("/low-stock", h.Inventory.GetLowStockReport)
+			inventory.POST("/generate-pos", h.Inventory.GenerateDraftPOs)
+			inventory.GET("/batches", h.Inventory.GetProductBatches)
+			inventory.GET("/batches/:id/history", h.Inventory.GetBatchMovementHistory)
 			
 		}
 

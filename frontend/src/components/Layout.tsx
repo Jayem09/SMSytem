@@ -3,6 +3,7 @@ import { useAuth } from '../hooks/useAuth';
 import { Settings } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import api from '../api/axios';
+import GlobalSearch from './GlobalSearch';
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', roles: ['super_admin', 'admin', 'cashier', 'purchasing', 'purchaser'] },
@@ -117,8 +118,21 @@ export default function Layout() {
       </aside>
 
       {}
-      <main className="flex-1 ml-56 min-h-screen">
-        <Outlet />
+      <main className="flex-1 ml-56 min-h-screen flex flex-col">
+        <header className="h-16 bg-white border-b border-gray-100 flex items-center px-6 sticky top-0 z-40 no-print">
+          <div className="flex-1 flex justify-center">
+            <GlobalSearch />
+          </div>
+          <div className="flex items-center gap-4">
+             <div className="text-right hidden md:block">
+               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{new Date().toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+               <p className="text-xs font-bold text-gray-900">{user?.branch?.name || 'Main Office'}</p>
+             </div>
+          </div>
+        </header>
+        <div className="flex-1">
+          <Outlet />
+        </div>
       </main>
     </div>
   );

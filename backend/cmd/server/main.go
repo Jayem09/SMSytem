@@ -48,6 +48,7 @@ func main() {
 		Report:        handlers.NewReportHandler(),
 		Branch:        handlers.NewBranchHandler(logService),
 		Transfer:      handlers.NewTransferHandler(logService),
+		Search:        handlers.NewSearchHandler(),
 	}
 
 	

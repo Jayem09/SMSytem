@@ -60,6 +60,7 @@ func (h *InventoryHandler) GetStockLevels(c *gin.Context) {
 		WarehouseID     uint       `json:"warehouse_id"`
 		WarehouseName   string     `json:"warehouse_name"`
 		TotalStock      int        `json:"total_stock"`
+		InTransitStock  int        `json:"in_transit_stock"`
 		ClosestExpiry   *time.Time `json:"closest_expiry"`
 		ExpiringBatches int        `json:"expiring_batches"` 
 	}
@@ -80,7 +81,7 @@ func (h *InventoryHandler) GetStockLevels(c *gin.Context) {
 
 	
 	query := database.DB.Table("batches").
-		Select("batches.product_id, products.name as product_name, products.size as product_size, batches.warehouse_id, warehouses.name as warehouse_name, SUM(batches.quantity) as total_stock, MIN(batches.expiry_date) as closest_expiry, COUNT(batches.id) as expiring_batches").
+		Select("batches.product_id, products.name as product_name, products.size as product_size, batches.warehouse_id, warehouses.name as warehouse_name, SUM(batches.quantity) as total_stock, MIN(batches.expiry_date) as closest_expiry, COUNT(CASE WHEN batches.expiry_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY) THEN 1 END) as expiring_batches, (SELECT COALESCE(SUM(sti.quantity), 0) FROM stock_transfer_items sti JOIN stock_transfers st ON sti.stock_transfer_id = st.id WHERE sti.product_id = batches.product_id AND st.destination_branch_id = batches.branch_id AND st.status = 'in_transit') as in_transit_stock").
 		Joins("LEFT JOIN products ON batches.product_id = products.id").
 		Joins("LEFT JOIN warehouses ON batches.warehouse_id = warehouses.id")
 
@@ -445,4 +446,142 @@ func (h *InventoryHandler) AdjustStock(c *gin.Context) {
 	h.LogService.Record(userID, "UPDATE", "Inventory", strconv.Itoa(int(batch.ID)), fmt.Sprintf("Adjusted Batch #%d to %d", batch.ID, input.NewQuantity), c.ClientIP())
 
 	c.JSON(http.StatusOK, gin.H{"message": "Stock successfully adjusted"})
+}
+
+func (h *InventoryHandler) GetLowStockReport(c *gin.Context) {
+	type LowStockResult struct {
+		ProductID         uint   `json:"product_id"`
+		ProductName       string `json:"product_name"`
+		ProductSize       string `json:"product_size"`
+		CurrentStock      int    `json:"current_stock"`
+		ReorderLevel      int    `json:"reorder_level"`
+		PrimarySupplierID *uint  `json:"primary_supplier_id"`
+		SupplierName      string `json:"supplier_name"`
+	}
+
+	var results []LowStockResult
+	
+	
+	database.DB.Table("products").
+		Select("products.id as product_id, products.name as product_name, products.size as product_size, products.stock as current_stock, products.reorder_level, products.primary_supplier_id, suppliers.name as supplier_name").
+		Joins("LEFT JOIN suppliers ON products.primary_supplier_id = suppliers.id").
+		Where("products.is_service = ? AND products.stock <= products.reorder_level AND products.deleted_at IS NULL", false).
+		Scan(&results)
+
+	c.JSON(http.StatusOK, gin.H{"low_stock": results})
+}
+
+func (h *InventoryHandler) GenerateDraftPOs(c *gin.Context) {
+	userIDVal, _ := c.Get("userID")
+	var userID uint
+	if userIDVal != nil {
+		switch v := userIDVal.(type) {
+		case uint:
+			userID = v
+		case float64:
+			userID = uint(v)
+		case int:
+			userID = uint(v)
+		}
+	}
+
+	var lowStockProducts []models.Product
+	database.DB.Where("is_service = ? AND stock <= reorder_level AND primary_supplier_id IS NOT NULL", false).Find(&lowStockProducts)
+
+	if len(lowStockProducts) == 0 {
+		c.JSON(http.StatusOK, gin.H{"message": "No low stock products with assigned suppliers found."})
+		return
+	}
+
+	
+	supplierGroups := make(map[uint][]models.Product)
+	for _, p := range lowStockProducts {
+		supplierGroups[*p.PrimarySupplierID] = append(supplierGroups[*p.PrimarySupplierID], p)
+	}
+
+	createdCount := 0
+	for supplierID, products := range supplierGroups {
+		sid := supplierID 
+		
+		po := models.PurchaseOrder{
+			SupplierID: &sid,
+			UserID:     userID,
+			OrderDate:  time.Now(),
+			Status:     "pending",
+			Notes:      "Auto-generated draft PO for low stock replenishment",
+			TotalCost:  0,
+		}
+
+		err := database.DB.Transaction(func(tx *gorm.DB) error {
+			if err := tx.Create(&po).Error; err != nil {
+				return err
+			}
+
+			var totalCost float64
+			for _, p := range products {
+				
+				qtyToOrder := (p.ReorderLevel * 2) - p.Stock 
+				if qtyToOrder <= 0 {
+					qtyToOrder = p.ReorderLevel
+				}
+
+				item := models.PurchaseOrderItem{
+					PurchaseOrderID: po.ID,
+					ProductID:       p.ID,
+					Quantity:        qtyToOrder,
+					UnitCost:        p.CostPrice,
+					Subtotal:        float64(qtyToOrder) * p.CostPrice,
+				}
+				if err := tx.Create(&item).Error; err != nil {
+					return err
+				}
+				totalCost += item.Subtotal
+			}
+
+			return tx.Model(&po).Update("total_cost", totalCost).Error
+		})
+
+		if err == nil {
+			createdCount++
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":      fmt.Sprintf("Successfully generated %d draft Purchase Orders.", createdCount),
+		"orders_count": createdCount,
+	})
+}
+
+func (h *InventoryHandler) GetBatchMovementHistory(c *gin.Context) {
+	batchID := c.Param("id")
+	if batchID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Batch ID is required"})
+		return
+	}
+
+	var movements []models.StockMovement
+	if err := database.DB.Preload("User").Preload("Warehouse").Where("batch_id = ?", batchID).Order("created_at desc").Find(&movements).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch movement history"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"movements": movements})
+}
+
+func (h *InventoryHandler) GetProductBatches(c *gin.Context) {
+	productID := c.Query("product_id")
+	warehouseID := c.Query("warehouse_id")
+
+	if productID == "" || warehouseID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Product ID and Warehouse ID are required"})
+		return
+	}
+
+	var batches []models.Batch
+	if err := database.DB.Where("product_id = ? AND warehouse_id = ? AND quantity > 0", productID, warehouseID).Order("expiry_date asc").Find(&batches).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch batches"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"batches": batches})
 }

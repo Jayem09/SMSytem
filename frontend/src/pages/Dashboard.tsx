@@ -213,9 +213,24 @@ export default function Dashboard() {
               {stats.low_stock_products.length} products are running low on stock. Check the product catalog to restock.
             </p>
           </div>
-          <a href="/products" className="text-xs font-bold text-orange-600 hover:text-orange-800 transition-colors bg-white px-4 py-2 rounded-lg border border-orange-200">
-            VIEW PRODUCTS
-          </a>
+          <div className="flex gap-2">
+            <button 
+              onClick={async () => {
+                try {
+                  const res = await api.post('/api/inventory/generate-pos');
+                  alert(res.data.message);
+                } catch (err) {
+                  alert('Failed to generate POs');
+                }
+              }}
+              className="text-xs font-bold text-indigo-600 hover:text-indigo-800 transition-colors bg-white px-4 py-2 rounded-lg border border-indigo-200"
+            >
+              GENERATE POS
+            </button>
+            <a href="/products" className="text-xs font-bold text-orange-600 hover:text-orange-800 transition-colors bg-white px-4 py-2 rounded-lg border border-orange-200">
+              VIEW PRODUCTS
+            </a>
+          </div>
         </div>
       )}  
       {isAdmin && (

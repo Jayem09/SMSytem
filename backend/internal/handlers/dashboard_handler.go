@@ -83,7 +83,7 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 		Scan(&salesTrend)
 
 	var lowStockProducts []models.Product
-	stockSubquery := "(SELECT CASE WHEN COUNT(batches.id) > 0 THEN SUM(batches.quantity) ELSE products.stock END FROM batches WHERE batches.product_id = products.id"
+	stockSubquery := "(SELECT COALESCE(SUM(batches.quantity), 0) FROM batches WHERE batches.product_id = products.id"
 	var queryArgs []interface{}
 	if branchID != 0 {
 		stockSubquery += " AND batches.branch_id = ?"

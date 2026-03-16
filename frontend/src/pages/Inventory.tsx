@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import api from '../api/axios';
 import * as XLSX from 'xlsx';
@@ -15,6 +15,8 @@ import {
   X
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
+import BatchHistoryModal from '../components/BatchHistoryModal';
+import { Activity, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface Warehouse {
   id: number;
@@ -34,6 +36,7 @@ interface StockLevel {
   warehouse_id: number;
   warehouse_name: string;
   total_stock: number;
+  in_transit_stock: number;
   closest_expiry: string;
   expiring_batches: number;
 }
@@ -98,6 +101,13 @@ export default function Inventory() {
   const [editRef, setEditRef] = useState('');
   const [editError, setEditError] = useState('');
   const [editSubmitting, setEditSubmitting] = useState(false);
+
+  
+  const [expandedProduct, setExpandedProduct] = useState<number | null>(null);
+  const [productBatches, setProductBatches] = useState<any[]>([]);
+  const [batchLoading, setBatchLoading] = useState(false);
+  const [selectedBatch, setSelectedBatch] = useState<any>(null);
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
 
   useEffect(() => {
     fetchWarehouses();
@@ -319,6 +329,19 @@ export default function Inventory() {
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
+              <button 
+                onClick={async () => {
+                  try {
+                    const res = await api.post('/api/inventory/generate-pos');
+                    showToast(res.data.message, 'success');
+                  } catch (err: any) {
+                    showToast(err.response?.data?.error || 'Failed to generate POs', 'error');
+                  }
+                }}
+                className="text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-4 py-2 rounded-lg border border-indigo-100 transition-colors"
+              >
+                Prepare Draft POs
+              </button>
             </div>
             {loading ? <div className="p-12 text-center text-gray-500">Loading stock data...</div> : (
               <table className="min-w-full divide-y divide-gray-200">
@@ -326,18 +349,44 @@ export default function Inventory() {
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Product</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Warehouse</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Total Stock</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">On Hand</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">In Transit</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Expiring</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Closest Expiry</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-100">
                   {stockLevels.length === 0 ? (
-                    <tr><td colSpan={4} className="p-6 text-center text-gray-500 text-sm">No stock found.</td></tr>
+                    <tr><td colSpan={6} className="p-6 text-center text-gray-500 text-sm">No stock found.</td></tr>
                   ) : stockLevels.map((s, i) => (
-                    <tr key={i} className="hover:bg-gray-50">
+                    <React.Fragment key={i}>
+                    <tr key={i} className={`hover:bg-gray-50 transition-colors cursor-pointer ${expandedProduct === s.product_id ? 'bg-indigo-50/30' : ''}`} onClick={async () => {
+                      if (expandedProduct === s.product_id) {
+                        setExpandedProduct(null);
+                        setProductBatches([]);
+                      } else {
+                        setExpandedProduct(s.product_id);
+                        setBatchLoading(true);
+                        try {
+                          const res = await api.get(`/api/inventory/batches?product_id=${s.product_id}&warehouse_id=${s.warehouse_id}`);
+                          setProductBatches(res.data.batches || []);
+                        } catch (err) {
+                          console.error(err);
+                        } finally {
+                          setBatchLoading(false);
+                        }
+                      }
+                    }}>
                       <td className="px-6 py-4">
-                        <div className="text-sm font-medium text-gray-900">{s.product_name}</div>
-                        <div className="text-xs text-gray-500">{s.product_size} | ID: {s.product_id}</div>
+                        <div className="flex items-center gap-3">
+                          <div className="bg-gray-100 p-1.5 rounded-lg text-gray-400">
+                            {expandedProduct === s.product_id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                          </div>
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{s.product_name}</div>
+                            <div className="text-xs text-gray-500">{s.product_size} | ID: {s.product_id}</div>
+                          </div>
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-500">
                         {s.warehouse_name}
@@ -346,6 +395,24 @@ export default function Inventory() {
                         <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${s.total_stock <= 5 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
                           {s.total_stock} Units
                         </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        {s.in_transit_stock > 0 ? (
+                          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-700">
+                            +{s.in_transit_stock} Shipped
+                          </span>
+                        ) : (
+                          <span className="text-gray-300 text-xs">--</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        {s.expiring_batches > 0 ? (
+                          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-700">
+                            {s.expiring_batches} batches
+                          </span>
+                        ) : (
+                          <span className="text-gray-300 text-xs">OK</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-500">
                         {s.closest_expiry ? (
@@ -356,6 +423,59 @@ export default function Inventory() {
                         ) : 'No expiry tracked'}
                       </td>
                     </tr>
+                    {expandedProduct === s.product_id && (
+                      <tr className="bg-white">
+                        <td colSpan={6} className="px-12 py-4">
+                          <div className="border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
+                            <div className="bg-gray-50 px-4 py-2 border-b border-gray-100 flex justify-between items-center">
+                              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Active Batches for Replenishment</span>
+                              {batchLoading && <span className="text-[10px] text-indigo-500 font-bold animate-pulse">Syncing...</span>}
+                            </div>
+                            <table className="min-w-full">
+                              <thead className="bg-white">
+                                <tr className="border-b border-gray-50">
+                                  <th className="px-4 py-2 text-left text-[10px] font-black text-gray-400 uppercase">Batch Number</th>
+                                  <th className="px-4 py-2 text-left text-[10px] font-black text-gray-400 uppercase">Quantity</th>
+                                  <th className="px-4 py-2 text-left text-[10px] font-black text-gray-400 uppercase">Expiry</th>
+                                  <th className="px-4 py-2"></th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-50">
+                                {productBatches.length === 0 && !batchLoading ? (
+                                  <tr><td colSpan={4} className="px-4 py-6 text-center text-xs text-gray-400 font-medium italic">No active batches detected for this location.</td></tr>
+                                ) : productBatches.map(b => (
+                                  <tr key={b.id} className="hover:bg-indigo-50/30">
+                                    <td className="px-4 py-3 text-sm font-bold text-gray-900 font-mono tracking-tighter">{b.batch_number}</td>
+                                    <td className="px-4 py-3 text-sm font-black text-gray-600">{b.quantity}</td>
+                                    <td className="px-4 py-3 text-xs text-gray-500 font-medium">
+                                      {b.expiry_date ? new Date(b.expiry_date).toLocaleDateString() : 'N/A'}
+                                    </td>
+                                    <td className="px-4 py-3 text-right">
+                                      <button 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setSelectedBatch({
+                                            id: b.id,
+                                            batch_number: b.batch_number,
+                                            product_name: s.product_name
+                                          });
+                                          setHistoryModalOpen(true);
+                                        }}
+                                        className="inline-flex items-center gap-2 px-3 py-1 bg-gray-900 text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-sm"
+                                      >
+                                        <Activity className="w-3 h-3" />
+                                        Audit History
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                   ))}
                 </tbody>
               </table>
@@ -685,6 +805,13 @@ export default function Inventory() {
           </div>
         </div>
       )}
+      <BatchHistoryModal 
+        open={historyModalOpen}
+        onClose={() => setHistoryModalOpen(false)}
+        batchId={selectedBatch?.id}
+        batchNumber={selectedBatch?.batch_number}
+        productName={selectedBatch?.product_name}
+      />
     </div>
   );
 }

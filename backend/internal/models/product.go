@@ -18,7 +18,9 @@ type Product struct {
 	ParentID    *uint   `gorm:"index" json:"parent_id"`
 	ImageURL    string  `gorm:"size:500" json:"image_url"`
 	CategoryID  uint    `gorm:"index" json:"category_id"`
-	BrandID     uint    `gorm:"index" json:"brand_id"`
+	BrandID    uint `gorm:"index" json:"brand_id"`
+	ReorderLevel int `gorm:"not null;default:5" json:"reorder_level"`
+	PrimarySupplierID *uint `gorm:"index" json:"primary_supplier_id"`
 
 	
 	IsService   bool   `gorm:"not null;default:false" json:"is_service"`
