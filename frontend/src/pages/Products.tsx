@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, type FormEvent } from 'react';
 import api from '../api/axios';
+import { useToast } from '../context/ToastContext';
 import DataTable from '../components/DataTable';
 import Modal from '../components/Modal';
 import FormField from '../components/FormField';
@@ -34,7 +35,7 @@ interface Product {
 
 export default function Products() {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'purchasing' || user?.role === 'purchaser';
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -45,6 +46,7 @@ export default function Products() {
   const [viewingProduct, setViewingProduct] = useState<Product | null>(null);
   const [editing, setEditing] = useState<Product | null>(null);
   const [error, setError] = useState('');
+  const { showToast } = useToast();
 
   
   const [name, setName] = useState('');
@@ -177,6 +179,7 @@ export default function Products() {
         await api.post('/api/products', payload);
       }
       setModalOpen(false);
+      showToast(editing ? 'Product updated successfully!' : 'Product created successfully!', 'success');
       fetchProducts();
     } catch (err: unknown) {
       const axiosError = err as { response?: { data?: { error?: string } } };
@@ -197,9 +200,10 @@ export default function Products() {
     if (!confirm(`Delete product "${p.name}"?`)) return;
     try {
       await api.delete(`/api/products/${p.id}`);
+      showToast('Product deleted successfully!', 'success');
       fetchProducts();
     } catch {
-      alert('Failed to delete product');
+      showToast('Failed to delete product', 'error');
     }
   };
 
@@ -216,7 +220,7 @@ export default function Products() {
       const res = await api.post('/api/products/import', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      alert(res.data.message);
+      showToast(res.data.message, 'success');
       fetchProducts();
     } catch (err: unknown) {
       const axiosError = err as { response?: { data?: { error?: string } } };

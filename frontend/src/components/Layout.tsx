@@ -5,23 +5,23 @@ import { useState, useEffect } from 'react';
 import api from '../api/axios';
 
 const navItems = [
+  { to: '/dashboard', label: 'Dashboard', roles: ['super_admin', 'admin', 'cashier', 'purchasing', 'purchaser'] },
   { to: '/pos', label: 'POS Checkout', roles: ['super_admin', 'admin', 'cashier'] },
-  { to: '/dashboard', label: 'Dashboard', roles: ['super_admin', 'admin', 'cashier'] },
+  { to: '/orders', label: 'Orders', roles: ['super_admin', 'admin', 'cashier'] },
+  { to: '/transfers', label: 'Branch Transfers', roles: ['super_admin', 'admin', 'cashier', 'user', 'purchasing', 'purchaser'] },
+  { to: '/inventory', label: 'Inventory Management', roles: ['super_admin', 'admin', 'purchasing', 'purchaser'] },
+  { to: '/products', label: 'Products', roles: ['super_admin', 'admin', 'purchasing', 'purchaser'] },
+  { to: '/categories', label: 'Categories', roles: ['super_admin', 'admin', 'purchasing', 'purchaser'] },
+  { to: '/brands', label: 'Brands', roles: ['super_admin', 'admin', 'purchasing', 'purchaser'] },
+  { to: '/purchase-orders', label: 'Purchase Orders', roles: ['super_admin', 'admin', 'purchasing', 'purchaser'] },
+  { to: '/suppliers', label: 'Suppliers', roles: ['super_admin', 'admin', 'purchasing', 'purchaser'] },
   { to: '/customers', label: 'Customers', roles: ['super_admin', 'admin', 'cashier'] },
   { to: '/crm', label: 'CRM Analysis', roles: ['super_admin', 'admin'] },
-  { to: '/inventory', label: 'Inventory Management', roles: ['super_admin', 'admin'] },
-  { to: '/orders', label: 'Orders', roles: ['super_admin', 'admin', 'cashier'] },
-  { to: '/products', label: 'Products', roles: ['super_admin', 'admin'] },
   { to: '/daily-report', label: 'Daily Summary', roles: ['super_admin', 'admin'] },
-  { to: '/categories', label: 'Categories', roles: ['super_admin', 'admin'] },
-  { to: '/brands', label: 'Brands', roles: ['super_admin', 'admin'] },
-  { to: '/suppliers', label: 'Suppliers', roles: ['super_admin', 'admin'] },
-  { to: '/purchase-orders', label: 'Purchase Orders', roles: ['super_admin', 'admin'] },
-  { to: '/expenses', label: 'Expenses', roles: ['super_admin', 'admin'] },
-  { to: '/logs', label: 'Activity Logs', roles: ['super_admin', 'admin'] },
+  { to: '/expenses', label: 'Expenses', roles: ['super_admin', 'admin', 'purchasing', 'purchaser'] },
   { to: '/staff', label: 'Staff & Roles', roles: ['super_admin', 'admin'] },
+  { to: '/logs', label: 'Activity Logs', roles: ['super_admin', 'admin'] },
   { to: '/branches', label: 'Branches', roles: ['super_admin'] },
-  { to: '/transfers', label: 'Branch Transfers', roles: ['super_admin', 'admin', 'cashier', 'user'] },
 ];
 
 export default function Layout() {

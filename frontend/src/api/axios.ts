@@ -4,7 +4,6 @@ import axios from 'axios';
 
 const baseURL = import.meta.env.DEV ? '' : 'http://localhost:8080';
 
-console.log('API baseURL:', baseURL, '| DEV mode:', import.meta.env.DEV);
 
 const api = axios.create({
   baseURL,

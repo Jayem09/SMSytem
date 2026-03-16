@@ -6,7 +6,7 @@ import { useAuth } from '../hooks/useAuth';
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'purchasing' || user?.role === 'purchaser';
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [timeRange, setTimeRange] = useState(30);
@@ -257,7 +257,7 @@ export default function Dashboard() {
             </select>
           </div>
           <div className="h-[320px] w-full min-h-[320px]">
-            <ResponsiveContainer width="100%" height="100%" minHeight={320} minWidth={0}>
+            <ResponsiveContainer width="100%" height={320}>
               <AreaChart data={filteredSalesTrend}>
                 <defs>
                   <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">

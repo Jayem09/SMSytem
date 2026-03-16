@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { ToastProvider } from './context/ToastContext';
+import ToastContainer from './components/Toast';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -30,40 +32,43 @@ function App() {
     <ErrorBoundary>
       <BrowserRouter>
         <AuthProvider>
-          <Routes>
-          {}
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/receipt-test" element={<ReceiptTest />} />
+          <ToastProvider>
+            <ToastContainer />
+            <Routes>
+              {}
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/receipt-test" element={<ReceiptTest />} />
 
-          {}
-          <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-            {}
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/pos" element={<POS />} />
-            <Route path="/customers" element={<Customers />} />
-            <Route path="/orders" element={<Orders />} />
+              {}
+              <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+                {}
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/pos" element={<POS />} />
+                <Route path="/customers" element={<Customers />} />
+                <Route path="/orders" element={<Orders />} />
 
-            {}
-            <Route path="/crm" element={<ProtectedRoute requiredRole="admin"><CRM /></ProtectedRoute>} />
-            <Route path="/products" element={<ProtectedRoute requiredRole="admin"><Products /></ProtectedRoute>} />
-            <Route path="/daily-report" element={<ProtectedRoute requiredRole="admin"><DailyReport /></ProtectedRoute>} />
-            <Route path="/categories" element={<ProtectedRoute requiredRole="admin"><Categories /></ProtectedRoute>} />
-            <Route path="/brands" element={<ProtectedRoute requiredRole="admin"><Brands /></ProtectedRoute>} />
-            <Route path="/inventory" element={<ProtectedRoute requiredRole="admin"><Inventory /></ProtectedRoute>} />
-            <Route path="/expenses" element={<ProtectedRoute requiredRole="admin"><Expenses /></ProtectedRoute>} />
-            <Route path="/suppliers" element={<ProtectedRoute requiredRole="admin"><Suppliers /></ProtectedRoute>} />
-            <Route path="/purchase-orders" element={<ProtectedRoute requiredRole="admin"><PurchaseOrders /></ProtectedRoute>} />
-            <Route path="/logs" element={<ProtectedRoute requiredRole="admin"><ActivityLogs /></ProtectedRoute>} />
-            <Route path="/staff" element={<ProtectedRoute requiredRole="admin"><Staff /></ProtectedRoute>} />
-            <Route path="/branches" element={<ProtectedRoute requiredRole="admin"><Branches /></ProtectedRoute>} />
-            <Route path="/transfers" element={<ProtectedRoute requiredRole="admin"><Transfers /></ProtectedRoute>} />
-            <Route path="/settings" element={<ProtectedRoute requiredRole="admin"><SettingsPage /></ProtectedRoute>} />
-          </Route>
+                {}
+                <Route path="/crm" element={<ProtectedRoute requiredRole="admin"><CRM /></ProtectedRoute>} />
+                <Route path="/products" element={<ProtectedRoute requiredRole={["admin", "purchasing", "purchaser"]}><Products /></ProtectedRoute>} />
+                <Route path="/daily-report" element={<ProtectedRoute requiredRole="admin"><DailyReport /></ProtectedRoute>} />
+                <Route path="/categories" element={<ProtectedRoute requiredRole={["admin", "purchasing", "purchaser"]}><Categories /></ProtectedRoute>} />
+                <Route path="/brands" element={<ProtectedRoute requiredRole={["admin", "purchasing", "purchaser"]}><Brands /></ProtectedRoute>} />
+                <Route path="/inventory" element={<ProtectedRoute requiredRole={["admin", "purchasing", "purchaser"]}><Inventory /></ProtectedRoute>} />
+                <Route path="/expenses" element={<ProtectedRoute requiredRole={["admin", "purchasing", "purchaser"]}><Expenses /></ProtectedRoute>} />
+                <Route path="/suppliers" element={<ProtectedRoute requiredRole={["admin", "purchasing", "purchaser"]}><Suppliers /></ProtectedRoute>} />
+                <Route path="/purchase-orders" element={<ProtectedRoute requiredRole={["admin", "purchasing", "purchaser"]}><PurchaseOrders /></ProtectedRoute>} />
+                <Route path="/logs" element={<ProtectedRoute requiredRole="admin"><ActivityLogs /></ProtectedRoute>} />
+                <Route path="/staff" element={<ProtectedRoute requiredRole="admin"><Staff /></ProtectedRoute>} />
+                <Route path="/branches" element={<ProtectedRoute requiredRole="admin"><Branches /></ProtectedRoute>} />
+                <Route path="/transfers" element={<ProtectedRoute requiredRole={["admin", "purchasing", "purchaser", "cashier", "user"]}><Transfers /></ProtectedRoute>} />
+                <Route path="/settings" element={<ProtectedRoute requiredRole="admin"><SettingsPage /></ProtectedRoute>} />
+              </Route>
 
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
-      </AuthProvider>
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </ToastProvider>
+        </AuthProvider>
     </BrowserRouter>
     </ErrorBoundary>
   );

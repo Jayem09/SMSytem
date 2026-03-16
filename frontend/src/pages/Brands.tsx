@@ -1,5 +1,6 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import api from '../api/axios';
+import { useToast } from '../context/ToastContext';
 import DataTable from '../components/DataTable';
 import Modal from '../components/Modal';
 import FormField from '../components/FormField';
@@ -12,13 +13,14 @@ interface Brand {
 
 export default function Brands() {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'purchasing' || user?.role === 'purchaser';
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Brand | null>(null);
   const [name, setName] = useState('');
   const [error, setError] = useState('');
+  const { showToast } = useToast();
 
   const fetchBrands = async () => {
     try {
@@ -57,6 +59,7 @@ export default function Brands() {
         await api.post('/api/brands', { name });
       }
       setModalOpen(false);
+      showToast(editing ? 'Brand updated successfully!' : 'Brand created successfully!', 'success');
       fetchBrands();
     } catch (err: unknown) {
       const axiosError = err as { response?: { data?: { error?: string } } };
@@ -68,9 +71,10 @@ export default function Brands() {
     if (!confirm(`Delete brand "${brand.name}"?`)) return;
     try {
       await api.delete(`/api/brands/${brand.id}`);
+      showToast('Brand deleted successfully!', 'success');
       fetchBrands();
     } catch {
-      alert('Failed to delete brand');
+      showToast('Failed to delete brand', 'error');
     }
   };
 

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import api from '../api/axios';
 import { Package, Plus, CheckCircle, Truck, XCircle, Search, Inbox } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 import Modal from '../components/Modal';
 import FormField from '../components/FormField';
 
@@ -62,25 +63,13 @@ export default function Transfers() {
   const [selectedTransfer, setSelectedTransfer] = useState<Transfer | null>(null);
 
   
-  const [feedback, setFeedback] = useState<{
-    open: boolean;
-    title: string;
-    message: string;
-    type: 'success' | 'error' | 'confirm';
-    onConfirm?: () => void;
-  }>({
-    open: false,
-    title: '',
-    message: '',
-    type: 'success'
-  });
-
-  const showFeedback = (title: string, message: string, type: 'success' | 'error' = 'success') => {
-    setFeedback({ open: true, title, message, type });
-  };
+  const { showToast } = useToast();
 
   const showConfirm = (title: string, message: string, onConfirm: () => void) => {
-    setFeedback({ open: true, title, message, type: 'confirm', onConfirm });
+    
+    if (window.confirm(`${title}: ${message}`)) {
+      onConfirm();
+    }
   };
 
   const isSuperAdmin = user?.role?.toLowerCase() === 'super_admin';
@@ -140,7 +129,7 @@ export default function Transfers() {
         await api.put(`/api/transfers/${id}/status`, { status: newStatus });
         
         const statusLabel = newStatus.replace('_', ' ').toUpperCase();
-        showFeedback('Success', `Transfer Status Updated: ${statusLabel}`, 'success');
+        showToast(`Transfer Status Updated: ${statusLabel}`, 'success');
 
         fetchData();
         window.dispatchEvent(new Event('transfer_updated'));
@@ -153,7 +142,7 @@ export default function Transfers() {
       } catch (err: any) {
         const errorMsg = err.response?.data?.error || 'Failed to update transfer status';
         const details = err.response?.data?.details ? `: ${err.response.data.details}` : '';
-        showFeedback('Error', `${errorMsg}${details}`, 'error');
+        showToast(`${errorMsg}${details}`, 'error');
       }
     };
 
@@ -170,7 +159,7 @@ export default function Transfers() {
 
   const submitRequest = async () => {
     if (!targetBranchId || requestItems.length === 0) {
-      showFeedback('Missing Information', 'Please select a branch and add at least one item', 'error');
+      showToast('Please select a branch and add at least one item', 'error');
       return;
     }
     
@@ -187,9 +176,9 @@ export default function Transfers() {
       setNotes('');
       setTargetBranchId('');
       window.dispatchEvent(new Event('transfer_updated'));
-      showFeedback('Success', 'Transfer request sent successfully!', 'success');
+      showToast('Transfer request sent successfully!', 'success');
     } catch (err: any) {
-      showFeedback('Error', err.response?.data?.error || 'Failed to submit request', 'error');
+      showToast(err.response?.data?.error || 'Failed to submit request', 'error');
     }
   };
 
@@ -585,55 +574,6 @@ export default function Transfers() {
             </div>
           </div>
         )}
-      </Modal>
-
-      <Modal 
-        open={feedback.open} 
-        onClose={() => setFeedback({ ...feedback, open: false })}
-        title={feedback.title}
-        maxWidth="max-w-md"
-      >
-        <div className="text-center py-4">
-          <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
-            feedback.type === 'success' ? 'bg-green-100 text-green-600' : 
-            feedback.type === 'error' ? 'bg-red-100 text-red-600' : 
-            'bg-amber-100 text-amber-600'
-          }`}>
-            {feedback.type === 'success' && <CheckCircle className="w-8 h-8" />}
-            {feedback.type === 'error' && <XCircle className="w-8 h-8" />}
-            {feedback.type === 'confirm' && <Truck className="w-8 h-8" />}
-          </div>
-          <p className="text-sm font-medium text-gray-600 mb-8 whitespace-pre-wrap">{feedback.message}</p>
-          
-          <div className="flex gap-3">
-            {feedback.type === 'confirm' ? (
-              <>
-                <button 
-                  onClick={() => setFeedback({ ...feedback, open: false })}
-                  className="flex-1 px-6 py-3 font-black text-xs uppercase tracking-widest text-gray-500 hover:text-gray-900 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button 
-                  onClick={() => {
-                    setFeedback({ ...feedback, open: false });
-                    feedback.onConfirm?.();
-                  }}
-                  className="flex-1 px-6 py-3 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg active:scale-95"
-                >
-                  Confirm
-                </button>
-              </>
-            ) : (
-              <button 
-                onClick={() => setFeedback({ ...feedback, open: false })}
-                className="w-full px-6 py-3 bg-gray-900 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-black transition-all shadow-lg active:scale-95"
-              >
-                GOT IT
-              </button>
-            )}
-          </div>
-        </div>
       </Modal>
     </div>
   );

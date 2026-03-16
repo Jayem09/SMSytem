@@ -14,6 +14,7 @@ import {
   FileDown,
   X
 } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 
 interface Warehouse {
   id: number;
@@ -60,7 +61,7 @@ interface ItemInput {
 
 export default function Inventory() {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'purchasing' || user?.role === 'purchaser';
   const [activeTab, setActiveTab] = useState<'levels' | 'in' | 'out' | 'logs'>('levels');
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -87,9 +88,8 @@ export default function Inventory() {
   const [quantity, setQuantity] = useState('');
   const [batchNumber, setBatchNumber] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
-  const [submitError, setSubmitError] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const { showToast } = useToast();
 
   
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
@@ -216,15 +216,13 @@ export default function Inventory() {
 
   const handleStockSubmit = async (e: React.FormEvent, type: 'in' | 'out') => {
     e.preventDefault();
-    setSubmitError('');
-    setSuccessMsg('');
     setSubmitting(true);
 
     try {
       if (type === 'in') {
         const validItems = items.filter(item => item.product_id > 0 && item.quantity > 0);
         if (validItems.length === 0) {
-          setSubmitError('Add at least one complete item (product and quantity).');
+          showToast('Add at least one complete item (product and quantity).', 'error');
           setSubmitting(false);
           return;
         }
@@ -236,7 +234,7 @@ export default function Inventory() {
           items: validItems
         };
         await api.post('/api/purchase-orders', payload);
-        setSuccessMsg('Successfully created a new Pending Purchase Order!');
+        showToast('Successfully created a new Pending Purchase Order!', 'success');
         
         
         setSupplierId('');
@@ -253,7 +251,7 @@ export default function Inventory() {
           expiry_date: expiryDate ? new Date(expiryDate).toISOString() : undefined,
         };
         await api.post(`/api/inventory/out`, payload);
-        setSuccessMsg(`Successfully logged stock out!`);
+        showToast(`Successfully logged stock out!`, 'success');
         
         
         setProductId('');
@@ -263,7 +261,7 @@ export default function Inventory() {
         setExpiryDate('');
       }
     } catch (err: any) {
-      setSubmitError(err.response?.data?.error || 'Failed to submit');
+      showToast(err.response?.data?.error || 'Failed to submit', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -373,8 +371,6 @@ export default function Inventory() {
               Receive New Stock
             </h2>
             
-            {submitError && <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded-lg border border-red-100">{submitError}</div>}
-            {successMsg && <div className="mb-4 p-3 bg-green-50 text-green-600 text-sm rounded-lg border border-green-100">{successMsg}</div>}
 
             <form onSubmit={(e) => handleStockSubmit(e, 'in')} className="space-y-5">
               <div className="bg-blue-50 text-blue-800 text-sm p-4 rounded-lg border border-blue-100 flex items-start gap-2">
@@ -495,8 +491,6 @@ export default function Inventory() {
             </h2>
             <p className="text-sm text-gray-500 mb-6">Use this to manually deduct stock for damages, expired goods, or internal transfers. Sales will automatically deduct stock.</p>
             
-            {submitError && <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded-lg border border-red-100">{submitError}</div>}
-            {successMsg && <div className="mb-4 p-3 bg-green-50 text-green-600 text-sm rounded-lg border border-green-100">{successMsg}</div>}
 
             <form onSubmit={(e) => handleStockSubmit(e, 'out')} className="space-y-5">
               <div>

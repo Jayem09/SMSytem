@@ -44,7 +44,7 @@ const statusColors: Record<string, string> = {
 
 export default function Orders() {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'purchasing' || user?.role === 'purchaser';
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [itemsModalOpen, setItemsModalOpen] = useState(false);

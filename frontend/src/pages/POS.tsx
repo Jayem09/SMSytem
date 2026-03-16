@@ -5,6 +5,7 @@ import FormField from '../components/FormField';
 import { printReceipt } from '../components/Receipt';
 import { printDeliveryReceipt } from '../components/DeliveryReceipt';
 import { Search, ShoppingCart, Trash2, Printer, CheckCircle, Package } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 
 interface Product {
   id: number;
@@ -74,6 +75,7 @@ export default function POS() {
   const [lastWithholdingTaxRate, setLastWithholdingTaxRate] = useState(0);
   const [lastReceiptType, setLastReceiptType] = useState<'SI' | 'DR'>('SI');
   const [isProcessingTerminal, setIsProcessingTerminal] = useState(false);
+  const { showToast } = useToast();
 
   const fetchData = async () => {
     setLoading(true);
@@ -150,7 +152,7 @@ export default function POS() {
   const handleCheckout = async (status: 'pending' | 'completed' = 'completed') => {
     if (cart.length === 0) return;
     if (receiptType === 'SI' && !businessAddress.trim()) {
-      alert('Business Address is required for a Sales Invoice (SI).');
+      showToast('Business Address is required for a Sales Invoice (SI).', 'error');
       return;
     }
     try {
@@ -160,13 +162,13 @@ export default function POS() {
           
           const terminalRes = await api.post('/api/terminal/payment', { amount: finalTotal });
           if (terminalRes.data.status !== "APPROVED") {
-            alert(`Terminal Error: ${terminalRes.data.error_message || "Transaction Declined"}`);
+            showToast(`Terminal Error: ${terminalRes.data.error_message || "Transaction Declined"}`, 'error');
             setIsProcessingTerminal(false);
             return;
           }
           
         } catch (termErr: any) {
-          alert(`Failed to communicate with terminal: ${termErr.message}`);
+          showToast(`Failed to communicate with terminal: ${termErr.message}`, 'error');
           setIsProcessingTerminal(false);
           return;
         }
@@ -213,7 +215,7 @@ export default function POS() {
       const axiosError = err as { response?: { data?: { error?: string, details?: string } } };
       const errorMessage = axiosError.response?.data?.error || 'Checkout failed';
       const detailMessage = axiosError.response?.data?.details ? `\nDetails: ${axiosError.response.data.details}` : '';
-      alert(`${errorMessage}${detailMessage}`);
+      showToast(`${errorMessage}${detailMessage}`, 'error');
     }
   };
 

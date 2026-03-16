@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Settings as SettingsIcon, Save, Plus, Trash2 } from 'lucide-react';
 import api from '../api/axios';
+import { useToast } from '../context/ToastContext';
 
 export default function Settings() {
   const [loading, setLoading] = useState(false);
@@ -9,6 +10,7 @@ export default function Settings() {
   const [contactEmail, setContactEmail] = useState('admin@smsystem.com');
   const [serviceAdvisors, setServiceAdvisors] = useState<string[]>([]);
   const [newAdvisor, setNewAdvisor] = useState('');
+  const { showToast } = useToast();
 
   useEffect(() => {
     fetchSettings();
@@ -48,10 +50,10 @@ export default function Settings() {
         contact_email: contactEmail,
         service_advisors: JSON.stringify(serviceAdvisors)
       });
-      alert('Settings saved successfully!');
+      showToast('Settings saved successfully!', 'success');
     } catch (err) {
       console.error('Failed to save settings', err);
-      alert('Failed to save settings.');
+      showToast('Failed to save settings.', 'error');
     } finally {
       setSaving(false);
     }
@@ -97,8 +99,8 @@ export default function Settings() {
               <input 
                 type="text" 
                 value={storeName}
-                onChange={e => setStoreName(e.target.value)}
-                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-gray-900/20 focus:border-gray-900 outline-none transition-all"
+                readOnly
+                className="w-full px-4 py-2 bg-gray-100 border border-gray-200 rounded-xl text-sm text-gray-500 cursor-not-allowed outline-none"
               />
             </div>
             
@@ -107,8 +109,8 @@ export default function Settings() {
               <input 
                 type="email" 
                 value={contactEmail}
-                onChange={e => setContactEmail(e.target.value)}
-                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-gray-900/20 focus:border-gray-900 outline-none transition-all"
+                readOnly
+                className="w-full px-4 py-2 bg-gray-100 border border-gray-200 rounded-xl text-sm text-gray-500 cursor-not-allowed outline-none"
               />
             </div>
           </div>

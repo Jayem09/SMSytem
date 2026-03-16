@@ -1,5 +1,6 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import api from '../api/axios';
+import { useToast } from '../context/ToastContext';
 import DataTable from '../components/DataTable';
 import Modal from '../components/Modal';
 import FormField from '../components/FormField';
@@ -13,7 +14,7 @@ interface Category {
 
 export default function Categories() {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'purchasing' || user?.role === 'purchaser';
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -21,6 +22,7 @@ export default function Categories() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [error, setError] = useState('');
+  const { showToast } = useToast();
 
   const fetchCategories = async () => {
     try {
@@ -61,6 +63,7 @@ export default function Categories() {
         await api.post('/api/categories', { name, description });
       }
       setModalOpen(false);
+      showToast(editing ? 'Category updated successfully!' : 'Category created successfully!', 'success');
       fetchCategories();
     } catch (err: unknown) {
       const axiosError = err as { response?: { data?: { error?: string } } };
@@ -72,9 +75,10 @@ export default function Categories() {
     if (!confirm(`Delete category "${cat.name}"?`)) return;
     try {
       await api.delete(`/api/categories/${cat.id}`);
+      showToast('Category deleted successfully!', 'success');
       fetchCategories();
     } catch {
-      alert('Failed to delete category');
+      showToast('Failed to delete category', 'error');
     }
   };
 
