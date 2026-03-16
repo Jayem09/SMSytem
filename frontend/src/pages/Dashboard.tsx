@@ -61,14 +61,27 @@ export default function Dashboard() {
   };
 
   const filteredSalesTrend = useMemo(() => {
-    if (!stats.sales_trend || stats.sales_trend.length === 0) return [];
-    if (timeRange === 30) return stats.sales_trend;
+    const data = [];
+    const now = new Date();
     
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - timeRange);
-    cutoff.setHours(0, 0, 0, 0); 
     
-    return stats.sales_trend.filter(d => new Date(d.date) >= cutoff);
+    for (let i = timeRange - 1; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      
+      
+      const existing = stats.sales_trend.find(s => {
+        const sDate = new Date(s.date).toISOString().split('T')[0];
+        return sDate === dateStr;
+      });
+
+      data.push({
+        date: dateStr,
+        amount: existing ? existing.amount : 0
+      });
+    }
+    return data;
   }, [stats.sales_trend, timeRange]);
 
   const exportToCSV = async () => {
@@ -261,8 +274,8 @@ export default function Dashboard() {
               <AreaChart data={filteredSalesTrend}>
                 <defs>
                   <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15}/>
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#000000ff" stopOpacity={0.15}/>
+                    <stop offset="95%" stopColor="#000000ff" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -292,7 +305,7 @@ export default function Dashboard() {
                 <Area 
                   type="monotone" 
                   dataKey="amount" 
-                  stroke="#3b82f6" 
+                  stroke="#2c4bf6ff" 
                   strokeWidth={4}
                   fillOpacity={1} 
                   fill="url(#colorSales)" 
