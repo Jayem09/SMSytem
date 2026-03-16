@@ -1,6 +1,7 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { useToast } from '../context/ToastContext';
 import api from '../api/axios';
 
 export default function Register() {
@@ -8,9 +9,9 @@ export default function Register() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { register } = useAuth();
+  const { showToast } = useToast();
   const navigate = useNavigate();
   const [backendStatus, setBackendStatus] = useState<'checking' | 'online' | 'offline'>('checking');
 
@@ -29,15 +30,13 @@ export default function Register() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setError('');
-
     if (password !== confirmPassword) {
-      setError('Passwords do not match');
+      showToast('Passwords do not match', 'error');
       return;
     }
 
     if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+      showToast('Password must be at least 6 characters', 'error');
       return;
     }
 
@@ -45,9 +44,10 @@ export default function Register() {
 
     try {
       await register(name, email, password);
+      showToast('Account created successfully!', 'success');
       navigate('/dashboard');
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Registration failed');
+      showToast(err instanceof Error ? err.message : 'Registration failed', 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -67,11 +67,6 @@ export default function Register() {
         </div>
 
         <div className="bg-white border border-gray-200 rounded-lg p-6">
-          {error && (
-            <div className="mb-4 p-3 rounded-md bg-red-50 border border-red-200 text-red-700 text-sm">
-              {error}
-            </div>
-          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>

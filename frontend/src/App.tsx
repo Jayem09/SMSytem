@@ -20,7 +20,6 @@ import POS from './pages/POS';
 import Suppliers from './pages/Suppliers';
 import PurchaseOrders from './pages/PurchaseOrders';
 import Staff from './pages/Staff';
-import ReceiptTest from './pages/ReceiptTest';
 import Inventory from './pages/Inventory';
 import SettingsPage from './pages/Settings';
 import DailyReport from './pages/DailyReport';
@@ -38,7 +37,6 @@ function App() {
               {}
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
-              <Route path="/receipt-test" element={<ReceiptTest />} />
 
               {}
               <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>

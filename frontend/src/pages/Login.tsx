@@ -1,26 +1,25 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { useToast } from '../context/ToastContext';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { login } = useAuth();
+  const { showToast } = useToast();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setError('');
     setIsSubmitting(true);
-
     try {
       await login(email, password);
       navigate('/dashboard');
     } catch (err: unknown) {
       const axiosError = err as { response?: { data?: { error?: string } } };
-      setError(axiosError.response?.data?.error || 'Login failed. Please try again.');
+      showToast(axiosError.response?.data?.error || 'Login failed. Please try again.', 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -35,11 +34,6 @@ export default function Login() {
         </div>
 
         <div className="bg-white border border-gray-200 rounded-lg p-6">
-          {error && (
-            <div className="mb-4 p-3 rounded-md bg-red-50 border border-red-200 text-red-700 text-sm">
-              {error}
-            </div>
-          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
