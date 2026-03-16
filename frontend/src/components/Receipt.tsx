@@ -87,36 +87,10 @@ export function generateReceiptHTML(order: ReceiptOrder, tin?: string, businessA
         }
 
         
-        .bg-template {
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 8.27in;
-          height: 11.69in;
-          opacity: 0.3;
-          z-index: 0;
-          pointer-events: none;
-        }
-        .bg-template img {
-          width: 100%;
-          height: 100%;
-          object-fit: fill;
-        }
-
-        
         @media print {
           
-           .bg-template { 
-             display: block !important; 
-             opacity: 0.25 !important; 
-             -webkit-print-color-adjust: exact !important; 
-             print-color-adjust: exact !important; 
-           }
-           .bg-template img { 
-             display: block !important; 
-             opacity: 0.25 !important; 
-           }
-          .toolbar { display: none !important; }
+           
+          
         }
 
         
@@ -168,53 +142,9 @@ export function generateReceiptHTML(order: ReceiptOrder, tin?: string, businessA
         .total-due       { position: absolute; top: calc(8.75in + var(--printer-offset)); left: 6.20in; font-size: 15px; font-weight: bold; text-align: right; width: 1.5in; }
 
         
-        .toolbar {
-          position: fixed;
-          top: 10px;
-          right: 10px;
-          z-index: 9999;
-          display: flex;
-          gap: 8px;
-          background: #333;
-          padding: 8px 12px;
-          border-radius: 8px;
-          box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-        }
-        .toolbar button {
-          padding: 6px 14px;
-          font-size: 13px;
-          border: none;
-          border-radius: 4px;
-          cursor: pointer;
-          font-weight: bold;
-        }
-        .btn-print {
-          background: #4CAF50;
-          color: white;
-        }
-        .btn-toggle {
-          background: #2196F3;
-          color: white;
-        }
-        .btn-close {
-          background: #f44336;
-          color: white;
-        }
       </style>
     </head>
-    <body>
-
-      <!-- Toolbar for preview controls (hidden when printing) -->
-      <div class="toolbar">
-        <button class="btn-toggle" onclick="toggleBg()">Toggle Background</button>
-        <button class="btn-print" onclick="window.print()">🖨️ Print</button>
-        <button class="btn-close" onclick="window.close()">✕ Close</button>
-      </div>
-
-      <!-- Scanned form background (visible on screen only) -->
-      <div class="bg-template" id="bgTemplate">
-        <img src="/PLDT_NEW_SI_FORMAT.png" alt="Invoice template" />
-      </div>
+    <body onload="window.print()">
 
       <!-- Customer Info -->
       <div class="date-field">${dateStr}</div>
@@ -240,16 +170,6 @@ export function generateReceiptHTML(order: ReceiptOrder, tin?: string, businessA
       <div class="less-withholding">${fmt(whTaxAmount)}</div>
       <div class="total-due">${fmt(totalAmountDue)}</div>
 
-      <script>
-        function toggleBg() {
-          const bg = document.getElementById('bgTemplate');
-          if (bg.style.display === 'none') {
-            bg.style.display = 'block';
-          } else {
-            bg.style.display = 'none';
-          }
-        }
-      </script>
     </body>
     </html>
   `;
