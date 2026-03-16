@@ -44,22 +44,22 @@ export function generateDeliveryReceiptHTML(order: ReceiptOrder, _tin?: string, 
   const MAX_ROWS = 10;
   const items = (order.items || []).slice(0, MAX_ROWS);
   const itemRows = items.map((item, index) => {
-    const unitPrice = item.unit_price ?? item.price ?? (item.subtotal && item.quantity ? item.subtotal / item.quantity : 0);
-    const subtotal = item.subtotal ?? 0;
-    const unit = "PCS"; // Default unit as it's not in the data model yet
+  const unitPrice = item.unit_price ?? item.price ?? (item.subtotal / item.quantity);
+  const subtotal = item.subtotal ?? 0;
+  const unit = "PCS";
     
     // Calculate the Y position for this row.
-    const baseTop = 3.47; 
-    const rowHeight = 0.29;
+    const baseTop = 2.70;
+    const rowHeight = 0.30;
     const topPos = baseTop + (index * rowHeight);
 
     return `
       <!-- Row ${index + 1} -->
-      <div class="col-qty"   style="top: calc(${topPos}in + var(--offset-y)); left: 4.75in;">${item.quantity}</div>
-      <div class="col-unit"  style="top: calc(${topPos}in + var(--offset-y)); left: 1.00in;">${unit}</div>
-      <div class="col-desc"  style="top: calc(${topPos}in + var(--offset-y)); left: 1.05in;">${item.product?.name || ''}</div>
-      <div class="col-price" style="top: calc(${topPos}in + var(--offset-y)); left: 5.30in;">${fmt(unitPrice)}</div>
-      <div class="col-amt"   style="top: calc(${topPos}in + var(--offset-y)); left: 6.50in;">${fmt(subtotal)}</div>
+    <div class="col-qty"   style="top:calc(${topPos}in + var(--offset-y)); left:0.80in;">${item.quantity}</div>
+    <div class="col-unit"  style="top:calc(${topPos}in + var(--offset-y)); left:1.50in;">${unit}</div>
+    <div class="col-desc"  style="top:calc(${topPos}in + var(--offset-y)); left:2.20in;">${item.product?.name || ''}</div>
+    <div class="col-price" style="top:calc(${topPos}in + var(--offset-y)); left:5.60in;">${fmt(unitPrice)}</div>
+    <div class="col-amt"   style="top:calc(${topPos}in + var(--offset-y)); left:6.70in;">${fmt(subtotal)}</div>
     `;
   }).join('');
 
@@ -138,11 +138,29 @@ export function generateDeliveryReceiptHTML(order: ReceiptOrder, _tin?: string, 
            ══════════════════════════════════════════════ */
 
         /* ---------- Customer Info Section ---------- */
-        .date-field { position: absolute; top: calc(1.60in + var(--offset-y)); left: calc(5.80in + var(--offset-x));  font-size: 15px; }
-        .reg-name   { position: absolute; top: calc(2.15in + var(--offset-y));  left: 1.90in;  font-size: 15px; }
-        .tin-field   { position: absolute; top: calc(2.50in + var(--offset-y));  left: 1.05in;  font-size: 15px; }
-        .address    { position: absolute; top: calc(2.75in + var(--offset-y));  left: 2.00in;  font-size: 15px; }
+        .reg-name {
+          position:absolute;
+          top:calc(1.70in + var(--offset-y));
+          left:1.30in;
+          font-size:15px;
+        }
 
+        .address{
+          position:absolute;
+          top:calc(2.00in + var(--offset-y));
+          left:1.30in;
+          font-size:15px;
+          width:4.5in;
+        }
+
+        .date-field{
+          position:absolute;
+          top:calc(2.00in + var(--offset-y));
+          left:6.10in;
+          font-size:15px;
+        }
+        .tin-field   { position: absolute; top: calc(2.50in + var(--offset-y));  left: 1.05in;  font-size: 15px; }
+  
         /* ---------- Items (Absolute Layout) ---------- */
         .col-qty, .col-unit, .col-desc, .col-price, .col-amt {
           position: absolute;
@@ -172,8 +190,7 @@ export function generateDeliveryReceiptHTML(order: ReceiptOrder, _tin?: string, 
         .less-discount   { position: absolute; top: calc(7.95in + var(--offset-y)); left: 6.20in; font-size: 15px; text-align: right; width: 1.5in; }
         .add-vat         { position: absolute; top: calc(8.20in + var(--offset-y)); left: 6.20in; font-size: 15px; text-align: right; width: 1.5in; }
         .less-withholding { position: absolute; top: calc(8.45in + var(--offset-y)); left: 6.20in; font-size: 15px; text-align: right; width: 1.5in; }
-        .total-due       { position: absolute; top: calc(8.75in + var(--offset-y)); left: 6.20in; font-size: 15px; font-weight: bold; text-align: right; width: 1.5in; }
-
+        .total-due       { position: absolute; top: calc(8.80in + var(--offset-y)); left: 6.70in; font-size: 15px; text-align: right; width: 1.5in; font-weight: bold; }position:absolute; }
         /* ---------- Toolbar ---------- */
         .toolbar {
           position: fixed;
