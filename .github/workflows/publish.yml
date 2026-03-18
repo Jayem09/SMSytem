@@ -20,6 +20,8 @@ jobs:
             args: ""
 
     runs-on: ${{ matrix.platform }}
+    env:
+      VITE_API_BASE_URL: "http://168.144.46.137:8080"
     steps:
       - uses: actions/checkout@v4
 
@@ -44,7 +46,6 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VITE_API_BASE_URL: "http://168.144.46.137:8080"
         with:
           tagName: app-v__VERSION__
           releaseName: "SMSytem v__VERSION__"

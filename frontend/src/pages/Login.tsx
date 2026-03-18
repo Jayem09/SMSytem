@@ -1,7 +1,8 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../context/ToastContext';
+import api from '../api/axios';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -10,6 +11,20 @@ export default function Login() {
   const { login } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
+  const [backendStatus, setBackendStatus] = useState<'checking' | 'online' | 'offline'>('checking');
+
+  useEffect(() => {
+    const checkBackend = async () => {
+      try {
+        await api.get('/api/health');
+        setBackendStatus('online');
+      } catch (err) {
+        console.error('Health check failed:', err);
+        setBackendStatus('offline');
+      }
+    };
+    checkBackend();
+  }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -31,6 +46,16 @@ export default function Login() {
         <div className="text-center mb-6">
           <h1 className="text-xl font-semibold text-gray-900">SMSystem</h1>
           <p className="text-sm text-gray-500 mt-1">Sign in to your account</p>
+          <div className="mt-2 flex justify-center">
+            {backendStatus === 'checking' && <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest animate-pulse">Checking connection...</span>}
+            {backendStatus === 'online' && <span className="text-[10px] text-green-500 font-bold uppercase tracking-widest flex items-center gap-1">● Backend Online</span>}
+            {backendStatus === 'offline' && (
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-[10px] text-red-500 font-bold uppercase tracking-widest flex items-center gap-1">● Backend Offline</span>
+                <span className="text-[8px] text-gray-400 font-medium">Trying: {api.defaults.baseURL}</span>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="bg-white border border-gray-200 rounded-lg p-6">
