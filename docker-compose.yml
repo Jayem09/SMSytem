@@ -5,6 +5,10 @@ services:
     image: mysql:8.0
     container_name: smsystem_mysql
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 350M
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
       MYSQL_DATABASE: ${DB_NAME}
@@ -27,6 +31,10 @@ services:
       dockerfile: Dockerfile
     container_name: smsystem_backend
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
     depends_on:
       mysql:
         condition: service_healthy
