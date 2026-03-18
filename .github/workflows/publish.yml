@@ -15,9 +15,11 @@ jobs:
       matrix:
         include:
           - platform: "macos-latest"
-            args: "--target aarch64-apple-darwin,x86_64-apple-darwin"
+            arch: "aarch64-apple-darwin"
+          - platform: "macos-latest"
+            arch: "x86_64-apple-darwin"
           - platform: "windows-latest"
-            args: ""
+            arch: ""
 
     runs-on: ${{ matrix.platform }}
     env:
@@ -34,7 +36,7 @@ jobs:
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ (matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin') || '' }}
+          targets: ${{ matrix.arch }}
 
       - name: install dependencies (ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'
@@ -56,4 +58,4 @@ jobs:
           releaseDraft: false
           prerelease: false
           projectPath: ./frontend
-          args: ${{ matrix.args }}
+          args: ${{ matrix.arch != '' && format('--target {0}', matrix.arch) || '' }}
