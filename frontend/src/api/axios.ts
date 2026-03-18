@@ -32,6 +32,45 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  // Custom adapter to use Tauri's native bridge in production
+  adapter: async (config) => {
+    // Only use Tauri fetch if we are in a Tauri environment (window.__TAURI_INTERNALS__ is present)
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+    
+    if (!isTauri) {
+      // Fallback to default browser adapter if not in Tauri
+      const defaultAdapter = axios.getAdapter(axios.defaults.adapter as any);
+      return (defaultAdapter as any)(config);
+    }
+
+    try {
+      const fullUrl = config.url?.startsWith('http') 
+        ? config.url 
+        : `${config.baseURL}${config.url}${config.params ? '?' + new URLSearchParams(config.params).toString() : ''}`;
+
+      const tauriResponse = await fetch(fullUrl, {
+        method: (config.method?.toUpperCase() as any) || 'GET',
+        headers: config.headers as any,
+        body: config.data ? (typeof config.data === 'string' ? config.data : JSON.stringify(config.data)) : undefined,
+        connectTimeout: config.timeout || 10000,
+      });
+
+      const responseData = await tauriResponse.json();
+
+      return {
+        data: responseData,
+        status: tauriResponse.status,
+        statusText: tauriResponse.statusText,
+        headers: tauriResponse.headers as any,
+        config,
+      };
+    } catch (error: any) {
+      console.error('Tauri Native Request Failed:', error);
+      // If native fails, try to fallback to standard browser adapter as last resort
+      const defaultAdapter = axios.getAdapter(axios.defaults.adapter as any);
+      return (defaultAdapter as any)(config);
+    }
+  }
 });
 
 

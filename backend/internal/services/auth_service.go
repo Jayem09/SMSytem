@@ -60,8 +60,14 @@ func (s *AuthService) Register(input RegisterInput) (*AuthResponse, error) {
 		return nil, errors.New("failed to hash password")
 	}
 
-	// Default role is "pending" for new employees
+	// If this is the very first user, make them super_admin automatically
+	var userCount int64
+	database.DB.Model(&models.User{}).Count(&userCount)
+	
 	role := "pending"
+	if userCount == 0 {
+		role = "super_admin"
+	}
 
 	// Default to the first branch as a placeholder until admin assigns one
 	var firstBranch models.Branch
