@@ -2,7 +2,7 @@ import { useState, useEffect, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../context/ToastContext';
-import api from '../api/axios';
+import api, { checkHealthNative } from '../api/axios';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -12,15 +12,22 @@ export default function Login() {
   const { showToast } = useToast();
   const navigate = useNavigate();
   const [backendStatus, setBackendStatus] = useState<'checking' | 'online' | 'offline'>('checking');
+  const [debugError, setDebugError] = useState<string>('');
 
   useEffect(() => {
     const checkBackend = async () => {
       try {
-        await api.get('/api/health');
-        setBackendStatus('online');
+        const isOnline = await checkHealthNative();
+        if (isOnline) {
+          setBackendStatus('online');
+        } else {
+          setBackendStatus('offline');
+          setDebugError('Native bridge failed to connect');
+        }
       } catch (err) {
         console.error('Health check failed:', err);
         setBackendStatus('offline');
+        setDebugError(err instanceof Error ? err.message : String(err));
       }
     };
     checkBackend();
@@ -53,6 +60,7 @@ export default function Login() {
               <div className="flex flex-col items-center gap-1">
                 <span className="text-[10px] text-red-500 font-bold uppercase tracking-widest flex items-center gap-1">● Backend Offline</span>
                 <span className="text-[8px] text-gray-400 font-medium">Trying: {api.defaults.baseURL}</span>
+                {debugError && <span className="text-[7px] text-red-400/70 block max-w-[200px] break-all">Error: {debugError}</span>}
               </div>
             )}
           </div>

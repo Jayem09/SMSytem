@@ -2,7 +2,7 @@ import { useState, useEffect, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../context/ToastContext';
-import api from '../api/axios';
+import api, { checkHealthNative } from '../api/axios';
 
 export default function Register() {
   const [name, setName] = useState('');
@@ -14,15 +14,22 @@ export default function Register() {
   const { showToast } = useToast();
   const navigate = useNavigate();
   const [backendStatus, setBackendStatus] = useState<'checking' | 'online' | 'offline'>('checking');
+  const [debugError, setDebugError] = useState<string>('');
 
   useEffect(() => {
     const initPage = async () => {
       try {
-        await api.get('/api/health');
-        setBackendStatus('online');
+        const isOnline = await checkHealthNative();
+        if (isOnline) {
+          setBackendStatus('online');
+        } else {
+          setBackendStatus('offline');
+          setDebugError('Native bridge failed to connect');
+        }
       } catch (err) {
         console.error('Initialization failed:', err);
         setBackendStatus('offline');
+        setDebugError(err instanceof Error ? err.message : String(err));
       }
     };
     initPage();
@@ -62,7 +69,13 @@ export default function Register() {
           <div className="mt-2 flex justify-center">
             {backendStatus === 'checking' && <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest animate-pulse">Checking connection...</span>}
             {backendStatus === 'online' && <span className="text-[10px] text-green-500 font-bold uppercase tracking-widest flex items-center gap-1">● Backend Online</span>}
-            {backendStatus === 'offline' && <span className="text-[10px] text-red-500 font-bold uppercase tracking-widest flex items-center gap-1">● Backend Offline</span>}
+            {backendStatus === 'offline' && (
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-[10px] text-red-500 font-bold uppercase tracking-widest flex items-center gap-1">● Backend Offline</span>
+                <span className="text-[8px] text-gray-400 font-medium">Trying: {api.defaults.baseURL}</span>
+                {debugError && <span className="text-[7px] text-red-400/70 block max-w-[200px] break-all text-center">Error: {debugError}</span>}
+              </div>
+            )}
           </div>
         </div>
 
