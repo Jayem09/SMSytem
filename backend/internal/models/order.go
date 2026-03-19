@@ -29,6 +29,7 @@ type Order struct {
 
 	
 	Customer Customer    `gorm:"foreignKey:CustomerID" json:"customer,omitempty"`
+	Branch   Branch      `gorm:"foreignKey:BranchID" json:"branch,omitempty"`
 	User     User        `gorm:"foreignKey:UserID" json:"user,omitempty"`
 	Items    []OrderItem `gorm:"foreignKey:OrderID" json:"items,omitempty"`
 }

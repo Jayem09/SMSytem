@@ -26,8 +26,10 @@ frontend/.vite/
 .DS_Store
 Thumbs.db
 
-# Tauri
+# Tauri & Keys
 frontend/src-tauri/target/
 frontend/.env.production
 *.zip
+*.key
+*.key.pub
 .go-cache/

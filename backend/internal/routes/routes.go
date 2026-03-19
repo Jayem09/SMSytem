@@ -33,6 +33,7 @@ type Handlers struct {
 	Branch        *handlers.BranchHandler
 	Transfer      *handlers.TransferHandler
 	Search        *handlers.SearchHandler
+	System        *handlers.SystemHandler
 }
 
 
@@ -44,6 +45,8 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 			"message": "SMSystem API is running",
 		})
 	})
+
+	router.GET("/api/status", h.System.GetStatus)
 
 	
 	auth := router.Group("/api/auth")

@@ -25,6 +25,7 @@ import SettingsPage from './pages/Settings';
 import DailyReport from './pages/DailyReport';
 import Branches from './pages/Branches';
 import Transfers from './pages/Transfers';
+import MaintenanceGuard from './components/MaintenanceGuard';
 
 function App() {
   return (
@@ -32,8 +33,9 @@ function App() {
       <BrowserRouter>
         <AuthProvider>
           <ToastProvider>
-            <ToastContainer />
-            <Routes>
+            <MaintenanceGuard>
+              <ToastContainer />
+              <Routes>
               {}
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
@@ -65,9 +67,10 @@ function App() {
 
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
+            </MaintenanceGuard>
           </ToastProvider>
         </AuthProvider>
-    </BrowserRouter>
+      </BrowserRouter>
     </ErrorBoundary>
   );
 }

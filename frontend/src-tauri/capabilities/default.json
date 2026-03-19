@@ -33,6 +33,7 @@
         }
       ]
     },
-    "core:webview:allow-print"
+    "core:webview:allow-print",
+    "updater:default"
   ]
 }
