@@ -26,6 +26,7 @@ type productInput struct {
 	Name        string  `json:"name" binding:"required,min=2,max=255"`
 	Description string  `json:"description"`
 	Price       float64 `json:"price" binding:"required,gt=0"`
+	CostPrice   float64 `json:"cost_price" binding:"min=0"`
 	Stock       int     `json:"stock" binding:"min=0"`
 	Size        string  `json:"size"`
 	ParentID    *uint   `json:"parent_id"`
@@ -169,6 +170,7 @@ func (h *ProductHandler) Create(c *gin.Context) {
 		Name:        input.Name,
 		Description: input.Description,
 		Price:       input.Price,
+		CostPrice:   input.CostPrice,
 		Stock:       input.Stock, 
 		Size:        input.Size,
 		ParentID:    input.ParentID,
@@ -282,6 +284,7 @@ func (h *ProductHandler) Update(c *gin.Context) {
 	product.Name = input.Name
 	product.Description = input.Description
 	product.Price = input.Price
+	product.CostPrice = input.CostPrice
 	product.Size = input.Size
 	product.ParentID = input.ParentID
 	product.ImageURL = input.ImageURL

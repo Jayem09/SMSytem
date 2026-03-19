@@ -13,6 +13,7 @@ interface Product {
   name: string;
   description: string;
   price: number;
+  cost_price?: number;
   stock: number;
   is_service?: boolean; 
   size?: string;
@@ -52,6 +53,7 @@ export default function Products() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
+  const [costPrice, setCostPrice] = useState('');
   const [stock, setStock] = useState('');
   const [size, setSize] = useState('');
   const [parentId, setParentId] = useState('');
@@ -119,7 +121,7 @@ export default function Products() {
 
   const openCreate = () => {
     setEditing(null);
-    setName(''); setDescription(''); setPrice(''); setStock('0');
+    setName(''); setDescription(''); setPrice(''); setCostPrice(''); setStock('0');
     setSize(''); setParentId('');
     setCategoryId(''); setBrandId('');
     setIsService(false);
@@ -135,6 +137,7 @@ export default function Products() {
     setName(p.name);
     setDescription(p.description);
     setPrice(String(p.price));
+    setCostPrice(p.cost_price ? String(p.cost_price) : '0');
     setStock(String(p.stock));
     setSize(p.size || '');
     setParentId(p.parent_id ? String(p.parent_id) : '');
@@ -156,6 +159,7 @@ export default function Products() {
       name,
       description,
       price: parseFloat(price),
+      cost_price: parseFloat(costPrice) || 0,
       stock: parseInt(stock),
       size,
       parent_id: parentId ? parseInt(parentId) : null,
@@ -294,7 +298,8 @@ export default function Products() {
             { key: 'speed', label: 'Speed', render: (p: Product) => p.speed_rating || '--' },
             { key: 'load', label: 'Load', render: (p: Product) => p.load_index || '--' },
           ] : []),
-          { key: 'price', label: 'Price', render: (p) => `P ${p.price.toLocaleString()}` },
+          { key: 'cost_price', label: 'Unit Price', render: (p) => p.cost_price ? `P ${p.cost_price.toLocaleString()}` : '--' },
+          { key: 'price', label: 'Selling Price', render: (p) => `P ${p.price.toLocaleString()}` },
           { key: 'stock', label: 'Stock', render: (p) => (
             p.is_service ? <span className="text-gray-400 font-bold">N/A</span> :
             <span className={p.stock <= 5 ? 'text-red-600 font-medium' : ''}>{p.stock}</span>
@@ -317,8 +322,9 @@ export default function Products() {
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-4">
               <FormField label="Description" type="textarea" value={description} onChange={setDescription} />
-              <div className="grid grid-cols-2 gap-3 items-end">
-                <FormField label="Price" type="number" value={price} onChange={setPrice} required min={0} step="0.01" />
+              <div className="grid grid-cols-3 gap-3 items-end">
+                <FormField label="Unit/Cost Price" type="number" value={costPrice} onChange={setCostPrice} required min={0} step="0.01" />
+                <FormField label="Selling Price" type="number" value={price} onChange={setPrice} required min={0} step="0.01" />
                 
                 {!isService && (
                   <FormField label="Stock" type="number" value={stock} onChange={setStock} required min={0} />
@@ -416,7 +422,11 @@ export default function Products() {
                 <p className="text-sm text-gray-900">{viewingProduct.name}</p>
               </div>
               <div>
-                <p className="text-xs font-medium text-gray-500 uppercase">Price</p>
+                <p className="text-xs font-medium text-gray-500 uppercase">Unit Price</p>
+                <p className="text-sm text-gray-900">P {viewingProduct.cost_price?.toLocaleString() || '0'}</p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase">Selling Price</p>
                 <p className="text-sm text-gray-900">P {viewingProduct.price.toLocaleString()}</p>
               </div>
               <div>

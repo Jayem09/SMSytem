@@ -127,6 +127,18 @@ export default function MaintenanceGuard({ children }: { children: React.ReactNo
           <div className="mt-8 text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">
             SMSystem Control v{APP_VERSION}
           </div>
+
+          {/* Developer Bypass (Only visible during npm run tauri dev) */}
+          {import.meta.env.DEV && (
+            <button 
+              onClick={() => {
+                setStatus(null); // Bypass the guard
+              }}
+              className="mt-6 w-full py-2 px-4 bg-red-100/50 text-red-600 border border-red-200 rounded-xl text-xs font-bold hover:bg-red-100 transition-colors uppercase tracking-widest"
+            >
+              [DEV ONLY] Bypass Lock
+            </button>
+          )}
         </div>
       </div>
     );
