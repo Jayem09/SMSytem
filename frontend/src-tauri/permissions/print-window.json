@@ -1,0 +1,7 @@
+{
+  "identifier": "allow-print-window",
+  "description": "Allows the print_window command",
+  "commands": [
+    "print_window"
+  ]
+}

@@ -69,22 +69,23 @@ export function generateDeliveryReceiptHTML(order: ReceiptOrder, _tin?: string, 
     <head>
       <title>Invoice Preview — Align &amp; Print</title>
       <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        .bir-delivery-app {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+          width: 7.6in;
+          height: 11.6in;
+          position: relative;
+          font-family: "Courier New", monospace;
+          background: white;
+          --offset-x: 0in;
+          --offset-y: 0in;
+        }
+        .bir-delivery-app * { margin: 0; padding: 0; box-sizing: border-box; }
+        
         @page {
           size: 7.68in 5.31in;
           margin: 0;
-        }
-        body {
-          width: 7.68in;
-          height: 5.31in;
-          transform-origin: top left;
-          font-family: "Courier New", monospace;
-          position: relative;
-          /* ★ PRINTER OFFSET — adjust this single value to shift ALL text up/down ★
-             Negative = move UP, Positive = move DOWN
-             Change this when switching printers */
-          --offset-x: 0in;
-          --offset-y: 0in;
         }
 
         /* ═══════════════════════════════════════════════
@@ -112,25 +113,25 @@ export function generateDeliveryReceiptHTML(order: ReceiptOrder, _tin?: string, 
         }
 
         
-        .date-field, .reg-name, .tin-field, .address,
-        .items-table, .vatable-sales, .vat-amount-left,
-        .zero-rated, .vat-exempt, .total-vat-incl,
-        .less-vat, .net-of-vat, .less-discount,
-        .add-vat, .less-withholding, .total-due {
+        .bir-delivery-app .date-field, .bir-delivery-app .reg-name, .bir-delivery-app .tin-field, .bir-delivery-app .address,
+        .bir-delivery-app .items-table, .bir-delivery-app .vatable-sales, .bir-delivery-app .vat-amount-left,
+        .bir-delivery-app .zero-rated, .bir-delivery-app .vat-exempt, .bir-delivery-app .total-vat-incl,
+        .bir-delivery-app .less-vat, .bir-delivery-app .net-of-vat, .bir-delivery-app .less-discount,
+        .bir-delivery-app .add-vat, .bir-delivery-app .less-withholding, .bir-delivery-app .total-due {
           z-index: 1;
         }
 
         
 
         /* ---------- Customer Info Section ---------- */
-        .reg-name {
+        .bir-delivery-app .reg-name {
           position:absolute;
           top:calc(1.70in + var(--offset-y));
           left:1.30in;
           font-size:15px;
         }
 
-        .address{
+        .bir-delivery-app .address{
           position:absolute;
           top:calc(2.00in + var(--offset-y));
           left:1.30in;
@@ -138,16 +139,15 @@ export function generateDeliveryReceiptHTML(order: ReceiptOrder, _tin?: string, 
           width:4.5in;
         }
 
-        .date-field{
+        .bir-delivery-app .date-field{
           position:absolute;
           top:calc(2.00in + var(--offset-y));
           left:6.10in;
           font-size:15px;
         }
-        .tin-field   { position: absolute; top: calc(2.50in + var(--offset-y));  left: 1.05in;  font-size: 15px; }
-  
-        /* ---------- Items (Absolute Layout) ---------- */
-        .col-qty, .col-unit, .col-desc, .col-price, .col-amt {
+        .bir-delivery-app .tin-field   { position: absolute; top: calc(2.50in + var(--offset-y));  left: 1.05in;  font-size: 15px; }
+
+        .bir-delivery-app .col-qty, .bir-delivery-app .col-unit, .bir-delivery-app .col-desc, .bir-delivery-app .col-price, .bir-delivery-app .col-amt {
           position: absolute;
           font-size: 15px;
           height: 0.29in;
@@ -156,62 +156,17 @@ export function generateDeliveryReceiptHTML(order: ReceiptOrder, _tin?: string, 
           overflow: hidden;
         }
         
-        .col-qty   { width: 0.4in; text-align: center; }
-        .col-unit  { width: 0.5in; text-align: center; }
-        .col-desc  { width: 3.5in; text-align: left; }
-        .col-price { width: 1.0in; text-align: right; }
-        .col-amt   { width: 1.0in; text-align: right; }
+        .bir-delivery-app .col-qty   { width: 0.4in; text-align: center; }
+        .bir-delivery-app .col-unit  { width: 0.5in; text-align: center; }
+        .bir-delivery-app .col-desc  { width: 3.5in; text-align: left; }
+        .bir-delivery-app .col-price { width: 1.0in; text-align: right; }
+        .bir-delivery-app .col-amt   { width: 1.0in; text-align: right; }
 
-        /* ---------- Tax Summary (Bottom Left) ---------- */
-        .vatable-sales   { position: absolute; top: calc(7.10in + var(--offset-y)); left: 2.40in; font-size: 15px; text-align: right; width: 1.2in; }
-        .vat-amount-left { position: absolute; top: calc(7.35in + var(--offset-y)); left: 2.40in; font-size: 15px; text-align: right; width: 1.2in; }
-        .zero-rated      { position: absolute; top: calc(7.65in + var(--offset-y)); left: 2.40in; font-size: 15px; text-align: right; width: 1.2in; }
-        .vat-exempt      { position: absolute; top: calc(7.90in + var(--offset-y)); left: 2.40in; font-size: 15px; text-align: right; width: 1.2in; }
-
-        /* ---------- Tax Summary (Bottom Right) ---------- */
-        .total-vat-incl  { position: absolute; top: calc(7.10in + var(--offset-y)); left: 6.20in; font-size: 15px; text-align: right; width: 1.5in; }
-        .less-vat        { position: absolute; top: calc(7.35in + var(--offset-y)); left: 6.20in; font-size: 15px; text-align: right; width: 1.5in; }
-        .net-of-vat      { position: absolute; top: calc(7.65in + var(--offset-y)); left: 6.20in; font-size: 15px; text-align: right; width: 1.5in; }
-        .less-discount   { position: absolute; top: calc(7.95in + var(--offset-y)); left: 6.20in; font-size: 15px; text-align: right; width: 1.5in; }
-        .add-vat         { position: absolute; top: calc(8.20in + var(--offset-y)); left: 6.20in; font-size: 15px; text-align: right; width: 1.5in; }
-        .less-withholding { position: absolute; top: calc(8.45in + var(--offset-y)); left: 6.20in; font-size: 15px; text-align: right; width: 1.5in; }
-        .total-due       { position: absolute; top: calc(8.80in + var(--offset-y)); left: 6.70in; font-size: 15px; text-align: right; width: 1.5in; font-weight: bold; }position:absolute; }
-        /* ---------- Toolbar ---------- */
-        .toolbar {
-          position: fixed;
-          top: 10px;
-          right: 10px;
-          z-index: 9999;
-          display: flex;
-          gap: 8px;
-          background: #333;
-          padding: 8px 12px;
-          border-radius: 8px;
-          box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-        }
-        .toolbar button {
-          padding: 6px 14px;
-          font-size: 13px;
-          border: none;
-          border-radius: 4px;
-          cursor: pointer;
-          font-weight: bold;
-        }
-        .btn-print {
-          background: #4CAF50;
-          color: white;
-        }
-        .btn-toggle {
-          background: #2196F3;
-          color: white;
-        }
-        .btn-close {
-          background: #f44336;
-          color: white;
-        }
+        .bir-delivery-app .total-due       { position: absolute; top: calc(8.80in + var(--offset-y)); left: 6.70in; font-size: 15px; text-align: right; width: 1.5in; font-weight: bold; }
       </style>
     </head>
-    <body onload="window.print()">
+    <body>
+      <div class="bir-delivery-app">
 
       <!-- Customer Info -->
       <div class="date-field">${dateStr}</div>
@@ -223,7 +178,7 @@ export function generateDeliveryReceiptHTML(order: ReceiptOrder, _tin?: string, 
 
       <!-- Total Amount Only -->
       <div class="total-due">${fmt(totalAmount)}</div>
-
+      </div>
     </body>
     </html>
   `;
@@ -232,11 +187,32 @@ export function generateDeliveryReceiptHTML(order: ReceiptOrder, _tin?: string, 
 }
 
 export function printDeliveryReceipt(order: ReceiptOrder, tin?: string, businessAddress?: string, withholdingTaxRate?: number) {
-  const html = generateDeliveryReceiptHTML(order, tin, businessAddress, withholdingTaxRate);
+  const htmlContent = generateDeliveryReceiptHTML(order, tin, businessAddress, withholdingTaxRate);
 
-  const printWindow = window.open('', '_blank', 'width=850,height=1100');
-  if (printWindow) {
-    printWindow.document.write(html);
-    printWindow.document.close();
+  // Use the #print-area from index.css for high-reliability, glitch-free printing
+  let container = document.getElementById('print-area');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'print-area';
+    document.body.appendChild(container);
   }
+
+  // Extract content and styles
+  const headContent = htmlContent.match(/<head[^>]*>([\s\S]*)<\/head>/)?.[1] || '';
+  const bodyInner = htmlContent.match(/<body[^>]*>([\s\S]*)<\/body>/)?.[1] || htmlContent;
+
+  container.innerHTML = `
+    ${headContent}
+    ${bodyInner}
+  `;
+
+  // Standard main-window print call
+  setTimeout(() => {
+    window.print();
+    
+    // Delayed cleanup to prevent blank PDF in Tauri
+    setTimeout(() => {
+      if (container) container.innerHTML = '';
+    }, 2000);
+  }, 500);
 }

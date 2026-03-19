@@ -28,6 +28,7 @@
           "sidecar": true
         }
       ]
-    }
+    },
+    "core:webview:allow-print"
   ]
 }

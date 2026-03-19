@@ -70,49 +70,39 @@ export function generateReceiptHTML(order: ReceiptOrder, tin?: string, businessA
     <head>
       <title>Invoice Preview — Align &amp; Print</title>
       <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        @page {
-          size: 8.27in 11.69in;
-          margin: 0;
-        }
-        body {
+        .bir-receipt-app { 
+          margin: 0; 
+          padding: 0; 
+          box-sizing: border-box; 
           font-family: 'Courier New', Courier, monospace;
           font-size: 15px;
           color: #000;
           width: 8.27in;
           height: 11.69in;
           position: relative;
-          
+          background: white;
           --printer-offset: 0in;
         }
-
-        
-        @media print {
-          
-           
-          
+        .bir-receipt-app * { margin: 0; padding: 0; box-sizing: border-box; }
+        @page {
+          size: 8.27in 11.69in;
+          margin: 0;
         }
 
-        
-        .date-field, .reg-name, .tin-field, .address,
-        .items-table, .vatable-sales, .vat-amount-left,
-        .zero-rated, .vat-exempt, .total-vat-incl,
-        .less-vat, .net-of-vat, .less-discount,
-        .add-vat, .less-withholding, .total-due {
+        .bir-receipt-app .date-field, .bir-receipt-app .reg-name, .bir-receipt-app .tin-field, .bir-receipt-app .address,
+        .bir-receipt-app .items-table, .bir-receipt-app .vatable-sales, .bir-receipt-app .vat-amount-left,
+        .bir-receipt-app .zero-rated, .bir-receipt-app .vat-exempt, .bir-receipt-app .total-vat-incl,
+        .bir-receipt-app .less-vat, .bir-receipt-app .net-of-vat, .bir-receipt-app .less-discount,
+        .bir-receipt-app .add-vat, .bir-receipt-app .less-withholding, .bir-receipt-app .total-due {
           z-index: 1;
         }
 
-        
+        .bir-receipt-app .date-field { position: absolute; top: calc(1.60in + var(--printer-offset));  left: 5.80in;  font-size: 15px; }
+        .bir-receipt-app .reg-name   { position: absolute; top: calc(2.15in + var(--printer-offset));  left: 1.90in;  font-size: 15px; }
+        .bir-receipt-app .tin-field   { position: absolute; top: calc(2.50in + var(--printer-offset));  left: 1.05in;  font-size: 15px; }
+        .bir-receipt-app .address    { position: absolute; top: calc(2.75in + var(--printer-offset));  left: 2.00in;  font-size: 15px; }
 
-        
-        .date-field { position: absolute; top: calc(1.60in + var(--printer-offset));  left: 5.80in;  font-size: 15px; }
-        .reg-name   { position: absolute; top: calc(2.15in + var(--printer-offset));  left: 1.90in;  font-size: 15px; }
-        .tin-field   { position: absolute; top: calc(2.50in + var(--printer-offset));  left: 1.05in;  font-size: 15px; }
-        .address    { position: absolute; top: calc(2.75in + var(--printer-offset));  left: 2.00in;  font-size: 15px; }
-
-        
-        
-        .col-desc, .col-qty, .col-price, .col-amt {
+        .bir-receipt-app .col-desc, .bir-receipt-app .col-qty, .bir-receipt-app .col-price, .bir-receipt-app .col-amt {
           position: absolute;
           font-size: 15px;
           height: 0.29in; 
@@ -121,30 +111,27 @@ export function generateReceiptHTML(order: ReceiptOrder, tin?: string, businessA
           overflow: hidden;
         }
         
-        .col-desc  { width: 3.2in; text-align: left; }
-        .col-qty   { width: 0.5in; text-align: center; }
-        .col-price { width: 1.0in; text-align: right; }
-        .col-amt   { width: 1.0in; text-align: right; }
+        .bir-receipt-app .col-desc  { width: 3.2in; text-align: left; }
+        .bir-receipt-app .col-qty   { width: 0.5in; text-align: center; }
+        .bir-receipt-app .col-price { width: 1.0in; text-align: right; }
+        .bir-receipt-app .col-amt   { width: 1.0in; text-align: right; }
 
-        
-        .vatable-sales   { position: absolute; top: calc(7.10in + var(--printer-offset)); left: 2.40in; font-size: 15px; text-align: right; width: 1.2in; }
-        .vat-amount-left { position: absolute; top: calc(7.35in + var(--printer-offset)); left: 2.40in; font-size: 15px; text-align: right; width: 1.2in; }
-        .zero-rated      { position: absolute; top: calc(7.65in + var(--printer-offset)); left: 2.40in; font-size: 15px; text-align: right; width: 1.2in; }
-        .vat-exempt      { position: absolute; top: calc(7.90in + var(--printer-offset)); left: 2.40in; font-size: 15px; text-align: right; width: 1.2in; }
+        .bir-receipt-app .vatable-sales   { position: absolute; top: calc(7.10in + var(--printer-offset)); left: 2.40in; font-size: 15px; text-align: right; width: 1.2in; }
+        .bir-receipt-app .vat-amount-left { position: absolute; top: calc(7.35in + var(--printer-offset)); left: 2.40in; font-size: 15px; text-align: right; width: 1.2in; }
+        .bir-receipt-app .zero-rated      { position: absolute; top: calc(7.65in + var(--printer-offset)); left: 2.40in; font-size: 15px; text-align: right; width: 1.2in; }
+        .bir-receipt-app .vat-exempt      { position: absolute; top: calc(7.90in + var(--printer-offset)); left: 2.40in; font-size: 15px; text-align: right; width: 1.2in; }
 
-        
-        .total-vat-incl  { position: absolute; top: calc(7.10in + var(--printer-offset)); left: 6.20in; font-size: 15px; text-align: right; width: 1.5in; }
-        .less-vat        { position: absolute; top: calc(7.35in + var(--printer-offset)); left: 6.20in; font-size: 15px; text-align: right; width: 1.5in; }
-        .net-of-vat      { position: absolute; top: calc(7.65in + var(--printer-offset)); left: 6.20in; font-size: 15px; text-align: right; width: 1.5in; }
-        .less-discount   { position: absolute; top: calc(7.95in + var(--printer-offset)); left: 6.20in; font-size: 15px; text-align: right; width: 1.5in; }
-        .add-vat         { position: absolute; top: calc(8.20in + var(--printer-offset)); left: 6.20in; font-size: 15px; text-align: right; width: 1.5in; }
-        .less-withholding { position: absolute; top: calc(8.45in + var(--printer-offset)); left: 6.20in; font-size: 15px; text-align: right; width: 1.5in; }
-        .total-due       { position: absolute; top: calc(8.75in + var(--printer-offset)); left: 6.20in; font-size: 15px; font-weight: bold; text-align: right; width: 1.5in; }
-
-        
+        .bir-receipt-app .total-vat-incl  { position: absolute; top: calc(7.10in + var(--printer-offset)); left: 6.20in; font-size: 15px; text-align: right; width: 1.5in; }
+        .bir-receipt-app .less-vat        { position: absolute; top: calc(7.35in + var(--printer-offset)); left: 6.20in; font-size: 15px; text-align: right; width: 1.5in; }
+        .bir-receipt-app .net-of-vat      { position: absolute; top: calc(7.65in + var(--printer-offset)); left: 6.20in; font-size: 15px; text-align: right; width: 1.5in; }
+        .bir-receipt-app .less-discount   { position: absolute; top: calc(7.95in + var(--printer-offset)); left: 6.20in; font-size: 15px; text-align: right; width: 1.5in; }
+        .bir-receipt-app .add-vat         { position: absolute; top: calc(8.20in + var(--printer-offset)); left: 6.20in; font-size: 15px; text-align: right; width: 1.5in; }
+        .bir-receipt-app .less-withholding { position: absolute; top: calc(8.45in + var(--printer-offset)); left: 6.20in; font-size: 15px; text-align: right; width: 1.5in; }
+        .bir-receipt-app .total-due       { position: absolute; top: calc(8.75in + var(--printer-offset)); left: 6.20in; font-size: 15px; font-weight: bold; text-align: right; width: 1.5in; }
       </style>
     </head>
-    <body onload="window.print()">
+    <body>
+      <div class="bir-receipt-app">
 
       <!-- Customer Info -->
       <div class="date-field">${dateStr}</div>
@@ -169,7 +156,7 @@ export function generateReceiptHTML(order: ReceiptOrder, tin?: string, businessA
       <div class="add-vat">${fmt(vatAmount)}</div>
       <div class="less-withholding">${fmt(whTaxAmount)}</div>
       <div class="total-due">${fmt(totalAmountDue)}</div>
-
+      </div>
     </body>
     </html>
   `;
@@ -178,11 +165,33 @@ export function generateReceiptHTML(order: ReceiptOrder, tin?: string, businessA
 }
 
 export function printReceipt(order: ReceiptOrder, tin?: string, businessAddress?: string, withholdingTaxRate?: number) {
-  const html = generateReceiptHTML(order, tin, businessAddress, withholdingTaxRate);
+  const htmlContent = generateReceiptHTML(order, tin, businessAddress, withholdingTaxRate);
 
-  const printWindow = window.open('', '_blank', 'width=850,height=1100');
-  if (printWindow) {
-    printWindow.document.write(html);
-    printWindow.document.close();
+  // Use the #print-area from index.css for high-reliability, glitch-free printing
+  let container = document.getElementById('print-area');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'print-area';
+    document.body.appendChild(container);
   }
+
+  // Extract content and styles
+  const headContent = htmlContent.match(/<head[^>]*>([\s\S]*)<\/head>/)?.[1] || '';
+  const bodyInner = htmlContent.match(/<body[^>]*>([\s\S]*)<\/body>/)?.[1] || htmlContent;
+
+  container.innerHTML = `
+    ${headContent}
+    ${bodyInner}
+  `;
+
+  // Standard main-window print call (most stable in Tauri v2)
+  // We use timeouts to ensure Tauri captures the content before it's deleted
+  setTimeout(() => {
+    window.print();
+    
+    // DELAYED CLEANUP: Wait 2 seconds for the print dialog to finish capturing
+    setTimeout(() => {
+      if (container) container.innerHTML = '';
+    }, 2000);
+  }, 500);
 }
