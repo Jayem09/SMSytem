@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
+import packageJson from '../../package.json';
 
 
 interface SystemStatus {
@@ -7,7 +8,7 @@ interface SystemStatus {
     min_version: string;
 }
 
-const APP_VERSION = "0.2.15";
+const APP_VERSION = packageJson.version;
 
 export default function MaintenanceGuard({ children }: { children: React.ReactNode }) {
     const [status, setStatus] = useState<SystemStatus | null>(null);
