@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
-import { Package, Hammer } from 'lucide-react';
+
 
 interface SystemStatus {
     maintenance: boolean;
@@ -86,12 +86,8 @@ export default function MaintenanceGuard({ children }: { children: React.ReactNo
         return (
             <div className="fixed inset-0 z-[99999] min-h-screen flex items-center justify-center bg-gray-50 px-4 font-sans select-none">
                 <div className="max-w-md w-full bg-white rounded-2xl border border-gray-200 p-8 text-center shadow-xl">
-                    <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                        {status.maintenance ? (
-                            <Hammer className="w-8 h-8" />
-                        ) : (
-                            <Package className="w-8 h-8" />
-                        )}
+                    <div className="mx-auto mb-6 flex justify-center">
+                        <img src="/logo.png" alt="SMSystem Logo" className="w-20 h-20 object-contain drop-shadow-sm" />
                     </div>
                     <h1 className="text-2xl font-bold text-gray-900 mb-2">
                         {status.maintenance ? "System Maintenance" : "Update Required"}

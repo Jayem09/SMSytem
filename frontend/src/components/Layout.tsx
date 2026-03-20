@@ -94,7 +94,10 @@ export default function Layout() {
       {}
       <aside className="w-56 bg-white border-r border-gray-200 flex flex-col fixed h-screen no-print">
         <div className="px-4 py-4 border-b border-gray-200 flex justify-between items-center">
-          <h1 className="text-lg font-semibold text-gray-900">SMSystem</h1>
+          <div className="flex items-center gap-2">
+            <img src="/logo.png" alt="SMSystem Logo" className="w-8 h-8 object-contain" />
+            <h1 className="text-lg font-bold text-gray-900">SMSystem</h1>
+          </div>
           {(user?.role === 'admin' || user?.role === 'super_admin') && (
             <Link to="/settings" className="text-gray-400 hover:text-gray-900 transition-colors" title="Settings">
               <Settings className="w-5 h-5" />
