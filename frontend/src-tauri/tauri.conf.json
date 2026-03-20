@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "SMSytem",
-  "version": "0.2.27",
+  "version": "0.2.28",
   "identifier": "com.smsystem.desktop",
   "build": {
     "frontendDist": "../dist",
@@ -32,7 +32,7 @@
       "endpoints": [
         "https://github.com/Jayem09/SMSystem/releases/latest/download/latest.json"
       ],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEM5MjNBRDJGNjREOTNBOEYKUldTUE90bGtMNjBqeVRCNGptYi9TOHFOOVNVM1JzeXdtSGhId25hK0prbktGbmljZlVZcncvVm0K"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDc2MDIzRTIxQUMzQzY1ODgKUldTSVpUeXNJVDRDZG5lbkFqU0Y0K1doOGRsOFdkdEF6UzA0Q3VVSHdpL3d4REJhNmg4ai9lUm0K"
     }
   },
   "bundle": {
