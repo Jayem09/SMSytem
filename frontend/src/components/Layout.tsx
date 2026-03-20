@@ -39,10 +39,10 @@ export default function Layout() {
         console.error('Failed to fetch pending transfer counts', err);
       }
     };
-    
+
     if (user) {
       fetchCounts();
-      
+
       const interval = setInterval(fetchCounts, 30000);
       window.addEventListener('transfer_updated', fetchCounts);
       return () => {
@@ -57,7 +57,7 @@ export default function Layout() {
     navigate('/login');
   };
 
-  
+
   const currentRole = user?.role || 'user';
 
   if (user?.role === 'pending') {
@@ -91,11 +91,10 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen flex bg-gray-50">
-      {}
+      { }
       <aside className="w-56 bg-white border-r border-gray-200 flex flex-col fixed h-screen no-print">
         <div className="px-4 py-4 border-b border-gray-200 flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <img src="/logo.png" alt="SMSystem Logo" className="w-8 h-8 object-contain" />
             <h1 className="text-lg font-bold text-gray-900">SMSystem</h1>
           </div>
           {(user?.role === 'admin' || user?.role === 'super_admin') && (
@@ -109,25 +108,24 @@ export default function Layout() {
           {navItems
             .filter((item) => item.roles.includes(currentRole))
             .map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) =>
-                `flex items-center justify-between px-3 py-2 rounded-md text-sm transition-colors ${
-                  isActive
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) =>
+                  `flex items-center justify-between px-3 py-2 rounded-md text-sm transition-colors ${isActive
                     ? 'bg-indigo-50 text-indigo-700 font-medium'
                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                }`
-              }
-            >
-              <span>{item.label}</span>
-              {item.to === '/transfers' && pendingCounts > 0 && (
-                <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm shadow-red-200">
-                  {pendingCounts}
-                </span>
-              )}
-            </NavLink>
-          ))}
+                  }`
+                }
+              >
+                <span>{item.label}</span>
+                {item.to === '/transfers' && pendingCounts > 0 && (
+                  <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm shadow-red-200">
+                    {pendingCounts}
+                  </span>
+                )}
+              </NavLink>
+            ))}
         </nav>
 
         <div className="border-t border-gray-200 px-4 py-3">
@@ -149,17 +147,17 @@ export default function Layout() {
         </div>
       </aside>
 
-      {}
+      { }
       <main className="flex-1 ml-56 min-h-screen flex flex-col">
         <header className="h-16 bg-white border-b border-gray-100 flex items-center px-6 sticky top-0 z-40 no-print">
           <div className="flex-1 flex justify-center">
             <GlobalSearch />
           </div>
           <div className="flex items-center gap-4">
-             <div className="text-right hidden md:block">
-               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{new Date().toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}</p>
-               <p className="text-xs font-bold text-gray-900">{user?.branch?.name || 'Main Office'}</p>
-             </div>
+            <div className="text-right hidden md:block">
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{new Date().toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+              <p className="text-xs font-bold text-gray-900">{user?.branch?.name || 'Main Office'}</p>
+            </div>
           </div>
         </header>
         <div className="flex-1">

@@ -64,7 +64,7 @@ export default function Register() {
     <div className="min-h-screen items-center justify-center px-4 bg-gray-50 flex flex-col py-12">
       <div className="w-full max-w-sm">
         <div className="text-center mb-6">
-          <h1 className="text-xl font-semibold text-gray-900">SMSystem</h1>
+          <img src="/logo.png" alt="SMSystem Logo" className="w-64 h-auto max-h-32 object-contain mx-auto mb-4 drop-shadow-md scale-110" />
           <p className="text-sm text-gray-500 mt-1">Create a new account</p>
           <div className="mt-2 flex justify-center">
             {backendStatus === 'checking' && <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest animate-pulse">Checking connection...</span>}
@@ -104,7 +104,7 @@ export default function Register() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 className="w-full px-3 py-2 rounded-md border border-gray-200 text-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                placeholder="you@smsystem.com"
+                placeholder="example.sms@gmail.com"
               />
             </div>
 

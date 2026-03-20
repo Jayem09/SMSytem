@@ -51,8 +51,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center px-4 bg-gray-50">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <img src="/logo.png" alt="SMSystem Logo" className="w-20 h-20 object-contain mx-auto mb-4 drop-shadow-sm" />
-          <h1 className="text-2xl font-bold text-gray-900">SMSystem</h1>
+          <img src="/logo.png" alt="SMSystem Logo" className="w-64 h-auto max-h-32 object-contain mx-auto mb-4 drop-shadow-md scale-110" />
           <p className="text-sm text-gray-500 mt-1">Sign in to your account</p>
           <div className="mt-2 flex justify-center">
             {backendStatus === 'checking' && <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest animate-pulse">Checking connection...</span>}
