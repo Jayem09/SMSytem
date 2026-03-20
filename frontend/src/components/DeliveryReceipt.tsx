@@ -49,17 +49,19 @@ export function generateDeliveryReceiptHTML(order: ReceiptOrder, _tin?: string, 
   const unit = "PCS";
     
     // Calculate the Y position for this row.
-    const baseTop = 2.70;
+    // The grid starts completely flat at 2.50in. Row height is perfectly 0.30in.
+    // So row 1 data sits at 2.60in to float squarely mid-line.
+    const baseTop = 2.60;
     const rowHeight = 0.30;
     const topPos = baseTop + (index * rowHeight);
 
     return `
       <!-- Row ${index + 1} -->
-    <div class="col-qty"   style="top:calc(${topPos}in + var(--offset-y)); left:0.80in;">${item.quantity}</div>
-    <div class="col-unit"  style="top:calc(${topPos}in + var(--offset-y)); left:1.50in;">${unit}</div>
-    <div class="col-desc"  style="top:calc(${topPos}in + var(--offset-y)); left:2.20in;">${item.product?.name || ''}</div>
-    <div class="col-price" style="top:calc(${topPos}in + var(--offset-y)); left:5.60in;">${fmt(unitPrice)}</div>
-    <div class="col-amt"   style="top:calc(${topPos}in + var(--offset-y)); left:6.70in;">${fmt(subtotal)}</div>
+    <div class="col-qty"   style="top:calc(${topPos}in + var(--offset-y)); left:0.30in;">${item.quantity}</div>
+    <div class="col-unit"  style="top:calc(${topPos}in + var(--offset-y)); left:0.80in;">${unit}</div>
+    <div class="col-desc"  style="top:calc(${topPos}in + var(--offset-y)); left:1.50in;">${item.product?.name || ''}</div>
+    <div class="col-price" style="top:calc(${topPos}in + var(--offset-y)); left:5.20in;">${fmt(unitPrice)}</div>
+    <div class="col-amt"   style="top:calc(${topPos}in + var(--offset-y)); left:6.40in;">${fmt(subtotal)}</div>
     `;
   }).join('');
 
@@ -73,8 +75,9 @@ export function generateDeliveryReceiptHTML(order: ReceiptOrder, _tin?: string, 
           margin: 0;
           padding: 0;
           box-sizing: border-box;
-          width: 7.6in;
-          height: 11.6in;
+          width: 8.5in;
+          height: 5.5in;
+          overflow: hidden;
           position: relative;
           font-family: "Courier New", monospace;
           background: white;
@@ -84,7 +87,7 @@ export function generateDeliveryReceiptHTML(order: ReceiptOrder, _tin?: string, 
         .bir-delivery-app * { margin: 0; padding: 0; box-sizing: border-box; }
         
         @page {
-          size: 7.68in 5.31in;
+          size: 8.5in 5.5in;
           margin: 0;
         }
 
@@ -96,8 +99,8 @@ export function generateDeliveryReceiptHTML(order: ReceiptOrder, _tin?: string, 
           position: absolute;
           top: 0;
           left: 0;
-          width: 7.68in;
-          height: 5.31in;
+          width: 8.5in;
+          height: 5.5in;
           opacity: 0.25;
           z-index: 0;
         }
@@ -112,7 +115,6 @@ export function generateDeliveryReceiptHTML(order: ReceiptOrder, _tin?: string, 
           .toolbar { display: none !important; }
         }
 
-        
         .bir-delivery-app .date-field, .bir-delivery-app .reg-name, .bir-delivery-app .tin-field, .bir-delivery-app .address,
         .bir-delivery-app .items-table, .bir-delivery-app .vatable-sales, .bir-delivery-app .vat-amount-left,
         .bir-delivery-app .zero-rated, .bir-delivery-app .vat-exempt, .bir-delivery-app .total-vat-incl,
@@ -121,31 +123,29 @@ export function generateDeliveryReceiptHTML(order: ReceiptOrder, _tin?: string, 
           z-index: 1;
         }
 
-        
-
         /* ---------- Customer Info Section ---------- */
         .bir-delivery-app .reg-name {
           position:absolute;
           top:calc(1.70in + var(--offset-y));
-          left:1.30in;
+          left:1.50in;
           font-size:15px;
         }
 
         .bir-delivery-app .address{
           position:absolute;
-          top:calc(2.00in + var(--offset-y));
-          left:1.30in;
+          top:calc(2.05in + var(--offset-y));
+          left:1.50in;
           font-size:15px;
-          width:4.5in;
+          width:4.0in;
         }
 
         .bir-delivery-app .date-field{
           position:absolute;
-          top:calc(2.00in + var(--offset-y));
-          left:6.10in;
+          top:calc(1.70in + var(--offset-y));
+          left:5.80in;
           font-size:15px;
         }
-        .bir-delivery-app .tin-field   { position: absolute; top: calc(2.50in + var(--offset-y));  left: 1.05in;  font-size: 15px; }
+        .bir-delivery-app .tin-field   { position: absolute; top: calc(2.40in + var(--offset-y));  left: 1.05in;  font-size: 15px; }
 
         .bir-delivery-app .col-qty, .bir-delivery-app .col-unit, .bir-delivery-app .col-desc, .bir-delivery-app .col-price, .bir-delivery-app .col-amt {
           position: absolute;
@@ -156,13 +156,13 @@ export function generateDeliveryReceiptHTML(order: ReceiptOrder, _tin?: string, 
           overflow: hidden;
         }
         
-        .bir-delivery-app .col-qty   { width: 0.4in; text-align: center; }
-        .bir-delivery-app .col-unit  { width: 0.5in; text-align: center; }
-        .bir-delivery-app .col-desc  { width: 3.5in; text-align: left; }
+        .bir-delivery-app .col-qty   { width: 0.5in; text-align: center; }
+        .bir-delivery-app .col-unit  { width: 0.6in; text-align: center; }
+        .bir-delivery-app .col-desc  { width: 3.5in; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .bir-delivery-app .col-price { width: 1.0in; text-align: right; }
-        .bir-delivery-app .col-amt   { width: 1.0in; text-align: right; }
+        .bir-delivery-app .col-amt   { width: 1.1in; text-align: right; }
 
-        .bir-delivery-app .total-due       { position: absolute; top: calc(8.80in + var(--offset-y)); left: 6.70in; font-size: 15px; text-align: right; width: 1.5in; font-weight: bold; }
+        .bir-delivery-app .total-due       { position: absolute; top: calc(5.00in + var(--offset-y)); left: 6.40in; font-size: 15px; text-align: right; width: 1.1in; font-weight: bold; }
       </style>
     </head>
     <body>
