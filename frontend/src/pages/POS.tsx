@@ -11,7 +11,8 @@ interface Product {
   id: number;
   name: string;
   price: number;
-  stock: number;
+  branch_stock: number;
+  stock?: number;
   is_service?: boolean;
   image_url?: string;
   category_id: number;
@@ -115,12 +116,12 @@ export default function POS() {
   }, []);
 
   const addToCart = (product: Product) => {
-    if (!product.is_service && product.stock <= 0) return;
+    if (!product.is_service && product.branch_stock <= 0) return;
     
     setCart((prev) => {
       const existing = prev.find((item) => item.id === product.id);
       if (existing) {
-        if (existing.quantity >= product.stock) return prev;
+        if (existing.quantity >= product.branch_stock) return prev;
         return prev.map((item) =>
           item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
         );
@@ -137,7 +138,7 @@ export default function POS() {
     setCart((prev) =>
       prev.map((item) => {
         if (item.id === productId) {
-          const maxQty = item.is_service ? 999 : item.stock;
+          const maxQty = item.is_service ? 999 : item.branch_stock;
           const newQty = Math.max(1, Math.min(item.quantity + delta, maxQty));
           return { ...item, quantity: newQty };
         }
@@ -203,12 +204,17 @@ export default function POS() {
       setCart([]);
       setCheckoutModalOpen(false);
       setSuccessModalOpen(true);
+      
+      setCustomerId('');
       setGuestName('');
       setGuestPhone('');
       setServiceAdvisorName('');
       setTin('');
       setBusinessAddress('');
       setWithholdingTaxRate('0');
+      setPaymentMethod('cash');
+      setReceiptType('SI');
+      setDiscount('0');
       
       fetchData(); 
     } catch (err: unknown) {
@@ -305,7 +311,7 @@ export default function POS() {
               </div>
               {}
               {filteredProducts.map((p, idx) => {
-                const outOfStock = !p.is_service && p.stock <= 0;
+                const outOfStock = !p.is_service && p.branch_stock <= 0;
                 return (
                   <div
                     key={p.id}
@@ -334,8 +340,8 @@ export default function POS() {
                       ) : outOfStock ? (
                         <span className="text-[10px] font-black px-2 py-0.5 rounded bg-red-100 text-red-600">OUT</span>
                       ) : (
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${p.stock <= 5 ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
-                          {p.stock}
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${p.branch_stock <= 5 ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+                          {p.branch_stock}
                         </span>
                       )}
                     </div>

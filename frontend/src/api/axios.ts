@@ -1,7 +1,11 @@
-import axios from 'axios';
+import axios, { type AxiosRequestConfig } from 'axios';
 import { fetch } from '@tauri-apps/plugin-http';
 
 const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://168.144.46.137:8080';
+
+export interface RequestConfig extends AxiosRequestConfig {
+  signal?: AbortSignal;
+}
 
 // For health checks and critical auth, we'll try native bridge first (to bypass CORS in production)
 // and fallback to regular axios if the bridge is missing (e.g. in dev).
@@ -25,6 +29,10 @@ export const checkHealthNative = async () => {
     console.error('All health checks failed:', err);
     return false;
   }
+};
+
+export const createAbortController = (): AbortController => {
+  return new AbortController();
 };
 
 const api = axios.create({

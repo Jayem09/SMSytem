@@ -1,7 +1,11 @@
 # Environment
 .env
+.env.local
+.env.*.local
 
-# Go
+# Go binaries & build
+backend/smsystem-backend
+backend/smsystem.exe
 backend/tmp/
 backend/bin/
 *.exe
@@ -10,10 +14,16 @@ backend/bin/
 *.so
 *.dylib
 
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
 # Node / Frontend
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
+frontend/src-tauri/target/
 
 # IDE
 .vscode/
@@ -27,9 +37,15 @@ frontend/.vite/
 Thumbs.db
 
 # Tauri & Keys
-frontend/src-tauri/target/
 frontend/.env.production
 *.zip
 *.key
 *.key.pub
+
+# Cache & Temp
 .go-cache/
+.agents/
+.agents/
+backups/
+tmp/
+*.tmp

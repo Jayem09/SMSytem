@@ -41,12 +41,11 @@ type updateTransferStatusInput struct {
 	Status string `json:"status" binding:"required,oneof=approved in_transit completed rejected cancelled"`
 }
 
-
 func (h *TransferHandler) List(c *gin.Context) {
 	userRole, _ := c.Get("userRole")
 	branchIDValue, _ := c.Get("branchID")
 	selectedBranchStr := c.Query("branch_id")
-	
+
 	userRoleStr := ""
 	if r, ok := userRole.(string); ok {
 		userRoleStr = strings.ToLower(r)
@@ -65,7 +64,6 @@ func (h *TransferHandler) List(c *gin.Context) {
 		}
 	}
 
-	
 	query := database.DB.Model(&models.StockTransfer{}).
 		Preload("SourceBranch").Preload("DestinationBranch").
 		Preload("RequestedByUser").Preload("Items.Product")
@@ -81,13 +79,8 @@ func (h *TransferHandler) List(c *gin.Context) {
 	} else if branchID > 0 {
 		effectiveQuery = query.Where("source_branch_id = ? OR destination_branch_id = ?", branchID, branchID)
 	} else {
-		effectiveQuery = query 
+		effectiveQuery = query
 	}
-
-	
-	sqlStr := database.DB.ToSQL(func(tx *gorm.DB) *gorm.DB {
-		return tx.Model(&models.StockTransfer{}).Where("source_branch_id = ? OR destination_branch_id = ?", branchID, branchID).Find(&[]models.StockTransfer{})
-	})
 
 	var transfers []models.StockTransfer
 	if err := effectiveQuery.Order("created_at DESC").Find(&transfers).Error; err != nil {
@@ -96,37 +89,32 @@ func (h *TransferHandler) List(c *gin.Context) {
 		return
 	}
 
-	log.Printf("TRANSFER LIST SUCCESS: User=%s, BranchID=%v, Found=%d, SQL=%s", userRoleStr, branchID, len(transfers), sqlStr)
-	
+	log.Printf("TRANSFER LIST SUCCESS: User=%s, BranchID=%v, Found=%d", userRoleStr, branchID, len(transfers))
+
 	c.JSON(http.StatusOK, gin.H{
 		"transfers": transfers,
-		"debug": gin.H{
-			"role": userRoleStr,
-			"branch_id": branchID,
-			"found": len(transfers),
-			"sql": sqlStr,
-		},
 	})
 }
-
 
 func (h *TransferHandler) GetPendingCounts(c *gin.Context) {
 	branchIDValue, _ := c.Get("branchID")
 	userRole, _ := c.Get("userRole")
-	
+
 	var incomingCount int64
 	var receivingCount int64
-	
+
 	userRoleStr := ""
 	if r, ok := userRole.(string); ok {
 		userRoleStr = strings.ToLower(r)
 	}
-	
+
 	var branchID uint
 	if branchIDValue != nil {
 		switch v := branchIDValue.(type) {
-		case uint: branchID = v
-		case float64: branchID = uint(v)
+		case uint:
+			branchID = v
+		case float64:
+			branchID = uint(v)
 		case string:
 			u64, _ := strconv.ParseUint(v, 10, 64)
 			branchID = uint(u64)
@@ -134,9 +122,9 @@ func (h *TransferHandler) GetPendingCounts(c *gin.Context) {
 	}
 
 	if userRoleStr == "super_admin" {
-		
+
 		database.DB.Model(&models.StockTransfer{}).Where("source_branch_id = ? AND status IN ?", branchID, []string{models.TransferStatusPending, models.TransferStatusApproved}).Count(&incomingCount)
-		
+
 		database.DB.Model(&models.StockTransfer{}).Where("destination_branch_id = ? AND status = ?", branchID, models.TransferStatusInTransit).Count(&receivingCount)
 	}
 
@@ -148,7 +136,6 @@ func (h *TransferHandler) GetPendingCounts(c *gin.Context) {
 		"total_actionable": int(incomingCount + receivingCount),
 	})
 }
-
 
 func (h *TransferHandler) Create(c *gin.Context) {
 	var input createTransferInput
@@ -168,8 +155,10 @@ func (h *TransferHandler) Create(c *gin.Context) {
 	var userID uint
 	if userIDValue != nil {
 		switch v := userIDValue.(type) {
-		case uint: userID = v
-		case float64: userID = uint(v)
+		case uint:
+			userID = v
+		case float64:
+			userID = uint(v)
 		case string:
 			u64, _ := strconv.ParseUint(v, 10, 64)
 			userID = uint(u64)
@@ -179,8 +168,10 @@ func (h *TransferHandler) Create(c *gin.Context) {
 	var branchID uint
 	if branchIDValue != nil {
 		switch v := branchIDValue.(type) {
-		case uint: branchID = v
-		case float64: branchID = uint(v)
+		case uint:
+			branchID = v
+		case float64:
+			branchID = uint(v)
 		case string:
 			u64, _ := strconv.ParseUint(v, 10, 64)
 			branchID = uint(u64)
@@ -192,7 +183,7 @@ func (h *TransferHandler) Create(c *gin.Context) {
 	var transfer models.StockTransfer
 
 	err := database.DB.Transaction(func(tx *gorm.DB) error {
-		
+
 		refNumber := fmt.Sprintf("TRF-%d", time.Now().Unix())
 
 		transfer = models.StockTransfer{
@@ -232,7 +223,6 @@ func (h *TransferHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "Transfer request created", "transfer": transfer})
 }
 
-
 func (h *TransferHandler) UpdateStatus(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -259,8 +249,10 @@ func (h *TransferHandler) UpdateStatus(c *gin.Context) {
 	var userID uint
 	if userIDValue != nil {
 		switch v := userIDValue.(type) {
-		case uint: userID = v
-		case float64: userID = uint(v)
+		case uint:
+			userID = v
+		case float64:
+			userID = uint(v)
 		case string:
 			u64, _ := strconv.ParseUint(v, 10, 64)
 			userID = uint(u64)
@@ -270,8 +262,10 @@ func (h *TransferHandler) UpdateStatus(c *gin.Context) {
 	var userBranchID uint
 	if branchIDValue != nil {
 		switch v := branchIDValue.(type) {
-		case uint: userBranchID = v
-		case float64: userBranchID = uint(v)
+		case uint:
+			userBranchID = v
+		case float64:
+			userBranchID = uint(v)
 		case string:
 			u64, _ := strconv.ParseUint(v, 10, 64)
 			userBranchID = uint(u64)
@@ -291,7 +285,6 @@ func (h *TransferHandler) UpdateStatus(c *gin.Context) {
 		return
 	}
 
-	
 	if userRole != "super_admin" {
 		if newStatus == models.TransferStatusApproved || newStatus == models.TransferStatusInTransit || newStatus == models.TransferStatusRejected {
 			if userBranchID != transfer.SourceBranchID {
@@ -307,7 +300,6 @@ func (h *TransferHandler) UpdateStatus(c *gin.Context) {
 		}
 	}
 
-	
 	err = database.DB.Transaction(func(tx *gorm.DB) error {
 		transfer.Status = newStatus
 
@@ -322,38 +314,35 @@ func (h *TransferHandler) UpdateStatus(c *gin.Context) {
 			return err
 		}
 
-		
 		if oldStatus == models.TransferStatusApproved && newStatus == models.TransferStatusInTransit {
-			
+
 			for _, item := range transfer.Items {
 				var product models.Product
 				if err := tx.First(&product, item.ProductID).Error; err != nil {
 					return errors.New("Product not found")
 				}
-				
-				
+
 				var sourceBatches []models.Batch
 				remaining := item.Quantity
 				log.Printf("STOCK DEDUCTION: ProductID=%d, SourceBranchID=%d, RemainingNeeded=%d", product.ID, transfer.SourceBranchID, remaining)
-				
+
 				if err := tx.Where("product_id = ? AND branch_id = ? AND quantity > 0", product.ID, transfer.SourceBranchID).Order("expiry_date ASC").Find(&sourceBatches).Error; err != nil {
 					return err
 				}
 				log.Printf("STOCK DEDUCTION: Found %d batches for ProductID=%d at BranchID=%d", len(sourceBatches), product.ID, transfer.SourceBranchID)
-				
-				
+
 				if len(sourceBatches) == 0 && product.Stock >= remaining {
 					log.Printf("STOCK SELF-HEALING: Creating migration batch for ProductID=%d at BranchID=%d", product.ID, transfer.SourceBranchID)
 					var sourceWarehouse models.Warehouse
 					if err := tx.Where("branch_id = ?", transfer.SourceBranchID).First(&sourceWarehouse).Error; err != nil {
-						
+
 						sourceWarehouse = models.Warehouse{
-							Name: "Default Warehouse",
+							Name:     "Default Warehouse",
 							BranchID: transfer.SourceBranchID,
 						}
 						tx.Create(&sourceWarehouse)
 					}
-					
+
 					migrationBatch := models.Batch{
 						ProductID:   product.ID,
 						WarehouseID: sourceWarehouse.ID,
@@ -365,7 +354,6 @@ func (h *TransferHandler) UpdateStatus(c *gin.Context) {
 						sourceBatches = append(sourceBatches, migrationBatch)
 					}
 				}
-				
 
 				for _, b := range sourceBatches {
 					log.Printf("  - Batch ID: %d, Qty: %d", b.ID, b.Quantity)
@@ -379,10 +367,9 @@ func (h *TransferHandler) UpdateStatus(c *gin.Context) {
 					if sourceBatches[i].Quantity < deduct {
 						deduct = sourceBatches[i].Quantity
 					}
-					
+
 					tx.Model(&sourceBatches[i]).Update("quantity", sourceBatches[i].Quantity-deduct)
-					
-					
+
 					movement := models.StockMovement{
 						ProductID:   product.ID,
 						BatchID:     &sourceBatches[i].ID,
@@ -400,18 +387,17 @@ func (h *TransferHandler) UpdateStatus(c *gin.Context) {
 					return fmt.Errorf("Insufficient stock at source branch for product ID %d (Need %d more)", product.ID, remaining)
 				}
 
-				
 				if err := tx.Model(&product).Update("stock", product.Stock-item.Quantity).Error; err != nil {
 					return err
 				}
 			}
 		} else if oldStatus == models.TransferStatusInTransit && newStatus == models.TransferStatusCompleted {
-			
+
 			for _, item := range transfer.Items {
-				
+
 				var destWarehouse models.Warehouse
 				if err := tx.Where("branch_id = ?", transfer.DestinationBranchID).First(&destWarehouse).Error; err != nil {
-					
+
 					destWarehouse = models.Warehouse{
 						Name:     "Default Warehouse",
 						BranchID: transfer.DestinationBranchID,
@@ -419,7 +405,6 @@ func (h *TransferHandler) UpdateStatus(c *gin.Context) {
 					tx.Create(&destWarehouse)
 				}
 
-				
 				batch := models.Batch{
 					ProductID:   item.ProductID,
 					WarehouseID: destWarehouse.ID,
@@ -431,13 +416,11 @@ func (h *TransferHandler) UpdateStatus(c *gin.Context) {
 					return err
 				}
 
-				
 				var product models.Product
 				if err := tx.First(&product, item.ProductID).Error; err == nil {
 					tx.Model(&product).Update("stock", product.Stock+item.Quantity)
 				}
 
-				
 				movement := models.StockMovement{
 					ProductID:   item.ProductID,
 					BatchID:     &batch.ID,

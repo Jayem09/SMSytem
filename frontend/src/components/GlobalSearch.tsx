@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, Package, User, ShoppingBag, X } from 'lucide-react';
 import api from '../api/axios';
 import { useNavigate } from 'react-router-dom';
@@ -10,6 +10,15 @@ interface SearchResult {
   subtitle: string;
 }
 
+const getIcon = (type: string) => {
+  switch (type) {
+    case 'product': return <Package className="w-4 h-4 text-blue-500" />;
+    case 'customer': return <User className="w-4 h-4 text-emerald-500" />;
+    case 'order': return <ShoppingBag className="w-4 h-4 text-amber-500" />;
+    default: return null;
+  }
+};
+
 export default function GlobalSearch() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -17,6 +26,7 @@ export default function GlobalSearch() {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -28,19 +38,33 @@ export default function GlobalSearch() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const performSearch = useCallback(async (searchQuery: string) => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    abortControllerRef.current = new AbortController();
+    
+    setLoading(true);
+    try {
+      const res = await api.get(`/api/search?q=${encodeURIComponent(searchQuery)}`, {
+        signal: abortControllerRef.current.signal,
+      });
+      setResults(res.data.results || []);
+      setIsOpen(true);
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name !== 'AbortError') {
+        console.error('Global search failed', err);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    const delayDebounceFn = setTimeout(async () => {
+    const delayDebounceFn = setTimeout(() => {
       if (query.trim().length > 1) {
-        setLoading(true);
-        try {
-          const res = await api.get(`/api/search?q=${query}`);
-          setResults(res.data.results || []);
-          setIsOpen(true);
-        } catch (err) {
-          console.error('Global search failed', err);
-        } finally {
-          setLoading(false);
-        }
+        performSearch(query);
       } else {
         setResults([]);
         setIsOpen(false);
@@ -48,7 +72,7 @@ export default function GlobalSearch() {
     }, 300);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [query]);
+  }, [query, performSearch]);
 
   const handleSelect = (result: SearchResult) => {
     setIsOpen(false);
@@ -63,15 +87,6 @@ export default function GlobalSearch() {
       case 'order':
         navigate('/orders');
         break;
-    }
-  };
-
-  const getIcon = (type: string) => {
-    switch (type) {
-      case 'product': return <Package className="w-4 h-4 text-blue-500" />;
-      case 'customer': return <User className="w-4 h-4 text-emerald-500" />;
-      case 'order': return <ShoppingBag className="w-4 h-4 text-amber-500" />;
-      default: return null;
     }
   };
 

@@ -28,13 +28,12 @@ type customerInput struct {
 	Address string `json:"address"`
 }
 
-
 func (h *CustomerHandler) List(c *gin.Context) {
 	query := database.DB.Model(&models.Customer{})
 
-	
 	if search := c.Query("search"); search != "" {
-		query = query.Where("name LIKE ? OR phone LIKE ? OR email LIKE ?", "%"+search+"%", "%"+search+"%", "%"+search+"%")
+		sanitized := sanitizeForLike(search)
+		query = query.Where("name LIKE ? OR phone LIKE ? OR email LIKE ?", "%"+sanitized+"%", "%"+sanitized+"%", "%"+sanitized+"%")
 	}
 
 	var customers []models.Customer
@@ -44,7 +43,6 @@ func (h *CustomerHandler) List(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"customers": customers})
 }
-
 
 func (h *CustomerHandler) GetByID(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -60,7 +58,6 @@ func (h *CustomerHandler) GetByID(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"customer": customer})
 }
-
 
 func (h *CustomerHandler) Create(c *gin.Context) {
 	var input customerInput
@@ -83,12 +80,13 @@ func (h *CustomerHandler) Create(c *gin.Context) {
 
 	userIDValue, _ := c.Get("userID")
 	if userIDValue != nil {
-		h.LogService.Record(userIDValue.(uint), "CREATE", "Customer", strconv.Itoa(int(customer.ID)), fmt.Sprintf("Created customer: %s", customer.Name), c.ClientIP())
+		if uid, ok := userIDValue.(uint); ok {
+			h.LogService.Record(uid, "CREATE", "Customer", strconv.Itoa(int(customer.ID)), fmt.Sprintf("Created customer: %s", customer.Name), c.ClientIP())
+		}
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"message": "Customer created", "customer": customer})
 }
-
 
 func (h *CustomerHandler) Update(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -121,12 +119,13 @@ func (h *CustomerHandler) Update(c *gin.Context) {
 
 	userIDValue, _ := c.Get("userID")
 	if userIDValue != nil {
-		h.LogService.Record(userIDValue.(uint), "UPDATE", "Customer", strconv.Itoa(int(customer.ID)), fmt.Sprintf("Updated customer: %s", customer.Name), c.ClientIP())
+		if uid, ok := userIDValue.(uint); ok {
+			h.LogService.Record(uid, "UPDATE", "Customer", strconv.Itoa(int(customer.ID)), fmt.Sprintf("Updated customer: %s", customer.Name), c.ClientIP())
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Customer updated", "customer": customer})
 }
-
 
 func (h *CustomerHandler) Delete(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -143,18 +142,18 @@ func (h *CustomerHandler) Delete(c *gin.Context) {
 
 	userIDValue, _ := c.Get("userID")
 	if userIDValue != nil {
-		h.LogService.Record(userIDValue.(uint), "DELETE", "Customer", strconv.Itoa(int(id)), fmt.Sprintf("Deleted customer #%d", id), c.ClientIP())
+		if uid, ok := userIDValue.(uint); ok {
+			h.LogService.Record(uid, "DELETE", "Customer", strconv.Itoa(int(id)), fmt.Sprintf("Deleted customer #%d", id), c.ClientIP())
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Customer deleted"})
 }
 
-
 func (h *CustomerHandler) GetCRMStats(c *gin.Context) {
 	var totalCustomers int64
 	database.DB.Model(&models.Customer{}).Count(&totalCustomers)
 
-	
 	type TopSpender struct {
 		ID          uint    `json:"id"`
 		Name        string  `json:"name"`
@@ -174,7 +173,6 @@ func (h *CustomerHandler) GetCRMStats(c *gin.Context) {
 		Limit(5).
 		Scan(&topSpenders)
 
-	
 	thirtyDaysAgo := time.Now().AddDate(0, 0, -30)
 	var recentBuyers []TopSpender
 	database.DB.Table("customers").
@@ -185,7 +183,6 @@ func (h *CustomerHandler) GetCRMStats(c *gin.Context) {
 		Order("last_payment DESC").
 		Scan(&recentBuyers)
 
-	
 	sixtyDaysAgo := time.Now().AddDate(0, 0, -60)
 	var atRiskCustomers []TopSpender
 	database.DB.Table("customers").
@@ -197,7 +194,6 @@ func (h *CustomerHandler) GetCRMStats(c *gin.Context) {
 		Order("last_payment DESC").
 		Scan(&atRiskCustomers)
 
-	
 	type CategoryStat struct {
 		Category string `json:"category"`
 		Count    int    `json:"count"`

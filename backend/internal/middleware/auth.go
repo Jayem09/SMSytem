@@ -10,6 +10,34 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+func getUintClaim(claims jwt.MapClaims, key string) (uint, bool) {
+	val, ok := claims[key]
+	if !ok {
+		return 0, false
+	}
+	switch v := val.(type) {
+	case float64:
+		return uint(v), true
+	case uint:
+		return v, true
+	case int:
+		return uint(v), true
+	case int64:
+		return uint(v), true
+	default:
+		return 0, false
+	}
+}
+
+func getStringClaim(claims jwt.MapClaims, key string) (string, bool) {
+	val, ok := claims[key]
+	if !ok {
+		return "", false
+	}
+	s, ok := val.(string)
+	return s, ok
+}
+
 func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
@@ -19,7 +47,6 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 			return
 		}
 
-		
 		parts := strings.SplitN(authHeader, " ", 2)
 		if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid authorization format. Use: Bearer <token>"})
@@ -29,7 +56,6 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 
 		tokenString := parts[1]
 
-		
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, jwt.ErrSignatureInvalid
@@ -43,7 +69,6 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 			return
 		}
 
-		
 		claims, ok := token.Claims.(jwt.MapClaims)
 		if !ok {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
@@ -51,21 +76,32 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 			return
 		}
 
-	
-		userID := uint(claims["user_id"].(float64))
-		branchID := uint(claims["branch_id"].(float64))
-		role := strings.ToLower(claims["role"].(string))
+		userID, ok := getUintClaim(claims, "user_id")
+		if !ok {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user ID in token"})
+			c.Abort()
+			return
+		}
+
+		branchID, _ := getUintClaim(claims, "branch_id")
+
+		role, ok := getStringClaim(claims, "role")
+		if !ok {
+			role = "user"
+		}
+		role = strings.ToLower(role)
+
+		userEmail, _ := getStringClaim(claims, "email")
 
 		c.Set("userID", userID)
 		c.Set("branchID", branchID)
-		c.Set("userEmail", claims["email"].(string))
+		c.Set("userEmail", userEmail)
 		c.Set("userRole", role)
 		c.Set("isSuperAdmin", role == "super_admin")
 
 		c.Next()
 	}
 }
-
 
 func RequireRole(roles ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -90,9 +126,7 @@ func RequireRole(roles ...string) gin.HandlerFunc {
 		}
 
 		c.JSON(http.StatusForbidden, gin.H{
-			"error": "NUCLEAR PERMISSION BLOCK",
-			"debug_role": roleStr,
-			"required_roles": roles,
+			"error": "Insufficient permissions",
 		})
 		c.Abort()
 	}

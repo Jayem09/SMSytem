@@ -8,7 +8,7 @@ import { printReceipt } from '../components/Receipt';
 import { printDeliveryReceipt } from '../components/DeliveryReceipt';
 
 interface Customer { id: number; name: string; }
-interface Product { id: number; name: string; price: number; stock: number; is_service?: boolean; }
+interface Product { id: number; name: string; price: number; branch_stock: number; stock?: number; is_service?: boolean; }
 interface OrderItem {
   id: number;
   product_id: number;

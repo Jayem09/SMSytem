@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os/exec"
+	"regexp"
 	"smsystem-backend/internal/models"
 )
 
@@ -13,6 +14,12 @@ type PrinterService struct {
 
 func NewPrinterService(logSvc *LogService) *PrinterService {
 	return &PrinterService{LogService: logSvc}
+}
+
+var safePrinterNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+
+func isValidPrinterName(name string) bool {
+	return len(name) > 0 && len(name) <= 128 && safePrinterNameRegex.MatchString(name)
 }
 
 // Common ESC/POS Commands
@@ -67,7 +74,7 @@ func (s *PrinterService) GenerateSI(order *models.Order) ([]byte, error) {
 		if len(desc) > 23 {
 			desc = desc[:20] + "..."
 		}
-		line := fmt.Sprintf("%-5d %-25s %7.2f %9.2f\n", 
+		line := fmt.Sprintf("%-5d %-25s %7.2f %9.2f\n",
 			item.Quantity, desc, item.UnitPrice, item.Subtotal)
 		b.WriteString(line)
 	}
@@ -142,11 +149,10 @@ func (s *PrinterService) GenerateDR(order *models.Order) ([]byte, error) {
 }
 
 func (s *PrinterService) PrintRaw(printerName string, data []byte) error {
-	if printerName == "" {
-		return fmt.Errorf("printer name is required")
+	if !isValidPrinterName(printerName) {
+		return fmt.Errorf("invalid printer name: must be alphanumeric with hyphens/underscores, max 128 characters")
 	}
 
-	// Use 'lp' command for raw printing on macOS/Linux
 	cmd := exec.Command("lp", "-d", printerName, "-o", "raw")
 	cmd.Stdin = bytes.NewReader(data)
 

@@ -14,7 +14,8 @@ interface Product {
   description: string;
   price: number;
   cost_price?: number;
-  stock: number;
+  branch_stock: number;
+  stock?: number;
   is_service?: boolean; 
   size?: string;
   parent_id?: number;
@@ -138,7 +139,7 @@ export default function Products() {
     setDescription(p.description);
     setPrice(String(p.price));
     setCostPrice(p.cost_price ? String(p.cost_price) : '0');
-    setStock(String(p.stock));
+    setStock(String(p.branch_stock));
     setSize(p.size || '');
     setParentId(p.parent_id ? String(p.parent_id) : '');
     setCategoryId(String(p.category_id));
@@ -302,7 +303,7 @@ export default function Products() {
           { key: 'price', label: 'Selling Price', render: (p) => `P ${p.price.toLocaleString()}` },
           { key: 'stock', label: 'Stock', render: (p) => (
             p.is_service ? <span className="text-gray-400 font-bold">N/A</span> :
-            <span className={p.stock <= 5 ? 'text-red-600 font-medium' : ''}>{p.stock}</span>
+            <span className={p.branch_stock <= 5 ? 'text-red-600 font-medium' : ''}>{p.branch_stock}</span>
           )},
         ]}
         data={products}

@@ -14,18 +14,16 @@ import (
 )
 
 func main() {
-	
+
 	cfg := config.Load()
 	log.Println("Configuration loaded")
 
-	
 	database.Connect(cfg)
 	log.Println("Database ready")
 
-	
 	authService := services.NewAuthService(cfg)
 	logService := services.NewLogService()
-	
+
 	terminalService := services.NewTerminalService(true, "COM1")
 
 	h := &routes.Handlers{
@@ -52,7 +50,6 @@ func main() {
 		System:        handlers.NewSystemHandler(),
 	}
 
-	
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
 
@@ -77,10 +74,8 @@ func main() {
 		c.Next()
 	})
 
-	
 	routes.Setup(router, cfg, h)
 
-	
 	addr := fmt.Sprintf(":%s", cfg.ServerPort)
 	log.Printf("Server starting on http://localhost%s", addr)
 	if err := router.Run(addr); err != nil {

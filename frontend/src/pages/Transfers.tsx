@@ -55,7 +55,7 @@ export default function Transfers() {
   const [requestModalOpen, setRequestModalOpen] = useState(false);
   const [targetBranchId, setTargetBranchId] = useState('');
   const [notes, setNotes] = useState('');
-  const [requestItems, setRequestItems] = useState<{product_id: number, quantity: number, product?: Product}[]>([]);
+  const [requestItems, setRequestItems] = useState<{product_id: number, quantity: number, product?: Product, _edited?: boolean}[]>([]);
   const [productSearch, setProductSearch] = useState('');
   
   
@@ -149,7 +149,7 @@ export default function Transfers() {
     if (newStatus === 'rejected') {
       showConfirm('Reject Transfer', 'Are you sure you want to reject this request?', performUpdate);
     } else if (newStatus === 'in_transit') {
-      showConfirm('Ship Inventory', 'Mark as shipped? This will deduct the items from your inventory.', performUpdate);
+      performUpdate();
     } else if (newStatus === 'completed') {
       showConfirm('Confirm Receipt', 'Confirm receipt? This will add the items to your inventory.', performUpdate);
     } else {
@@ -186,11 +186,6 @@ export default function Transfers() {
     if (requestItems.find(i => i.product_id === product.id)) return;
     setRequestItems([...requestItems, { product_id: product.id, quantity: 1, product }]);
     setProductSearch('');
-  };
-
-  const updateRequestItemQty = (productId: number, qty: number) => {
-    if (qty < 1) return;
-    setRequestItems(requestItems.map(i => i.product_id === productId ? { ...i, quantity: qty } : i));
   };
 
   const removeRequestItem = (productId: number) => {
@@ -450,13 +445,20 @@ export default function Transfers() {
                      <span className="text-sm font-bold text-gray-900 flex-1">{item.product?.name}</span>
                      <div className="flex items-center gap-2">
                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">QTY</span>
-                       <input 
-                         type="number" 
-                         min="1"
-                         value={item.quantity}
-                         onChange={e => updateRequestItemQty(item.product_id, parseInt(e.target.value) || 1)}
-                         className="w-16 px-2 py-1 text-center font-bold text-sm border border-gray-300 rounded focus:border-indigo-500 outline-none" 
-                       />
+                        <input 
+                          type="number" 
+                          min="1"
+                          placeholder=""
+                          value={item.quantity === 1 && !item._edited ? '' : item.quantity}
+                          onChange={e => {
+                            const val = e.target.value;
+                            const qty = val === '' ? 1 : parseInt(val) || 1;
+                            setRequestItems(requestItems.map(i => 
+                              i.product_id === item.product_id ? { ...i, quantity: qty, _edited: true } : i
+                            ));
+                          }}
+                          className="w-16 px-2 py-1 text-center font-bold text-sm border border-gray-300 rounded focus:border-indigo-500 outline-none" 
+                        />
                        <button onClick={() => removeRequestItem(item.product_id)} className="p-1 px-2 text-red-500 hover:bg-red-50 rounded transition-colors font-black">X</button>
                      </div>
                    </div>

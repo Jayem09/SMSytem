@@ -18,7 +18,6 @@ func NewExpenseHandler(logService *services.LogService) *ExpenseHandler {
 	return &ExpenseHandler{LogService: logService}
 }
 
-
 func (h *ExpenseHandler) Create(c *gin.Context) {
 	var expense models.Expense
 	if err := c.ShouldBindJSON(&expense); err != nil {
@@ -26,12 +25,25 @@ func (h *ExpenseHandler) Create(c *gin.Context) {
 		return
 	}
 
-	userID, _ := c.Get("userID")
-	branchID, _ := c.Get("branchID")
-	expense.UserID = userID.(uint)
-	expense.BranchID = branchID.(uint)
+	userIDValue, _ := c.Get("userID")
+	branchIDValue, _ := c.Get("branchID")
 
-	
+	var userID uint
+	var branchID uint
+	if userIDValue != nil {
+		if v, ok := userIDValue.(uint); ok {
+			userID = v
+		}
+	}
+	if branchIDValue != nil {
+		if v, ok := branchIDValue.(uint); ok {
+			branchID = v
+		}
+	}
+
+	expense.UserID = userID
+	expense.BranchID = branchID
+
 	tx := database.DB.Begin()
 
 	if err := tx.Create(&expense).Error; err != nil {
@@ -40,26 +52,15 @@ func (h *ExpenseHandler) Create(c *gin.Context) {
 		return
 	}
 
-	
-	if expense.ProductID != nil && expense.Quantity > 0 {
-		if err := tx.Model(&models.Product{}).Where("id = ?", *expense.ProductID).
-			Update("stock", database.DB.Raw("stock + ?", expense.Quantity)).Error; err != nil {
-			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update product stock"})
-			return
-		}
-	}
-
 	if err := tx.Commit().Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit transaction"})
 		return
 	}
 
-	h.LogService.Record(userID.(uint), "CREATE", "Expense", strconv.Itoa(int(expense.ID)), "Recorded new expense", c.ClientIP())
+	h.LogService.Record(userID, "CREATE", "Expense", strconv.Itoa(int(expense.ID)), "Recorded new expense", c.ClientIP())
 
 	c.JSON(http.StatusCreated, expense)
 }
-
 
 func (h *ExpenseHandler) List(c *gin.Context) {
 	branchID, _ := c.Get("branchID")
@@ -70,7 +71,6 @@ func (h *ExpenseHandler) List(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, expenses)
 }
-
 
 func (h *ExpenseHandler) Update(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
@@ -97,7 +97,6 @@ func (h *ExpenseHandler) Update(c *gin.Context) {
 
 	c.JSON(http.StatusOK, expense)
 }
-
 
 func (h *ExpenseHandler) Delete(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))

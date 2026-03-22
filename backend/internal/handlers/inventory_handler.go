@@ -22,7 +22,6 @@ func NewInventoryHandler(logService *services.LogService) *InventoryHandler {
 	return &InventoryHandler{LogService: logService}
 }
 
-
 func (h *InventoryHandler) GetWarehouses(c *gin.Context) {
 	branchIDVal, exists := c.Get("branchID")
 	var branchID uint
@@ -51,7 +50,6 @@ func (h *InventoryHandler) GetWarehouses(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"warehouses": warehouses})
 }
 
-
 func (h *InventoryHandler) GetStockLevels(c *gin.Context) {
 	type StockLevelResult struct {
 		ProductID       uint       `json:"product_id"`
@@ -62,7 +60,7 @@ func (h *InventoryHandler) GetStockLevels(c *gin.Context) {
 		TotalStock      int        `json:"total_stock"`
 		InTransitStock  int        `json:"in_transit_stock"`
 		ClosestExpiry   *time.Time `json:"closest_expiry"`
-		ExpiringBatches int        `json:"expiring_batches"` 
+		ExpiringBatches int        `json:"expiring_batches"`
 	}
 
 	var results []StockLevelResult
@@ -79,7 +77,6 @@ func (h *InventoryHandler) GetStockLevels(c *gin.Context) {
 		}
 	}
 
-	
 	query := database.DB.Table("batches").
 		Select("batches.product_id, products.name as product_name, products.size as product_size, batches.warehouse_id, warehouses.name as warehouse_name, SUM(batches.quantity) as total_stock, MIN(batches.expiry_date) as closest_expiry, COUNT(CASE WHEN batches.expiry_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY) THEN 1 END) as expiring_batches, (SELECT COALESCE(SUM(sti.quantity), 0) FROM stock_transfer_items sti JOIN stock_transfers st ON sti.stock_transfer_id = st.id WHERE sti.product_id = batches.product_id AND st.destination_branch_id = batches.branch_id AND st.status = 'in_transit') as in_transit_stock").
 		Joins("LEFT JOIN products ON batches.product_id = products.id").
@@ -102,7 +99,6 @@ func (h *InventoryHandler) GetStockLevels(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"levels": results})
 }
-
 
 func (h *InventoryHandler) GetMovementLogs(c *gin.Context) {
 	branchIDVal, exists := c.Get("branchID")
@@ -141,12 +137,11 @@ func (h *InventoryHandler) GetMovementLogs(c *gin.Context) {
 type stockMovementInput struct {
 	ProductID   uint       `json:"product_id" binding:"required"`
 	WarehouseID uint       `json:"warehouse_id" binding:"required"`
-	Quantity    int        `json:"quantity" binding:"required"` 
+	Quantity    int        `json:"quantity" binding:"required"`
 	BatchNumber string     `json:"batch_number"`
 	ExpiryDate  *time.Time `json:"expiry_date"`
 	Reference   string     `json:"reference" binding:"required"`
 }
-
 
 func (h *InventoryHandler) StockIn(c *gin.Context) {
 	var input stockMovementInput
@@ -165,7 +160,6 @@ func (h *InventoryHandler) StockIn(c *gin.Context) {
 	userID := userIDValue.(uint)
 	branchID := branchIDValue.(uint)
 
-	
 	var wh models.Warehouse
 	if err := database.DB.First(&wh, input.WarehouseID).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid warehouse ID"})
@@ -173,7 +167,6 @@ func (h *InventoryHandler) StockIn(c *gin.Context) {
 	}
 	actualBranchID := wh.BranchID
 
-	
 	if branchID != 0 && actualBranchID != branchID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Cannot stock in to a warehouse belonging to another branch"})
 		return
@@ -181,7 +174,6 @@ func (h *InventoryHandler) StockIn(c *gin.Context) {
 
 	tx := database.DB.Begin()
 
-	
 	batch := models.Batch{
 		ProductID:   input.ProductID,
 		WarehouseID: input.WarehouseID,
@@ -197,7 +189,6 @@ func (h *InventoryHandler) StockIn(c *gin.Context) {
 		return
 	}
 
-	
 	movement := models.StockMovement{
 		ProductID:   input.ProductID,
 		BatchID:     &batch.ID,
@@ -205,7 +196,7 @@ func (h *InventoryHandler) StockIn(c *gin.Context) {
 		BranchID:    actualBranchID,
 		UserID:      &userID,
 		Type:        models.MovementTypeIn,
-		Quantity:    input.Quantity, 
+		Quantity:    input.Quantity,
 		Reference:   input.Reference,
 	}
 
@@ -215,7 +206,6 @@ func (h *InventoryHandler) StockIn(c *gin.Context) {
 		return
 	}
 
-	
 	if err := tx.Model(&models.Product{}).Where("id = ?", input.ProductID).UpdateColumn("stock", gorm.Expr("stock + ?", input.Quantity)).Error; err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update total product stock"})
@@ -228,7 +218,6 @@ func (h *InventoryHandler) StockIn(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Stock successfully received", "batch": batch})
 }
-
 
 func (h *InventoryHandler) StockOut(c *gin.Context) {
 	var input stockMovementInput
@@ -249,7 +238,6 @@ func (h *InventoryHandler) StockOut(c *gin.Context) {
 
 	tx := database.DB.Begin()
 
-	
 	var batches []models.Batch
 	batchQuery := tx.Where("product_id = ? AND warehouse_id = ? AND quantity > 0", input.ProductID, input.WarehouseID)
 	if branchID != 0 {
@@ -272,7 +260,6 @@ func (h *InventoryHandler) StockOut(c *gin.Context) {
 			deduct = batches[i].Quantity
 		}
 
-		
 		batches[i].Quantity -= deduct
 		if err := tx.Save(&batches[i]).Error; err != nil {
 			tx.Rollback()
@@ -280,7 +267,6 @@ func (h *InventoryHandler) StockOut(c *gin.Context) {
 			return
 		}
 
-		
 		movement := models.StockMovement{
 			ProductID:   input.ProductID,
 			BatchID:     &batches[i].ID,
@@ -288,7 +274,7 @@ func (h *InventoryHandler) StockOut(c *gin.Context) {
 			BranchID:    batches[i].BranchID,
 			UserID:      &userID,
 			Type:        models.MovementTypeOut,
-			Quantity:    -deduct, 
+			Quantity:    -deduct,
 			Reference:   input.Reference,
 		}
 
@@ -302,24 +288,32 @@ func (h *InventoryHandler) StockOut(c *gin.Context) {
 	}
 
 	if remainingToDeduct > 0 {
-		
+
 		var product models.Product
 		if err := tx.First(&product, input.ProductID).Error; err == nil {
 			if product.Stock >= remainingToDeduct {
-				
+
 				legacyBatch := models.Batch{
 					ProductID:   product.ID,
 					WarehouseID: input.WarehouseID,
-					BranchID:    branchID, 
+					BranchID:    branchID,
 					BatchNumber: "LEGACY-SYNC",
 					Quantity:    product.Stock - remainingToDeduct,
 				}
-				
+
 				var wh models.Warehouse
-				database.DB.First(&wh, input.WarehouseID)
+				if err := database.DB.First(&wh, input.WarehouseID).Error; err != nil {
+					tx.Rollback()
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find warehouse"})
+					return
+				}
 				legacyBatch.BranchID = wh.BranchID
 
-				tx.Create(&legacyBatch)
+				if err := tx.Create(&legacyBatch).Error; err != nil {
+					tx.Rollback()
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create legacy batch"})
+					return
+				}
 
 				movement := models.StockMovement{
 					ProductID:   product.ID,
@@ -331,7 +325,11 @@ func (h *InventoryHandler) StockOut(c *gin.Context) {
 					Quantity:    -remainingToDeduct,
 					Reference:   input.Reference + " (Legacy Sync)",
 				}
-				tx.Create(&movement)
+				if err := tx.Create(&movement).Error; err != nil {
+					tx.Rollback()
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create stock movement"})
+					return
+				}
 				remainingToDeduct = 0
 			}
 		}
@@ -343,7 +341,6 @@ func (h *InventoryHandler) StockOut(c *gin.Context) {
 		return
 	}
 
-	
 	if err := tx.Model(&models.Product{}).Where("id = ?", input.ProductID).UpdateColumn("stock", gorm.Expr("stock - ?", input.Quantity)).Error; err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update total product stock"})
@@ -356,7 +353,6 @@ func (h *InventoryHandler) StockOut(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Stock successfully deducted"})
 }
-
 
 type adjustStockInput struct {
 	BatchID     uint   `json:"batch_id" binding:"required"`
@@ -373,8 +369,18 @@ func (h *InventoryHandler) AdjustStock(c *gin.Context) {
 
 	userIDValue, _ := c.Get("userID")
 	branchIDValue, _ := c.Get("branchID")
-	userID := userIDValue.(uint)
-	branchID := branchIDValue.(uint)
+	userID := uint(0)
+	branchID := uint(0)
+	if userIDValue != nil {
+		if v, ok := userIDValue.(uint); ok {
+			userID = v
+		}
+	}
+	if branchIDValue != nil {
+		if v, ok := branchIDValue.(uint); ok {
+			branchID = v
+		}
+	}
 
 	tx := database.DB.Begin()
 
@@ -385,7 +391,6 @@ func (h *InventoryHandler) AdjustStock(c *gin.Context) {
 		return
 	}
 
-	
 	if branchID != 0 && batch.BranchID != branchID {
 		tx.Rollback()
 		c.JSON(http.StatusForbidden, gin.H{"error": "Cannot adjust stock for a batch belonging to another branch"})
@@ -399,7 +404,6 @@ func (h *InventoryHandler) AdjustStock(c *gin.Context) {
 		return
 	}
 
-	
 	batch.Quantity = input.NewQuantity
 	if err := tx.Save(&batch).Error; err != nil {
 		tx.Rollback()
@@ -407,7 +411,6 @@ func (h *InventoryHandler) AdjustStock(c *gin.Context) {
 		return
 	}
 
-	
 	movement := models.StockMovement{
 		ProductID:   batch.ProductID,
 		BatchID:     &batch.ID,
@@ -425,7 +428,6 @@ func (h *InventoryHandler) AdjustStock(c *gin.Context) {
 		return
 	}
 
-	
 	if difference > 0 {
 		if err := tx.Model(&models.Product{}).Where("id = ?", batch.ProductID).UpdateColumn("stock", gorm.Expr("stock + ?", difference)).Error; err != nil {
 			tx.Rollback()
@@ -433,7 +435,7 @@ func (h *InventoryHandler) AdjustStock(c *gin.Context) {
 			return
 		}
 	} else {
-		
+
 		if err := tx.Model(&models.Product{}).Where("id = ?", batch.ProductID).UpdateColumn("stock", gorm.Expr("stock - ?", -difference)).Error; err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update total product stock"})
@@ -460,8 +462,7 @@ func (h *InventoryHandler) GetLowStockReport(c *gin.Context) {
 	}
 
 	var results []LowStockResult
-	
-	
+
 	database.DB.Table("products").
 		Select("products.id as product_id, products.name as product_name, products.size as product_size, products.stock as current_stock, products.reorder_level, products.primary_supplier_id, suppliers.name as supplier_name").
 		Joins("LEFT JOIN suppliers ON products.primary_supplier_id = suppliers.id").
@@ -493,7 +494,6 @@ func (h *InventoryHandler) GenerateDraftPOs(c *gin.Context) {
 		return
 	}
 
-	
 	supplierGroups := make(map[uint][]models.Product)
 	for _, p := range lowStockProducts {
 		supplierGroups[*p.PrimarySupplierID] = append(supplierGroups[*p.PrimarySupplierID], p)
@@ -501,8 +501,8 @@ func (h *InventoryHandler) GenerateDraftPOs(c *gin.Context) {
 
 	createdCount := 0
 	for supplierID, products := range supplierGroups {
-		sid := supplierID 
-		
+		sid := supplierID
+
 		po := models.PurchaseOrder{
 			SupplierID: &sid,
 			UserID:     userID,
@@ -519,8 +519,8 @@ func (h *InventoryHandler) GenerateDraftPOs(c *gin.Context) {
 
 			var totalCost float64
 			for _, p := range products {
-				
-				qtyToOrder := (p.ReorderLevel * 2) - p.Stock 
+
+				qtyToOrder := (p.ReorderLevel * 2) - p.Stock
 				if qtyToOrder <= 0 {
 					qtyToOrder = p.ReorderLevel
 				}

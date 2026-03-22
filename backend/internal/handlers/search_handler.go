@@ -3,11 +3,18 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"regexp"
 	"smsystem-backend/internal/database"
 	"smsystem-backend/internal/models"
 
 	"github.com/gin-gonic/gin"
 )
+
+var likeEscapeRegex = regexp.MustCompile(`[%_\\]`)
+
+func sanitizeForLike(s string) string {
+	return likeEscapeRegex.ReplaceAllString(s, `\$0`)
+}
 
 type SearchHandler struct{}
 
@@ -30,16 +37,23 @@ func (h *SearchHandler) GlobalSearch(c *gin.Context) {
 		return
 	}
 
+	if len(query) > 100 {
+		query = query[:100]
+	}
+
 	var results []SearchResult
 	branchIDVal, _ := c.Get("branchID")
 	var branchID uint
 	if branchIDVal != nil {
-		branchID = branchIDVal.(uint)
+		if v, ok := branchIDVal.(uint); ok {
+			branchID = v
+		}
 	}
 
-	
+	sanitizedQuery := sanitizeForLike(query)
+
 	var products []models.Product
-	database.DB.Where("name LIKE ? AND deleted_at IS NULL", "%"+query+"%").Limit(5).Find(&products)
+	database.DB.Where("name LIKE ? AND deleted_at IS NULL", "%"+sanitizedQuery+"%").Limit(5).Find(&products)
 	for _, p := range products {
 		results = append(results, SearchResult{
 			Type:     "product",
@@ -50,9 +64,8 @@ func (h *SearchHandler) GlobalSearch(c *gin.Context) {
 		})
 	}
 
-	
 	var customers []models.Customer
-	database.DB.Where("(name LIKE ? OR phone LIKE ?) AND deleted_at IS NULL", "%"+query+"%", "%"+query+"%").Limit(5).Find(&customers)
+	database.DB.Where("(name LIKE ? OR phone LIKE ?) AND deleted_at IS NULL", "%"+sanitizedQuery+"%", "%"+sanitizedQuery+"%").Limit(5).Find(&customers)
 	for _, cust := range customers {
 		results = append(results, SearchResult{
 			Type:     "customer",
@@ -63,9 +76,8 @@ func (h *SearchHandler) GlobalSearch(c *gin.Context) {
 		})
 	}
 
-	
 	var orders []models.Order
-	orderQuery := database.DB.Where("id = ? OR guest_name LIKE ?", query, "%"+query+"%")
+	orderQuery := database.DB.Where("guest_name LIKE ?", "%"+sanitizedQuery+"%")
 	if branchID != 0 {
 		orderQuery = orderQuery.Where("branch_id = ?", branchID)
 	}
