@@ -24,6 +24,9 @@ var allowedOrigins = []string{
 	"http://localhost:5173",
 	"http://127.0.0.1:5173",
 	"http://168.144.46.137:5173",
+	"tauri://",
+	"tauri://localhost",
+	"http://localhost",
 }
 
 func isOriginAllowed(origin string) bool {
