@@ -61,7 +61,6 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 		protected.GET("/auth/me", h.Auth.GetMe)
 
 		protected.GET("/dashboard", h.Dashboard.GetStats)
-		protected.GET("/analytics", h.Analytics.Query)
 		protected.GET("/analytics/revenue", h.Analytics.GetRevenue)
 		protected.GET("/search", h.Search.GlobalSearch)
 
