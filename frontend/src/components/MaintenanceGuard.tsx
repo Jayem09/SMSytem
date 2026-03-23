@@ -36,6 +36,7 @@ export default function MaintenanceGuard({ children }: { children: React.ReactNo
     const startUpdate = async () => {
         try {
             setIsUpdating(true);
+            setUpdateProgress(0);
             const { check } = await import('@tauri-apps/plugin-updater');
             const { relaunch } = await import('@tauri-apps/plugin-process');
             const update = await check();
@@ -43,7 +44,9 @@ export default function MaintenanceGuard({ children }: { children: React.ReactNo
             if (update) {
                 let downloaded = 0;
                 let contentLength = 0;
-                await update.downloadAndInstall((event) => {
+                
+                // Use separate download and install for better control
+                const downloadResult = await update.download((event) => {
                     if (event.event === 'Started') {
                         contentLength = event.data?.contentLength || 0;
                     } else if (event.event === 'Progress') {
@@ -53,6 +56,12 @@ export default function MaintenanceGuard({ children }: { children: React.ReactNo
                         }
                     }
                 });
+                
+                setUpdateProgress(100);
+                await downloadResult.install();
+                
+                // Small delay to ensure install completes before relaunch
+                await new Promise(resolve => setTimeout(resolve, 1000));
                 await relaunch();
             } else {
                 window.location.reload();
@@ -60,6 +69,8 @@ export default function MaintenanceGuard({ children }: { children: React.ReactNo
         } catch (e) {
             console.error("Update failed:", e);
             window.location.reload();
+        } finally {
+            setIsUpdating(false);
         }
     };
 

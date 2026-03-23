@@ -42,11 +42,12 @@ const api = axios.create({
   },
   // Custom adapter to use Tauri's native bridge in production
   adapter: async (config) => {
-    // Only use Tauri fetch if we are in a Tauri environment (window.__TAURI_INTERNALS__ is present)
-    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+    const isTauri = typeof window !== 'undefined' && 
+      ((window as any).__TAURI_INTERNALS__ || 
+       typeof window.__TAURI__ !== 'undefined' ||
+       document.location.protocol === 'tauri:');
     
     if (!isTauri) {
-      // Fallback to default browser adapter if not in Tauri
       const defaultAdapter = axios.getAdapter(axios.defaults.adapter as any);
       return (defaultAdapter as any)(config);
     }
@@ -74,7 +75,32 @@ const api = axios.create({
         connectTimeout: config.timeout || 10000,
       });
 
-      const responseData = await tauriResponse.json();
+      // Read response text first to handle non-JSON responses
+      const responseText = await tauriResponse.text();
+      
+      // Check if response is OK
+      if (!tauriResponse.ok) {
+        // Try to parse as JSON for error response, otherwise use text
+        let errorData;
+        try {
+          errorData = JSON.parse(responseText);
+        } catch {
+          errorData = { error: responseText || `HTTP ${tauriResponse.status}` };
+        }
+        return {
+          data: errorData,
+          status: tauriResponse.status,
+          statusText: tauriResponse.statusText,
+          headers: tauriResponse.headers as any,
+          config,
+        };
+      }
+
+      // Parse JSON only if there's content
+      let responseData = null;
+      if (responseText.trim()) {
+        responseData = JSON.parse(responseText);
+      }
 
       return {
         data: responseData,
@@ -85,7 +111,6 @@ const api = axios.create({
       };
     } catch (error: any) {
       console.error('Tauri Native Request Failed:', error);
-      // If native fails, try to fallback to standard browser adapter as last resort
       const defaultAdapter = axios.getAdapter(axios.defaults.adapter as any);
       return (defaultAdapter as any)(config);
     }
