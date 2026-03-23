@@ -132,7 +132,7 @@ func (h *AnalyticsHandler) getQueryPatterns() []QueryPattern {
 	return []QueryPattern{
 		// === REVENUE & SALES ===
 		{
-			Regex: regexp.MustCompile(`(?i)(how much|what is|total|amount).*(earn|revenue|sales|income)(\s+this\s+month|\s+last\s+month|\s+today|\s+this\s+week)?`),
+			Regex: regexp.MustCompile(`(?i)^(how much|what is|total|amount|how much money).*(earn|revenue|sales|income)(\s+this\s+month|\s+last\s+month|\s+today|\s+this\s+week)?`),
 			Parser: func(question string, branchID uint, _ interface{}) *QueryResult {
 				db := database.DB
 				period := h.parsePeriod(question)
@@ -154,6 +154,30 @@ func (h *AnalyticsHandler) getQueryPatterns() []QueryPattern {
 				if err := db.Raw(query).Scan(&result).Error; err != nil {
 					return &QueryResult{Query: question, Answer: fmt.Sprintf("Error: %v", err)}
 				}
+				return &QueryResult{Query: question, Answer: fmt.Sprintf("Total revenue: ₱%.2f", result.Total), Data: result, ChartType: "metric"}
+			},
+		},
+		{
+			Regex: regexp.MustCompile(`(?i)^(revenue|sales|income|earn).*(\s+this\s+month|\s+last\s+month|\s+today|\s+this\s+week)?$`),
+			Parser: func(question string, branchID uint, _ interface{}) *QueryResult {
+				db := database.DB
+				period := h.parsePeriod(question)
+				query := `SELECT COALESCE(SUM(total_amount - discount_amount), 0) as total FROM orders WHERE status != 'cancelled'`
+				switch period {
+				case "today":
+					query += " AND DATE(created_at) = CURDATE()"
+				case "week":
+					query += " AND YEARWEEK(created_at) = YEARWEEK(NOW())"
+				case "month":
+					query += " AND YEAR(created_at) = YEAR(NOW()) AND MONTH(created_at) = MONTH(NOW())"
+				case "last_month":
+					query += " AND YEAR(created_at) = YEAR(DATE_SUB(NOW(), INTERVAL 1 MONTH)) AND MONTH(created_at) = MONTH(DATE_SUB(NOW(), INTERVAL 1 MONTH))"
+				}
+				if branchID > 0 {
+					query += fmt.Sprintf(" AND branch_id = %d", branchID)
+				}
+				var result RevenueResult
+				db.Raw(query).Scan(&result)
 				return &QueryResult{Query: question, Answer: fmt.Sprintf("Total revenue: ₱%.2f", result.Total), Data: result, ChartType: "metric"}
 			},
 		},
@@ -210,7 +234,7 @@ func (h *AnalyticsHandler) getQueryPatterns() []QueryPattern {
 		},
 		// === ORDERS ===
 		{
-			Regex: regexp.MustCompile(`(?i)(how many|total|number of).*(order|sale|transaction)(\s+this\s+month|\s+last\s+month|\s+today|\s+this\s+week)?`),
+			Regex: regexp.MustCompile(`(?i)^(total\s+)?(orders|transactions?|sales)\s*(this\s+month|last\s+month|today|this\s+week)?$`),
 			Parser: func(question string, branchID uint, _ interface{}) *QueryResult {
 				db := database.DB
 				period := h.parsePeriod(question)
@@ -571,7 +595,7 @@ func (h *AnalyticsHandler) getQueryPatterns() []QueryPattern {
 		},
 		// === EXPENSES ===
 		{
-			Regex: regexp.MustCompile(`(?i)(expense|cost|spending)(\s+this\s+month|\s+last\s+month|\s+today|\s+this\s+week)?`),
+			Regex: regexp.MustCompile(`(?i)^(total\s+)?(expenses?|costs?|spending)(\s+this\s+month|\s+last\s+month|\s+today|\s+this\s+week)?$`),
 			Parser: func(question string, branchID uint, _ interface{}) *QueryResult {
 				db := database.DB
 				period := h.parsePeriod(question)

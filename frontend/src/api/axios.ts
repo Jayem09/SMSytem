@@ -57,8 +57,6 @@ const api = axios.create({
         ? config.url 
         : `${config.baseURL}${config.url}${config.params ? '?' + new URLSearchParams(config.params).toString() : ''}`;
 
-      // CONVERSION: Ensure headers are a plain object (not AxiosHeaders)
-      // This is crucial for @tauri-apps/plugin-http's fetch to work correctly
       const plainHeaders: Record<string, string> = {};
       if (config.headers) {
         Object.entries(config.headers).forEach(([key, value]) => {
@@ -75,12 +73,9 @@ const api = axios.create({
         connectTimeout: config.timeout || 10000,
       });
 
-      // Read response text first to handle non-JSON responses
       const responseText = await tauriResponse.text();
       
-      // Check if response is OK
       if (!tauriResponse.ok) {
-        // Try to parse as JSON for error response, otherwise use text
         let errorData;
         try {
           errorData = JSON.parse(responseText);
@@ -96,7 +91,6 @@ const api = axios.create({
         };
       }
 
-      // Parse JSON only if there's content
       let responseData = null;
       if (responseText.trim()) {
         responseData = JSON.parse(responseText);
