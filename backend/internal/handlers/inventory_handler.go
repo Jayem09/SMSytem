@@ -155,10 +155,8 @@ func (h *InventoryHandler) StockIn(c *gin.Context) {
 		return
 	}
 
-	userIDValue, _ := c.Get("userID")
-	branchIDValue, _ := c.Get("branchID")
-	userID := userIDValue.(uint)
-	branchID := branchIDValue.(uint)
+	userID, _ := GetUintFromContext(c, "userID")
+	branchID, _ := GetUintFromContext(c, "branchID")
 
 	var wh models.Warehouse
 	if err := database.DB.First(&wh, input.WarehouseID).Error; err != nil {
@@ -231,10 +229,8 @@ func (h *InventoryHandler) StockOut(c *gin.Context) {
 		return
 	}
 
-	userIDValue, _ := c.Get("userID")
-	branchIDValue, _ := c.Get("branchID")
-	userID := userIDValue.(uint)
-	branchID := branchIDValue.(uint)
+	userID, _ := GetUintFromContext(c, "userID")
+	branchID, _ := GetUintFromContext(c, "branchID")
 
 	tx := database.DB.Begin()
 

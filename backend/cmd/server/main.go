@@ -1,8 +1,14 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"smsystem-backend/internal/config"
 	"smsystem-backend/internal/database"
@@ -13,8 +19,23 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func main() {
+var allowedOrigins = []string{
+	"http://localhost:3000",
+	"http://localhost:5173",
+	"http://127.0.0.1:5173",
+	"http://168.144.46.137:5173",
+}
 
+func isOriginAllowed(origin string) bool {
+	for _, allowed := range allowedOrigins {
+		if origin == allowed {
+			return true
+		}
+	}
+	return false
+}
+
+func main() {
 	cfg := config.Load()
 	log.Println("Configuration loaded")
 
@@ -48,21 +69,21 @@ func main() {
 		Transfer:      handlers.NewTransferHandler(logService),
 		Search:        handlers.NewSearchHandler(),
 		System:        handlers.NewSystemHandler(),
+		Analytics:     handlers.NewAnalyticsHandler(),
 	}
 
 	gin.SetMode(gin.ReleaseMode)
-	router := gin.Default()
+	router := gin.New()
+	router.Use(gin.Recovery())
 
-	// CORS Middleware
 	router.Use(func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
-		if origin != "" {
+
+		if origin != "" && isOriginAllowed(origin) {
 			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
-		} else {
-			c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+			c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		}
 
-		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE, PATCH")
 
@@ -77,8 +98,32 @@ func main() {
 	routes.Setup(router, cfg, h)
 
 	addr := fmt.Sprintf(":%s", cfg.ServerPort)
-	log.Printf("Server starting on http://localhost%s", addr)
-	if err := router.Run(addr); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+	srv := &http.Server{
+		Addr:    addr,
+		Handler: router,
 	}
+
+	go func() {
+		log.Printf("Server starting on http://localhost%s", addr)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Failed to start server: %v", err)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	log.Println("Shutting down server...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatalf("Server forced to shutdown: %v", err)
+	}
+
+	logService.Shutdown()
+
+	log.Println("Server exited properly")
 }

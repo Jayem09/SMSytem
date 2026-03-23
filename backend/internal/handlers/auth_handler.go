@@ -10,18 +10,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-
 type AuthHandler struct {
 	AuthService *services.AuthService
 	LogService  *services.LogService
 }
 
-
 func NewAuthHandler(authService *services.AuthService, logService *services.LogService) *AuthHandler {
 	return &AuthHandler{AuthService: authService, LogService: logService}
 }
-
-
 
 func (h *AuthHandler) Register(c *gin.Context) {
 	var input services.RegisterInput
@@ -51,8 +47,6 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	})
 }
 
-
-
 func (h *AuthHandler) Login(c *gin.Context) {
 	var input services.LoginInput
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -69,8 +63,9 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	
-	h.LogService.Record(response.User.ID, "LOGIN", "System", strconv.Itoa(int(response.User.ID)), "User logged in", c.ClientIP())
+	if response != nil {
+		h.LogService.Record(response.User.ID, "LOGIN", "System", strconv.Itoa(int(response.User.ID)), "User logged in", c.ClientIP())
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Login successful",
@@ -79,16 +74,20 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	})
 }
 
-
-
 func (h *AuthHandler) GetMe(c *gin.Context) {
-	userID, exists := c.Get("userID")
+	userIDValue, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
 		return
 	}
 
-	user, err := h.AuthService.GetUserByID(userID.(uint))
+	userID, ok := userIDValue.(uint)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	user, err := h.AuthService.GetUserByID(userID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return

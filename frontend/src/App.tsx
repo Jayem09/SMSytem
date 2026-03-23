@@ -25,6 +25,7 @@ import SettingsPage from './pages/Settings';
 import DailyReport from './pages/DailyReport';
 import Branches from './pages/Branches';
 import Transfers from './pages/Transfers';
+import Analytics from './pages/Analytics';
 import MaintenanceGuard from './components/MaintenanceGuard';
 
 function App() {
@@ -44,6 +45,7 @@ function App() {
               <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
                 {}
                 <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/analytics" element={<Analytics />} />
                 <Route path="/pos" element={<POS />} />
                 <Route path="/customers" element={<Customers />} />
                 <Route path="/orders" element={<Orders />} />

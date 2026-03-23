@@ -1,29 +1,47 @@
-# Environment
+# Environment - NEVER commit these
 .env
 .env.local
 .env.*.local
+.env.production
+.env.development
 
-# Go binaries & build
-backend/smsystem-backend
+# Backend
+backend/.env
+backend/smsystem-server
 backend/smsystem.exe
+backend/main
 backend/tmp/
 backend/bin/
+backend/*.log
+
+# Frontend / Tauri
+frontend/.env
+frontend/.env.production
+frontend/.env.development
+frontend/dist/
+frontend/.vite/
+frontend/node_modules/
+frontend/src-tauri/.env
+frontend/src-tauri/Cargo.lock
+frontend/src-tauri/target/
+frontend/src-tauri/gen/
+frontend/src-tauri/release/
+
+# Build artifacts
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
+*.zip
+*.key
+*.key.pub
 
 # Databases
 *.db
 *.sqlite
 *.sqlite3
-
-# Node / Frontend
-frontend/node_modules/
-frontend/dist/
-frontend/.vite/
-frontend/src-tauri/target/
+*.sql.bak
 
 # IDE
 .vscode/
@@ -36,16 +54,15 @@ frontend/src-tauri/target/
 .DS_Store
 Thumbs.db
 
-# Tauri & Keys
-frontend/.env.production
-*.zip
-*.key
-*.key.pub
-
 # Cache & Temp
 .go-cache/
+.ruff_cache/
 .agents/
-.agents/
+.backup/
 backups/
 tmp/
 *.tmp
+
+# Logs
+logs/
+*.log

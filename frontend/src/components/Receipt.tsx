@@ -21,16 +21,21 @@ interface ReceiptOrder {
   items?: ReceiptOrderItem[];
 }
 
+function escapeHtml(text: string | undefined | null): string {
+  if (!text) return '';
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
 export function generateReceiptHTML(order: ReceiptOrder, tin?: string, businessAddress?: string, withholdingTaxRate?: number): string {
   const date = new Date(order.created_at);
   const dateStr = date.toLocaleDateString('en-PH', { year: 'numeric', month: '2-digit', day: '2-digit' });
 
-  
-  const customerName = order.customer?.name || order.guest_name || 'WALK-IN';
-  const custAddress = businessAddress || order.customer?.address || '';
-  const custTin = tin || '';
+  const customerName = escapeHtml(order.customer?.name || order.guest_name || 'WALK-IN');
+  const custAddress = escapeHtml(businessAddress || order.customer?.address || '');
+  const custTin = escapeHtml(tin || '');
 
-  
   const totalAmount = order.total_amount || 0;
   const discountAmount = order.discount_amount || 0;
   const vatInclusive = totalAmount;
@@ -43,13 +48,10 @@ export function generateReceiptHTML(order: ReceiptOrder, tin?: string, businessA
 
   const fmt = (n: number | undefined | null) => (n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  
   const items = order.items || [];
   const itemRows = items.map((item, index) => {
     const unitPrice = item.unit_price ?? item.price ?? (item.subtotal && item.quantity ? item.subtotal / item.quantity : 0);
     const subtotal = item.subtotal ?? 0;
-    
-    
     
     const baseTop = 3.47; 
     const rowHeight = 0.29;
@@ -57,7 +59,7 @@ export function generateReceiptHTML(order: ReceiptOrder, tin?: string, businessA
 
     return `
       <!-- Row ${index + 1} -->
-      <div class="col-desc"  style="top: calc(${topPos}in + var(--printer-offset)); left: 1.05in;">${item.product?.name || ''}</div>
+      <div class="col-desc"  style="top: calc(${topPos}in + var(--printer-offset)); left: 1.05in;">${escapeHtml(item.product?.name || '')}</div>
       <div class="col-qty"   style="top: calc(${topPos}in + var(--printer-offset)); left: 4.75in;">${item.quantity}</div>
       <div class="col-price" style="top: calc(${topPos}in + var(--printer-offset)); left: 5.30in;">${fmt(unitPrice)}</div>
       <div class="col-amt"   style="top: calc(${topPos}in + var(--printer-offset)); left: 6.50in;">${fmt(subtotal)}</div>

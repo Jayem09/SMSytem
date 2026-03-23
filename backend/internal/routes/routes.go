@@ -11,7 +11,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-
 type Handlers struct {
 	Auth          *handlers.AuthHandler
 	Category      *handlers.CategoryHandler
@@ -34,11 +33,11 @@ type Handlers struct {
 	Transfer      *handlers.TransferHandler
 	Search        *handlers.SearchHandler
 	System        *handlers.SystemHandler
+	Analytics     *handlers.AnalyticsHandler
 }
 
-
 func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
-	
+
 	router.GET("/api/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status":  "ok",
@@ -48,46 +47,41 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 
 	router.GET("/api/status", h.System.GetStatus)
 
-	
 	auth := router.Group("/api/auth")
 	{
 		auth.POST("/register", h.Auth.Register)
 		auth.POST("/login", h.Auth.Login)
 	}
 
-	
 	protected := router.Group("/api")
 	protected.Use(middleware.AuthMiddleware(cfg))
 	{
-		
+
 		protected.GET("/auth/me", h.Auth.GetMe)
 
-		
 		protected.GET("/dashboard", h.Dashboard.GetStats)
+		protected.GET("/analytics", h.Analytics.Query)
+		protected.GET("/analytics/revenue", h.Analytics.GetRevenue)
 		protected.GET("/search", h.Search.GlobalSearch)
 
-		
 		categories := protected.Group("/categories")
 		{
 			categories.GET("", h.Category.List)
 			categories.GET("/:id", h.Category.GetByID)
 		}
 
-		
 		brands := protected.Group("/brands")
 		{
 			brands.GET("", h.Brand.List)
 			brands.GET("/:id", h.Brand.GetByID)
 		}
 
-		
 		products := protected.Group("/products")
 		{
 			products.GET("", h.Product.List)
 			products.GET("/:id", h.Product.GetByID)
 		}
 
-		
 		customers := protected.Group("/customers")
 		{
 			customers.GET("", h.Customer.List)
@@ -97,7 +91,6 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 			customers.PUT("/:id", h.Customer.Update)
 		}
 
-		
 		orders := protected.Group("/orders")
 		{
 			orders.GET("", h.Order.List)
@@ -106,7 +99,6 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 			orders.PATCH("/:id/status", h.Order.UpdateStatus)
 		}
 
-		
 		inventory := protected.Group("/inventory")
 		{
 			inventory.GET("/warehouses", h.Inventory.GetWarehouses)
@@ -116,55 +108,45 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 			inventory.POST("/generate-pos", h.Inventory.GenerateDraftPOs)
 			inventory.GET("/batches", h.Inventory.GetProductBatches)
 			inventory.GET("/batches/:id/history", h.Inventory.GetBatchMovementHistory)
-			
+
 		}
 
-		
 		protected.GET("/branches", h.Branch.List)
 
-		
 		transfers := protected.Group("/transfers")
 		{
 			transfers.GET("", h.Transfer.List)
 			transfers.GET("/pending-counts", h.Transfer.GetPendingCounts)
 			transfers.POST("", h.Transfer.Create)
-			
+
 			transfers.PUT("/:id/status", h.Transfer.UpdateStatus)
 		}
 
-		
 		admin := protected.Group("")
 		admin.Use(middleware.RequireRole("admin", "super_admin"))
 		{
-			
+
 			admin.POST("/categories", h.Category.Create)
 			admin.PUT("/categories/:id", h.Category.Update)
 			admin.DELETE("/categories/:id", h.Category.Delete)
 
-			
 			admin.POST("/brands", h.Brand.Create)
 			admin.PUT("/brands/:id", h.Brand.Update)
 			admin.DELETE("/brands/:id", h.Brand.Delete)
 
-			
 			admin.POST("/products", h.Product.Create)
 			admin.PUT("/products/:id", h.Product.Update)
 			admin.DELETE("/products/:id", h.Product.Delete)
 			admin.POST("/products/import", h.Import.ImportProducts)
 
-			
 			admin.DELETE("/customers/:id", h.Customer.Delete)
 
-			
 			admin.DELETE("/orders/:id", h.Order.Delete)
 
-			
 			admin.GET("/logs", h.Log.List)
 
-			
 			admin.POST("/terminal/payment", h.Terminal.ProcessPayment)
 
-			
 			expenses := admin.Group("/expenses")
 			{
 				expenses.GET("", h.Expense.List)
@@ -173,7 +155,6 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 				expenses.DELETE("/:id", h.Expense.Delete)
 			}
 
-			
 			inventoryAdmin := admin.Group("/inventory")
 			{
 				inventoryAdmin.POST("/in", h.Inventory.StockIn)
@@ -181,7 +162,6 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 				inventoryAdmin.POST("/adjust", h.Inventory.AdjustStock)
 			}
 
-			
 			suppliers := admin.Group("/suppliers")
 			{
 				suppliers.GET("", h.Supplier.List)
@@ -191,7 +171,6 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 				suppliers.DELETE("/:id", h.Supplier.Delete)
 			}
 
-			
 			purchaseOrders := admin.Group("/purchase-orders")
 			{
 				purchaseOrders.GET("", h.PurchaseOrder.List)
@@ -200,7 +179,7 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 				purchaseOrders.PUT("/:id/receive", h.PurchaseOrder.Receive)
 				purchaseOrders.DELETE("/:id", h.PurchaseOrder.Delete)
 			}
-			
+
 			users := admin.Group("/users")
 			{
 				users.GET("", h.User.List)
@@ -210,27 +189,24 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 				users.DELETE("/:id", h.User.Delete)
 			}
 
-			
 			settings := admin.Group("/settings")
 			{
 				settings.GET("", h.Settings.GetAll)
 				settings.POST("", h.Settings.UpdateBulk)
 			}
 
-			
 			reports := admin.Group("/reports")
 			{
 				reports.GET("/daily-summary", h.Report.GetDailySummary)
 			}
 
-			
 			superAdmin := admin.Group("")
 			superAdmin.Use(middleware.RequireRole("super_admin"))
 			{
-				
+
 				branches := superAdmin.Group("/branches")
 				{
-					
+
 					branches.POST("", h.Branch.Create)
 					branches.PUT("/:id", h.Branch.Update)
 				}
@@ -238,11 +214,8 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 		}
 	}
 
-	
-	
 	router.Use(static.Serve("/", static.LocalFile("./public", true)))
 
-	
 	router.NoRoute(func(c *gin.Context) {
 		c.File("./public/index.html")
 	})

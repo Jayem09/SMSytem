@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"log"
 	"os"
 	"path/filepath"
@@ -8,25 +9,19 @@ import (
 	"github.com/joho/godotenv"
 )
 
-
 type Config struct {
 	DBHost      string
 	DBPort      string
 	DBUser      string
 	DBPassword  string
 	DBName      string
-	DatabaseURL string 
+	DatabaseURL string
 	ServerPort  string
 	JWTSecret   string
 	JWTExpiry   string
 }
 
-
 func Load() *Config {
-	
-	
-	
-	
 	paths := []string{".env", "../.env"}
 
 	if execPath, err := os.Executable(); err == nil {
@@ -41,6 +36,11 @@ func Load() *Config {
 		}
 	}
 
+	jwtSecret := getEnv("JWT_SECRET", "")
+	if jwtSecret == "" {
+		log.Fatal("JWT_SECRET environment variable is required")
+	}
+
 	return &Config{
 		DBHost:      getEnv("DB_HOST", "127.0.0.1"),
 		DBPort:      getEnv("DB_PORT", "3306"),
@@ -49,7 +49,7 @@ func Load() *Config {
 		DBName:      getEnv("DB_NAME", "smsystem_db"),
 		DatabaseURL: getEnv("DATABASE_URL", ""),
 		ServerPort:  getEnv("SERVER_PORT", "8080"),
-		JWTSecret:   getEnv("JWT_SECRET", "your-super-secret-jwt-key-change-in-production"),
+		JWTSecret:   jwtSecret,
 		JWTExpiry:   getEnv("JWT_EXPIRY", "24h"),
 	}
 }
@@ -59,4 +59,12 @@ func getEnv(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func requireEnv(key string) (string, error) {
+	value := os.Getenv(key)
+	if value == "" {
+		return "", errors.New(key + " environment variable is required")
+	}
+	return value, nil
 }

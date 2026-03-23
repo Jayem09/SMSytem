@@ -7,6 +7,7 @@ import GlobalSearch from './GlobalSearch';
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', roles: ['super_admin', 'admin', 'cashier', 'purchasing', 'purchaser'] },
+  { to: '/analytics', label: 'AI Analytics', roles: ['super_admin', 'admin', 'cashier', 'purchasing', 'purchaser'] },
   { to: '/pos', label: 'POS Checkout', roles: ['super_admin', 'admin', 'cashier'] },
   { to: '/orders', label: 'Orders', roles: ['super_admin', 'admin', 'cashier'] },
   { to: '/transfers', label: 'Branch Transfers', roles: ['super_admin', 'admin', 'cashier', 'user', 'purchasing', 'purchaser'] },

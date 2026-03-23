@@ -54,7 +54,7 @@ type checkoutInput struct {
 }
 
 func (h *OrderHandler) List(c *gin.Context) {
-	branchID, _ := c.Get("branchID")
+	branchID, _ := GetUintFromContext(c, "branchID")
 	query := database.DB.Where("branch_id = ?", branchID).Preload("Customer").Preload("User").Preload("Items.Product")
 
 	if status := c.Query("status"); status != "" {
@@ -100,12 +100,16 @@ func (h *OrderHandler) Create(c *gin.Context) {
 		orderStatus = input.Status
 	}
 
-	userID, exists := c.Get("userID")
-	branchID, _ := c.Get("branchID")
+	userIDValue, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
 		return
 	}
+
+	branchID, _ := GetUintFromContext(c, "branchID")
+	userID, _ := GetUintFromContext(c, "userID")
+
+	_ = userIDValue
 
 	if input.CustomerID != nil && *input.CustomerID > 0 {
 		var customer models.Customer
@@ -116,12 +120,12 @@ func (h *OrderHandler) Create(c *gin.Context) {
 	}
 
 	var order models.Order
-	bID := branchID.(uint)
+	bID := branchID
 	if bID == 0 {
 		bID = 1
 	}
 	order.BranchID = bID
-	uID := userID.(uint)
+	uID := userID
 
 	err := database.DB.Transaction(func(tx *gorm.DB) error {
 		var totalAmount float64
@@ -297,7 +301,7 @@ func (h *OrderHandler) Create(c *gin.Context) {
 
 	database.DB.Preload("Customer").Preload("User").Preload("Items.Product").First(&order, order.ID)
 
-	h.LogService.Record(userID.(uint), "CREATE", "Order", strconv.Itoa(int(order.ID)), fmt.Sprintf("Checked out POS Order #%d", order.ID), c.ClientIP())
+	h.LogService.Record(userID, "CREATE", "Order", strconv.Itoa(int(order.ID)), fmt.Sprintf("Checked out POS Order #%d", order.ID), c.ClientIP())
 
 	c.JSON(http.StatusCreated, gin.H{"message": "Order created", "order": order})
 }
@@ -331,8 +335,7 @@ func (h *OrderHandler) UpdateStatus(c *gin.Context) {
 				return err
 			}
 
-			userIDValue, _ := c.Get("userID")
-			uID := userIDValue.(uint)
+			uID, _ := GetUintFromContext(c, "userID")
 
 			for _, item := range items {
 				var product models.Product
@@ -446,10 +449,8 @@ func (h *OrderHandler) UpdateStatus(c *gin.Context) {
 	}
 
 	database.DB.Preload("Customer").Preload("User").Preload("Items.Product").First(&order, order.ID)
-	userIDValue, _ := c.Get("userID")
-	if userIDValue != nil {
-		h.LogService.Record(userIDValue.(uint), "UPDATE_STATUS", "Order", strconv.Itoa(int(order.ID)), fmt.Sprintf("Status changed from %s to %s", oldStatus, input.Status), c.ClientIP())
-	}
+	userID, _ := GetUintFromContext(c, "userID")
+	h.LogService.Record(userID, "UPDATE_STATUS", "Order", strconv.Itoa(int(order.ID)), fmt.Sprintf("Status changed from %s to %s", oldStatus, input.Status), c.ClientIP())
 
 	c.JSON(http.StatusOK, gin.H{"message": "Order status updated", "order": order})
 }
@@ -482,10 +483,8 @@ func (h *OrderHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	userIDValue, _ := c.Get("userID")
-	if userIDValue != nil {
-		h.LogService.Record(userIDValue.(uint), "DELETE", "Order", strconv.Itoa(int(id)), fmt.Sprintf("Deleted order #%d", id), c.ClientIP())
-	}
+	userID, _ := GetUintFromContext(c, "userID")
+	h.LogService.Record(userID, "DELETE", "Order", strconv.Itoa(int(id)), fmt.Sprintf("Deleted order #%d", id), c.ClientIP())
 
 	c.JSON(http.StatusOK, gin.H{"message": "Order deleted successfully"})
 }

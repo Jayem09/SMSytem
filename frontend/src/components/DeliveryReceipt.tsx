@@ -28,19 +28,23 @@ interface ReceiptOrder {
   items?: ReceiptOrderItem[];
 }
 
+function escapeHtml(text: string | undefined | null): string {
+  if (!text) return '';
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
 export function generateDeliveryReceiptHTML(order: ReceiptOrder, _tin?: string, businessAddress?: string, _withholdingTaxRate?: number): string {
   const date = new Date(order.created_at);
   const dateStr = date.toLocaleDateString('en-PH', { year: 'numeric', month: '2-digit', day: '2-digit' });
 
-  
-  const customerName = order.customer?.name || order.guest_name || 'WALK-IN';
-  const custAddress = (order.customer?.address || businessAddress || '').toUpperCase();
+  const customerName = escapeHtml(order.customer?.name || order.guest_name || 'WALK-IN');
+  const custAddress = escapeHtml((order.customer?.address || businessAddress || '').toUpperCase());
 
-  
   const totalAmount = order.total_amount || 0;
   const fmt = (n: number | undefined | null) => (n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  // Build item rows using absolute positioning for columns
   const MAX_ROWS = 10;
   const items = (order.items || []).slice(0, MAX_ROWS);
   const itemRows = items.map((item, index) => {
@@ -48,9 +52,6 @@ export function generateDeliveryReceiptHTML(order: ReceiptOrder, _tin?: string, 
   const subtotal = item.subtotal ?? 0;
   const unit = "PCS";
     
-    // Calculate the Y position for this row.
-    // The grid starts completely flat at 2.50in. Row height is perfectly 0.30in.
-    // So row 1 data sits at 2.60in to float squarely mid-line.
     const baseTop = 2.60;
     const rowHeight = 0.30;
     const topPos = baseTop + (index * rowHeight);
@@ -59,7 +60,7 @@ export function generateDeliveryReceiptHTML(order: ReceiptOrder, _tin?: string, 
       <!-- Row ${index + 1} -->
     <div class="col-qty"   style="top:calc(${topPos}in + var(--offset-y)); left:0.30in;">${item.quantity}</div>
     <div class="col-unit"  style="top:calc(${topPos}in + var(--offset-y)); left:0.80in;">${unit}</div>
-    <div class="col-desc"  style="top:calc(${topPos}in + var(--offset-y)); left:1.50in;">${item.product?.name || ''}</div>
+    <div class="col-desc"  style="top:calc(${topPos}in + var(--offset-y)); left:1.50in;">${escapeHtml(item.product?.name || '')}</div>
     <div class="col-price" style="top:calc(${topPos}in + var(--offset-y)); left:5.20in;">${fmt(unitPrice)}</div>
     <div class="col-amt"   style="top:calc(${topPos}in + var(--offset-y)); left:6.40in;">${fmt(subtotal)}</div>
     `;

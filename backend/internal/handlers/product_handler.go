@@ -48,13 +48,7 @@ type productInput struct {
 }
 
 func (h *ProductHandler) List(c *gin.Context) {
-	branchIDValue, _ := c.Get("branchID")
-	var branchID uint
-	if branchIDValue != nil {
-		if v, ok := branchIDValue.(uint); ok {
-			branchID = v
-		}
-	}
+	branchID, _ := GetUintFromContext(c, "branchID")
 
 	var queryArgs []interface{}
 	var stockSubquery string
@@ -110,13 +104,7 @@ func (h *ProductHandler) GetByID(c *gin.Context) {
 	}
 
 	var product models.Product
-	branchIDValue, _ := c.Get("branchID")
-	var branchID uint
-	if branchIDValue != nil {
-		if v, ok := branchIDValue.(uint); ok {
-			branchID = v
-		}
-	}
+	branchID, _ := GetUintFromContext(c, "branchID")
 
 	type ProductWithStock struct {
 		models.Product
@@ -192,10 +180,9 @@ func (h *ProductHandler) Create(c *gin.Context) {
 		IsService:   input.IsService,
 	}
 
-	branchIDValue, _ := c.Get("branchID")
-	userIDValue, _ := c.Get("userID")
+	bID, _ := GetUintFromContext(c, "branchID")
+	userID, _ := GetUintFromContext(c, "userID")
 
-	bID := branchIDValue.(uint)
 	if bID == 0 {
 		bID = 1
 	}
@@ -222,10 +209,10 @@ func (h *ProductHandler) Create(c *gin.Context) {
 				return err
 			}
 
-			var userID *uint
-			if userIDValue != nil {
-				uid := userIDValue.(uint)
-				userID = &uid
+			var userIDPtr *uint
+			if userID != 0 {
+				uid := userID
+				userIDPtr = &uid
 			}
 
 			movement := models.StockMovement{
@@ -233,7 +220,7 @@ func (h *ProductHandler) Create(c *gin.Context) {
 				BatchID:     &batch.ID,
 				WarehouseID: warehouse.ID,
 				BranchID:    bID,
-				UserID:      userID,
+				UserID:      userIDPtr,
 				Type:        models.MovementTypeIn,
 				Quantity:    input.Stock,
 				Reference:   "Initial Stock upon Creation",
@@ -254,9 +241,7 @@ func (h *ProductHandler) Create(c *gin.Context) {
 		Select("products.*, (SELECT COALESCE(SUM(quantity), 0) FROM batches WHERE product_id = products.id AND branch_id = ?) as stock", bID).
 		First(&product, product.ID)
 
-	if userIDValue != nil {
-		h.LogService.Record(userIDValue.(uint), "CREATE", "Product", strconv.Itoa(int(product.ID)), fmt.Sprintf("Created product: %s with initial stock %d", product.Name, input.Stock), c.ClientIP())
-	}
+	h.LogService.Record(userID, "CREATE", "Product", strconv.Itoa(int(product.ID)), fmt.Sprintf("Created product: %s with initial stock %d", product.Name, input.Stock), c.ClientIP())
 
 	c.JSON(http.StatusCreated, gin.H{"message": "Product created", "product": product})
 }
@@ -302,15 +287,9 @@ func (h *ProductHandler) Update(c *gin.Context) {
 	product.IsService = input.IsService
 	product.Stock = input.Stock
 
-	branchIDValue, _ := c.Get("branchID")
-	userIDValue, _ := c.Get("userID")
+	bID, _ := GetUintFromContext(c, "branchID")
+	userID, _ := GetUintFromContext(c, "userID")
 
-	bID := uint(0)
-	if branchIDValue != nil {
-		if v, ok := branchIDValue.(uint); ok {
-			bID = v
-		}
-	}
 	if bID == 0 {
 		bID = 1
 	}
@@ -327,7 +306,6 @@ func (h *ProductHandler) Update(c *gin.Context) {
 			return err
 		}
 
-		// FORCE update the stock column, bypassing any GORM computed-column protections
 		if err := tx.Model(&product).UpdateColumn("stock", input.Stock).Error; err != nil {
 			return err
 		}
@@ -351,10 +329,10 @@ func (h *ProductHandler) Update(c *gin.Context) {
 				return err
 			}
 
-			var userID *uint
-			if userIDValue != nil {
-				uid := userIDValue.(uint)
-				userID = &uid
+			var userIDPtr *uint
+			if userID != 0 {
+				uid := userID
+				userIDPtr = &uid
 			}
 
 			movement := models.StockMovement{
@@ -362,7 +340,7 @@ func (h *ProductHandler) Update(c *gin.Context) {
 				BatchID:     &batch.ID,
 				WarehouseID: warehouse.ID,
 				BranchID:    bID,
-				UserID:      userID,
+				UserID:      userIDPtr,
 				Type:        models.MovementTypeAdjustment,
 				Quantity:    diff,
 				Reference:   fmt.Sprintf("Direct Edit Sync (From %d to %d)", currentStock, input.Stock),
@@ -379,13 +357,10 @@ func (h *ProductHandler) Update(c *gin.Context) {
 		return
 	}
 
-	userIDValue, exists := c.Get("userID")
-	if exists {
-		if oldPrice != product.Price {
-			h.LogService.Record(userIDValue.(uint), "UPDATE_PRICE", "Product", strconv.Itoa(int(product.ID)), fmt.Sprintf("Price changed for %s: P%.2f -> P%.2f", product.Name, oldPrice, product.Price), c.ClientIP())
-		} else {
-			h.LogService.Record(userIDValue.(uint), "UPDATE", "Product", strconv.Itoa(int(product.ID)), fmt.Sprintf("Updated details/stock for %s", product.Name), c.ClientIP())
-		}
+	if oldPrice != product.Price {
+		h.LogService.Record(userID, "UPDATE_PRICE", "Product", strconv.Itoa(int(product.ID)), fmt.Sprintf("Price changed for %s: P%.2f -> P%.2f", product.Name, oldPrice, product.Price), c.ClientIP())
+	} else {
+		h.LogService.Record(userID, "UPDATE", "Product", strconv.Itoa(int(product.ID)), fmt.Sprintf("Updated details/stock for %s", product.Name), c.ClientIP())
 	}
 
 	database.DB.Preload("Category").Preload("Brand").
@@ -413,9 +388,7 @@ func (h *ProductHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	userIDValue, _ := c.Get("userID")
-	if userIDValue != nil {
-		h.LogService.Record(userIDValue.(uint), "DELETE", "Product", strconv.Itoa(int(id)), fmt.Sprintf("Deleted product: %s", product.Name), c.ClientIP())
-	}
+	userID, _ := GetUintFromContext(c, "userID")
+	h.LogService.Record(userID, "DELETE", "Product", strconv.Itoa(int(id)), fmt.Sprintf("Deleted product: %s", product.Name), c.ClientIP())
 	c.JSON(http.StatusOK, gin.H{"message": "Product deleted"})
 }
