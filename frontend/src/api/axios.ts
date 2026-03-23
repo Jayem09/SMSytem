@@ -1,6 +1,13 @@
 import axios, { type AxiosRequestConfig } from 'axios';
 import { fetch } from '@tauri-apps/plugin-http';
 
+declare global {
+  interface Window {
+    __TAURI__?: any;
+    __TAURI_INTERNALS__?: any;
+  }
+}
+
 const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://168.144.46.137:8080';
 
 export interface RequestConfig extends AxiosRequestConfig {

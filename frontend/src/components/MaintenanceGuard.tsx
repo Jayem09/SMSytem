@@ -45,8 +45,7 @@ export default function MaintenanceGuard({ children }: { children: React.ReactNo
                 let downloaded = 0;
                 let contentLength = 0;
                 
-                // Use separate download and install for better control
-                const downloadResult = await update.download((event) => {
+                await update.downloadAndInstall((event) => {
                     if (event.event === 'Started') {
                         contentLength = event.data?.contentLength || 0;
                     } else if (event.event === 'Progress') {
@@ -54,14 +53,12 @@ export default function MaintenanceGuard({ children }: { children: React.ReactNo
                         if (contentLength > 0) {
                             setUpdateProgress(Math.round((downloaded / contentLength) * 100));
                         }
+                    } else if (event.event === 'Finished') {
+                        setUpdateProgress(100);
                     }
                 });
                 
-                setUpdateProgress(100);
-                await downloadResult.install();
-                
-                // Small delay to ensure install completes before relaunch
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                await new Promise(resolve => setTimeout(resolve, 1500));
                 await relaunch();
             } else {
                 window.location.reload();
