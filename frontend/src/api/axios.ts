@@ -87,12 +87,19 @@ const api = axios.create({
         });
       }
 
-      const tauriResponse = await fetchFn(fullUrl, {
+      const isUsingTauriHttp = fetchFn !== globalThis.fetch;
+      
+      const requestInit: RequestInit & { connectTimeout?: number } = {
         method: (config.method?.toUpperCase() as any) || 'GET',
         headers: plainHeaders,
         body: config.data ? (typeof config.data === 'string' ? config.data : JSON.stringify(config.data)) : undefined,
-        connectTimeout: config.timeout || 10000,
-      });
+      };
+      
+      if (isUsingTauriHttp) {
+        requestInit.connectTimeout = config.timeout || 10000;
+      }
+      
+      const tauriResponse = await fetchFn(fullUrl, requestInit);
 
       const responseText = await tauriResponse.text();
       
