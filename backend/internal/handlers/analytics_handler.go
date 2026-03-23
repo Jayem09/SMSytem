@@ -132,7 +132,7 @@ func (h *AnalyticsHandler) getQueryPatterns() []QueryPattern {
 	return []QueryPattern{
 		// === REVENUE & SALES ===
 		{
-			Regex: regexp.MustCompile(`(?i)^(how much|what is|total|amount|how much money).*(earn|revenue|sales|income)(\s+this\s+month|\s+last\s+month|\s+today|\s+this\s+week)?`),
+			Regex: regexp.MustCompile(`(?i)(how much|what is|total|amount).*(earn|revenue|sales|income)(\s+this\s+month|\s+last\s+month|\s+today|\s+this\s+week)?`),
 			Parser: func(question string, branchID uint, _ interface{}) *QueryResult {
 				db := database.DB
 				period := h.parsePeriod(question)
@@ -157,84 +157,9 @@ func (h *AnalyticsHandler) getQueryPatterns() []QueryPattern {
 				return &QueryResult{Query: question, Answer: fmt.Sprintf("Total revenue: ₱%.2f", result.Total), Data: result, ChartType: "metric"}
 			},
 		},
-		{
-			Regex: regexp.MustCompile(`(?i)^(revenue|sales|income|earn).*(\s+this\s+month|\s+last\s+month|\s+today|\s+this\s+week)?$`),
-			Parser: func(question string, branchID uint, _ interface{}) *QueryResult {
-				db := database.DB
-				period := h.parsePeriod(question)
-				query := `SELECT COALESCE(SUM(total_amount - discount_amount), 0) as total FROM orders WHERE status != 'cancelled'`
-				switch period {
-				case "today":
-					query += " AND DATE(created_at) = CURDATE()"
-				case "week":
-					query += " AND YEARWEEK(created_at) = YEARWEEK(NOW())"
-				case "month":
-					query += " AND YEAR(created_at) = YEAR(NOW()) AND MONTH(created_at) = MONTH(NOW())"
-				case "last_month":
-					query += " AND YEAR(created_at) = YEAR(DATE_SUB(NOW(), INTERVAL 1 MONTH)) AND MONTH(created_at) = MONTH(DATE_SUB(NOW(), INTERVAL 1 MONTH))"
-				}
-				if branchID > 0 {
-					query += fmt.Sprintf(" AND branch_id = %d", branchID)
-				}
-				var result RevenueResult
-				db.Raw(query).Scan(&result)
-				return &QueryResult{Query: question, Answer: fmt.Sprintf("Total revenue: ₱%.2f", result.Total), Data: result, ChartType: "metric"}
-			},
-		},
-		{
-			Regex: regexp.MustCompile(`(?i)^(total\s+)?(sales|revenue|income)\s*(today|this\s+day)$`),
-			Parser: func(question string, branchID uint, _ interface{}) *QueryResult {
-				db := database.DB
-				query := `SELECT COALESCE(SUM(total_amount - discount_amount), 0) as total FROM orders WHERE status != 'cancelled' AND DATE(created_at) = CURDATE()`
-				if branchID > 0 {
-					query += fmt.Sprintf(" AND branch_id = %d", branchID)
-				}
-				var result RevenueResult
-				db.Raw(query).Scan(&result)
-				return &QueryResult{Query: question, Answer: fmt.Sprintf("Today's sales: ₱%.2f", result.Total), Data: result, ChartType: "metric"}
-			},
-		},
-		{
-			Regex: regexp.MustCompile(`(?i)(monthly|per\s+month|this\s+month|for\s+month)\s*(sales|revenue|income)?`),
-			Parser: func(question string, branchID uint, _ interface{}) *QueryResult {
-				db := database.DB
-				var query string
-				query = `SELECT COALESCE(SUM(total_amount - discount_amount), 0) as total FROM orders WHERE status != 'cancelled' AND YEAR(created_at) = YEAR(NOW()) AND MONTH(created_at) = MONTH(NOW())`
-				if branchID > 0 {
-					query += fmt.Sprintf(" AND branch_id = %d", branchID)
-				}
-				var result RevenueResult
-				db.Raw(query).Scan(&result)
-				return &QueryResult{Query: question, Answer: fmt.Sprintf("Monthly revenue: ₱%.2f", result.Total), Data: result, ChartType: "metric"}
-			},
-		},
-		{
-			Regex: regexp.MustCompile(`(?i)(gross\s+)?sales\s*(this\s+month|last\s+month|this\s+week)?`),
-			Parser: func(question string, branchID uint, _ interface{}) *QueryResult {
-				db := database.DB
-				period := h.parsePeriod(question)
-				query := `SELECT COALESCE(SUM(total_amount), 0) as total FROM orders WHERE status != 'cancelled'`
-				switch period {
-				case "today":
-					query += " AND DATE(created_at) = CURDATE()"
-				case "week":
-					query += " AND YEARWEEK(created_at) = YEARWEEK(NOW())"
-				case "month":
-					query += " AND YEAR(created_at) = YEAR(NOW()) AND MONTH(created_at) = MONTH(NOW())"
-				case "last_month":
-					query += " AND YEAR(created_at) = YEAR(DATE_SUB(NOW(), INTERVAL 1 MONTH)) AND MONTH(created_at) = MONTH(DATE_SUB(NOW(), INTERVAL 1 MONTH))"
-				}
-				if branchID > 0 {
-					query += fmt.Sprintf(" AND branch_id = %d", branchID)
-				}
-				var result RevenueResult
-				db.Raw(query).Scan(&result)
-				return &QueryResult{Query: question, Answer: fmt.Sprintf("Gross sales: ₱%.2f", result.Total), Data: result, ChartType: "metric"}
-			},
-		},
 		// === ORDERS ===
 		{
-			Regex: regexp.MustCompile(`(?i)^(total\s+)?(orders|transactions?|sales)\s*(this\s+month|last\s+month|today|this\s+week)?$`),
+			Regex: regexp.MustCompile(`(?i)(how many|total|number of|order count).*(order|orders|transaction|transactions)(\s+this\s+month|\s+last\s+month|\s+today|\s+this\s+week)?`),
 			Parser: func(question string, branchID uint, _ interface{}) *QueryResult {
 				db := database.DB
 				period := h.parsePeriod(question)
@@ -256,6 +181,31 @@ func (h *AnalyticsHandler) getQueryPatterns() []QueryPattern {
 				var result OrderCountResult
 				db.Raw(query).Scan(&result)
 				return &QueryResult{Query: question, Answer: fmt.Sprintf("Total orders: %d", result.Count), Data: result, ChartType: "metric"}
+			},
+		},
+		// === EXPENSES ===
+		{
+			Regex: regexp.MustCompile(`(?i)(how much|total|amount).*(expense|expenses|cost|costs|spending)(\s+this\s+month|\s+last\s+month|\s+today|\s+this\s+week)?`),
+			Parser: func(question string, branchID uint, _ interface{}) *QueryResult {
+				db := database.DB
+				period := h.parsePeriod(question)
+				query := `SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE 1=1`
+				switch period {
+				case "today":
+					query += " AND DATE(expense_date) = CURDATE()"
+				case "week":
+					query += " AND YEARWEEK(expense_date) = YEARWEEK(NOW())"
+				case "month":
+					query += " AND YEAR(expense_date) = YEAR(NOW()) AND MONTH(expense_date) = MONTH(NOW())"
+				case "last_month":
+					query += " AND YEAR(expense_date) = YEAR(DATE_SUB(NOW(), INTERVAL 1 MONTH)) AND MONTH(expense_date) = MONTH(DATE_SUB(NOW(), INTERVAL 1 MONTH))"
+				}
+				if branchID > 0 {
+					query += fmt.Sprintf(" AND branch_id = %d", branchID)
+				}
+				var result ExpensesResult
+				db.Raw(query).Scan(&result)
+				return &QueryResult{Query: question, Answer: fmt.Sprintf("Total expenses: ₱%.2f", result.Total), Data: result, ChartType: "metric"}
 			},
 		},
 		{
