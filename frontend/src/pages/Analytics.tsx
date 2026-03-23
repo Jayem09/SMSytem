@@ -18,10 +18,16 @@ const COLORS = ['#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e'
 
 interface HistoryItem {
   id: number;
+  // Original user query for display
   query: string;
+  // Answer returned from the backend (rendered in UI)
   answer: string;
+  // Additional data to render charts/tables (if any)
   data: Record<string, unknown> | null;
+  // Chart type string (metric/bar/pie/...) for renderChart
   chartType: string;
+  // Optional: type marker to support future extension
+  type?: string;
 }
 
 export default function Analytics() {
@@ -34,6 +40,7 @@ export default function Analytics() {
     if (!q.trim()) return;
     
     const questionId = Date.now();
+    // Push a new entry to show the question immediately with a loading state
     setHistory(prev => [...prev, { id: questionId, type: 'question', query: q, answer: '', data: null, chartType: '' }]);
     setQuestion('');
     setLoading(true);
@@ -41,9 +48,13 @@ export default function Analytics() {
 
     try {
       const res = await api.get(`/api/analytics?q=${encodeURIComponent(q)}`);
+      // Be defensive in case the backend shape changes slightly
+      const answer = res?.data?.answer ?? '';
+      const data = res?.data?.data ?? null;
+      const chartType = res?.data?.chart_type ?? '';
       setHistory(prev => prev.map(h => 
         h.id === questionId 
-          ? { ...h, answer: res.data.answer, data: res.data.data, chartType: res.data.chart_type }
+          ? { ...h, answer, data, chartType }
           : h
       ));
     } catch (err: unknown) {
