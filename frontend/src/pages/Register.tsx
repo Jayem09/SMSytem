@@ -28,7 +28,7 @@ export default function Register() {
         setBackendStatus('online');
       } else {
         setBackendStatus('offline');
-        setDebugError('Backend unreachable at ' + baseURL);
+        setDebugError('Backend unreachable');
       }
     } catch (err) {
       console.error('Initialization failed:', err);

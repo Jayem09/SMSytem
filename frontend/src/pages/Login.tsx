@@ -24,10 +24,10 @@ export default function Login() {
        const isOnline = await checkHealthNative();
        if (isOnline) {
          setBackendStatus('online');
-       } else {
-         setBackendStatus('offline');
-         setDebugError('Backend unreachable at ' + baseURL);
-       }
+      } else {
+        setBackendStatus('offline');
+        setDebugError('Backend unreachable');
+      }
      } catch (err) {
        setBackendStatus('offline');
        setDebugError(err instanceof Error ? err.message : String(err));
