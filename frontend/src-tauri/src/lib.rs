@@ -1,4 +1,3 @@
-use tauri::Manager;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
