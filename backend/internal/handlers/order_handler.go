@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type OrderHandler struct {
@@ -138,11 +139,19 @@ func (h *OrderHandler) Create(c *gin.Context) {
 			}
 
 			if orderStatus == "completed" && !product.IsService {
+				var batches []models.Batch
+				if err := tx.Model(&models.Batch{}).
+					Where("product_id = ? AND branch_id = ? AND quantity > 0", product.ID, order.BranchID).
+					Clauses(clause.Locking{Strength: "UPDATE"}).
+					Order("expiry_date ASC, created_at ASC").
+					Find(&batches).Error; err != nil {
+					return fmt.Errorf("failed to lock batches: %v", err)
+				}
+
 				var currentStock int
-				tx.Model(&models.Batch{}).
-					Where("product_id = ? AND branch_id = ?", product.ID, order.BranchID).
-					Select("COALESCE(SUM(quantity), 0)").
-					Row().Scan(&currentStock)
+				for _, b := range batches {
+					currentStock += b.Quantity
+				}
 
 				if currentStock < item.Quantity {
 					return errors.New("insufficient stock for " + product.Name + " (available: " + strconv.Itoa(currentStock) + ")")
@@ -244,43 +253,6 @@ func (h *OrderHandler) Create(c *gin.Context) {
 					remainingToDeduct -= deduct
 				}
 
-				if remainingToDeduct > 0 && product.Stock >= remainingToDeduct {
-					fmt.Printf("🔧 Self-healing: Creating legacy batch for product %d to satisfy order #%d\n", product.ID, order.ID)
-					var warehouse models.Warehouse
-					whQuery := tx.Model(&models.Warehouse{})
-					if order.BranchID != 0 {
-						whQuery = whQuery.Where("branch_id = ?", order.BranchID)
-					}
-					if err := whQuery.First(&warehouse).Error; err == nil {
-						legacyBatch := models.Batch{
-							ProductID:   product.ID,
-							WarehouseID: warehouse.ID,
-							BranchID:    warehouse.BranchID,
-							BatchNumber: "LEGACY-SYNC",
-							Quantity:    product.Stock - remainingToDeduct,
-						}
-						if err := tx.Create(&legacyBatch).Error; err != nil {
-							return fmt.Errorf("failed to create legacy batch: %v", err)
-						}
-
-						deduct := remainingToDeduct
-						movement := models.StockMovement{
-							ProductID:   product.ID,
-							BatchID:     &legacyBatch.ID,
-							WarehouseID: warehouse.ID,
-							BranchID:    warehouse.BranchID,
-							UserID:      &uID,
-							Type:        models.MovementTypeOut,
-							Quantity:    -deduct,
-							Reference:   fmt.Sprintf("POS Order #%d (Legacy Auto-sync)", order.ID),
-						}
-						if err := tx.Create(&movement).Error; err != nil {
-							return fmt.Errorf("failed to create stock movement: %v", err)
-						}
-						remainingToDeduct -= deduct
-					}
-				}
-
 				if remainingToDeduct > 0 {
 					return fmt.Errorf("insufficient batch stock for %s during final deduction", product.Name)
 				}
@@ -344,18 +316,16 @@ func (h *OrderHandler) UpdateStatus(c *gin.Context) {
 				}
 
 				if !product.IsService {
+					var batches []models.Batch
+					if err := tx.Model(&models.Batch{}).
+						Where("product_id = ? AND branch_id = ? AND quantity > 0", product.ID, order.BranchID).
+						Clauses(clause.Locking{Strength: "UPDATE"}).
+						Order("expiry_date ASC, created_at ASC").
+						Find(&batches).Error; err != nil {
+						return fmt.Errorf("failed to lock batches for %s: %v", product.Name, err)
+					}
 
 					remainingToDeduct := item.Quantity
-					var batches []models.Batch
-
-					batchQuery := tx.Where("product_id = ? AND quantity > 0", product.ID)
-					if order.BranchID != 0 {
-						batchQuery = batchQuery.Where("branch_id = ?", order.BranchID)
-					}
-
-					if err := batchQuery.Order("expiry_date ASC, created_at ASC").Find(&batches).Error; err != nil {
-						return fmt.Errorf("failed to find available batches for %s", product.Name)
-					}
 
 					for i := range batches {
 						if remainingToDeduct <= 0 {
@@ -387,38 +357,6 @@ func (h *OrderHandler) UpdateStatus(c *gin.Context) {
 						}
 
 						remainingToDeduct -= deductFromBatch
-					}
-
-					if remainingToDeduct > 0 && product.Stock >= remainingToDeduct {
-						var warehouse models.Warehouse
-						whQuery := tx.Model(&models.Warehouse{})
-						if order.BranchID != 0 {
-							whQuery = whQuery.Where("branch_id = ?", order.BranchID)
-						}
-						if err := whQuery.First(&warehouse).Error; err == nil {
-							legacyBatch := models.Batch{
-								ProductID:   product.ID,
-								WarehouseID: warehouse.ID,
-								BranchID:    warehouse.BranchID,
-								BatchNumber: "LEGACY-SYNC",
-								Quantity:    product.Stock - remainingToDeduct,
-							}
-							tx.Create(&legacyBatch)
-
-							deduct := remainingToDeduct
-							movement := models.StockMovement{
-								ProductID:   product.ID,
-								BatchID:     &legacyBatch.ID,
-								WarehouseID: warehouse.ID,
-								BranchID:    warehouse.BranchID,
-								UserID:      &uID,
-								Type:        models.MovementTypeOut,
-								Quantity:    -deduct,
-								Reference:   fmt.Sprintf("POS Order #%d (Pending Legacy Sync)", order.ID),
-							}
-							tx.Create(&movement)
-							remainingToDeduct -= deduct
-						}
 					}
 
 					if remainingToDeduct > 0 {
