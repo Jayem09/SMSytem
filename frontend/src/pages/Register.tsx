@@ -15,24 +15,32 @@ export default function Register() {
   const navigate = useNavigate();
   const [backendStatus, setBackendStatus] = useState<'checking' | 'online' | 'offline'>('checking');
   const [debugError, setDebugError] = useState<string>('');
+  const [isRetrying, setIsRetrying] = useState(false);
+
+  const checkBackend = async (isRetry = false) => {
+    if (isRetry) setIsRetrying(true);
+    setBackendStatus('checking');
+    setDebugError('');
+    
+    try {
+      const isOnline = await checkHealthNative();
+      if (isOnline) {
+        setBackendStatus('online');
+      } else {
+        setBackendStatus('offline');
+        setDebugError('Backend unreachable at ' + baseURL);
+      }
+    } catch (err) {
+      console.error('Initialization failed:', err);
+      setBackendStatus('offline');
+      setDebugError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsRetrying(false);
+    }
+  };
 
   useEffect(() => {
-    const initPage = async () => {
-      try {
-        const isOnline = await checkHealthNative();
-        if (isOnline) {
-          setBackendStatus('online');
-        } else {
-          setBackendStatus('offline');
-          setDebugError('Backend unreachable at ' + baseURL);
-        }
-      } catch (err) {
-        console.error('Initialization failed:', err);
-        setBackendStatus('offline');
-        setDebugError(err instanceof Error ? err.message : String(err));
-      }
-    };
-    initPage();
+    checkBackend();
   }, []);
 
   const handleSubmit = async (e: FormEvent) => {
@@ -74,6 +82,14 @@ export default function Register() {
                 <span className="text-[10px] text-red-500 font-bold uppercase tracking-widest flex items-center gap-1">● Backend Offline</span>
                 <span className="text-[8px] text-gray-400 font-medium">Trying: {baseURL}</span>
                 {debugError && <span className="text-[7px] text-red-400/70 block max-w-[200px] break-all text-center">Error: {debugError}</span>}
+                <button
+                  type="button"
+                  onClick={() => checkBackend(true)}
+                  disabled={isRetrying}
+                  className="mt-2 text-[10px] px-3 py-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium transition-colors disabled:opacity-50"
+                >
+                  {isRetrying ? 'Retrying...' : 'Retry Connection'}
+                </button>
               </div>
             )}
           </div>
