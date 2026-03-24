@@ -169,7 +169,83 @@ func (h *AnalyticsHandler) getQueryPatterns() []QueryPattern {
 				return &QueryResult{Query: question, Answer: fmt.Sprintf("Total revenue: ₱%.2f", result.Total), Data: result, ChartType: "metric"}
 			},
 		},
-		// === ORDERS ===
+		{
+			Regex: regexp.MustCompile(`(?i)^revenue(\s+this\s+month|\s+last\s+month|\s+today|\s+this\s+week)?$`),
+			Parser: func(question string, branchID uint, _ interface{}) *QueryResult {
+				db := database.DB
+				period := h.parsePeriod(question)
+				query := `SELECT COALESCE(SUM(total_amount - discount_amount), 0) as total FROM orders WHERE status != 'cancelled'`
+				switch period {
+				case "today":
+					query += " AND DATE(created_at) = CURDATE()"
+				case "week":
+					query += " AND YEARWEEK(created_at) = YEARWEEK(NOW())"
+				case "month":
+					query += " AND YEAR(created_at) = YEAR(NOW()) AND MONTH(created_at) = MONTH(NOW())"
+				case "last_month":
+					query += " AND YEAR(created_at) = YEAR(DATE_SUB(NOW(), INTERVAL 1 MONTH)) AND MONTH(created_at) = MONTH(DATE_SUB(NOW(), INTERVAL 1 MONTH))"
+				}
+				if branchID > 0 {
+					query += fmt.Sprintf(" AND branch_id = %d", branchID)
+				}
+				var result RevenueResult
+				if err := db.Raw(query).Scan(&result).Error; err != nil {
+					return &QueryResult{Query: question, Answer: fmt.Sprintf("Error: %v", err)}
+				}
+				return &QueryResult{Query: question, Answer: fmt.Sprintf("Revenue: ₱%.2f", result.Total), Data: result, ChartType: "metric"}
+			},
+		},
+		{
+			Regex: regexp.MustCompile(`(?i)^sales(\s+this\s+month|\s+last\s+month|\s+today|\s+this\s+week)?$`),
+			Parser: func(question string, branchID uint, _ interface{}) *QueryResult {
+				db := database.DB
+				period := h.parsePeriod(question)
+				query := `SELECT COALESCE(SUM(total_amount - discount_amount), 0) as total FROM orders WHERE status != 'cancelled'`
+				switch period {
+				case "today":
+					query += " AND DATE(created_at) = CURDATE()"
+				case "week":
+					query += " AND YEARWEEK(created_at) = YEARWEEK(NOW())"
+				case "month":
+					query += " AND YEAR(created_at) = YEAR(NOW()) AND MONTH(created_at) = MONTH(NOW())"
+				case "last_month":
+					query += " AND YEAR(created_at) = YEAR(DATE_SUB(NOW(), INTERVAL 1 MONTH)) AND MONTH(created_at) = MONTH(DATE_SUB(NOW(), INTERVAL 1 MONTH))"
+				}
+				if branchID > 0 {
+					query += fmt.Sprintf(" AND branch_id = %d", branchID)
+				}
+				var result RevenueResult
+				if err := db.Raw(query).Scan(&result).Error; err != nil {
+					return &QueryResult{Query: question, Answer: fmt.Sprintf("Error: %v", err)}
+				}
+				return &QueryResult{Query: question, Answer: fmt.Sprintf("Sales: ₱%.2f", result.Total), Data: result, ChartType: "metric"}
+			},
+		},
+		{
+			Regex: regexp.MustCompile(`(?i)^orders?\s+(this\s+month|last\s+month|today|this\s+week)$`),
+			Parser: func(question string, branchID uint, _ interface{}) *QueryResult {
+				db := database.DB
+				period := h.parsePeriod(question)
+				query := `SELECT COUNT(*) as count FROM orders WHERE status != 'cancelled'`
+				switch period {
+				case "today":
+					query += " AND DATE(created_at) = CURDATE()"
+				case "week":
+					query += " AND YEARWEEK(created_at) = YEARWEEK(NOW())"
+				case "month":
+					query += " AND YEAR(created_at) = YEAR(NOW()) AND MONTH(created_at) = MONTH(NOW())"
+				case "last_month":
+					query += " AND YEAR(created_at) = YEAR(DATE_SUB(NOW(), INTERVAL 1 MONTH)) AND MONTH(created_at) = MONTH(DATE_SUB(NOW(), INTERVAL 1 MONTH))"
+				}
+				if branchID > 0 {
+					query += fmt.Sprintf(" AND branch_id = %d", branchID)
+				}
+				var result OrderCountResult
+				db.Raw(query).Scan(&result)
+				return &QueryResult{Query: question, Answer: fmt.Sprintf("Total orders: %d", result.Count), Data: result, ChartType: "metric"}
+			},
+		},
+		// === EXPENSES ===
 		{
 			Regex: regexp.MustCompile(`(?i)(how many|total|number of|order count).*(order|orders|transaction|transactions)(\s+this\s+month|\s+last\s+month|\s+today|\s+this\s+week)?`),
 			Parser: func(question string, branchID uint, _ interface{}) *QueryResult {
@@ -1295,13 +1371,18 @@ func (h *AnalyticsHandler) getBreakdownLabel(question string) string {
 
 func (h *AnalyticsHandler) fallbackQuery(question string) string {
 	keywords := map[string]string{
-		"stock":    "Try: 'show low stock items'",
-		"order":    "Try: 'how many orders today?'",
-		"customer": "Try: 'who are our top customers?'",
-		"product":  "Try: 'best selling products'",
-		"sale":     "Try: 'how much revenue this month?'",
-		"revenue":  "Try: 'how much did we earn this month?'",
-		"profit":   "Try: 'show profit this month'",
+		"stock":    "Try: 'low stock items' or 'out of stock'",
+		"order":    "Try: 'orders this month' or 'how many orders today?'",
+		"orders":   "Try: 'orders this month' or 'how many orders today?'",
+		"customer": "Try: 'top customers' or 'who are our best customers'",
+		"product":  "Try: 'best selling products' or 'top selling products'",
+		"sale":     "Try: 'revenue this month' or 'sales today'",
+		"revenue":  "Try: 'revenue this month' or 'how much did we earn this month?'",
+		"profit":   "Try: 'profit this month' or 'net income'",
+		"expense":  "Try: 'expenses this month' or 'total expenses'",
+		"category": "Try: 'sales by category' or 'top categories'",
+		"brand":    "Try: 'sales by brand' or 'top brands'",
+		"advisor":  "Try: 'service advisor performance' or 'top advisor'",
 	}
 
 	questionLower := strings.ToLower(question)
@@ -1311,7 +1392,13 @@ func (h *AnalyticsHandler) fallbackQuery(question string) string {
 		}
 	}
 
-	return "I couldn't understand that question. Try asking:\n• How much did we earn this month?\n• What are our best selling products?\n• How many orders today?\n• Show low stock items\n• Customer sales by category"
+	return `I couldn't understand that. Try these:
+• Revenue: "revenue this month", "sales today", "how much did we earn this month?"
+• Orders: "orders this month", "how many orders today?", "order count"
+• Profit: "profit this month", "net income"
+• Products: "best selling products", "low stock items"
+• Customers: "top customers", "who are our best customers"
+• Reports: "daily summary", "expenses this month", "sales by category"`
 }
 
 func (h *AnalyticsHandler) GetRevenue(c *gin.Context) {

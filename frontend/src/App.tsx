@@ -8,7 +8,6 @@ import ErrorBoundary from './components/ErrorBoundary';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
-import Products from './pages/Products';
 import Categories from './pages/Categories';
 import Brands from './pages/Brands';
 import CRM from './pages/CRM';
@@ -25,6 +24,7 @@ import DailyReport from './pages/DailyReport';
 import Branches from './pages/Branches';
 import Transfers from './pages/Transfers';
 import Analytics from './pages/Analytics';
+import Customers from './pages/Customers';
 import MaintenanceGuard from './components/MaintenanceGuard';
 
 function App() {
