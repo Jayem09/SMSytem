@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "SMSytem",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "identifier": "com.smsystem.desktop",
   "build": {
     "frontendDist": "../dist",
@@ -19,7 +19,8 @@
         "minHeight": 768,
         "resizable": true,
         "fullscreen": false,
-        "maximized": true
+        "maximized": true,
+        "devtools": true
       }
     ],
     "security": {

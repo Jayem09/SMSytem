@@ -10,8 +10,6 @@ export default function Login() {
   const { login } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
-  // Backend connection checking happens silently in background
-  // No UI feedback during connection attempts
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();

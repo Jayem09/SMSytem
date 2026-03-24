@@ -37,6 +37,12 @@ function App() {
               <ToastContainer />
               <Routes>
                 <Route path="/login" element={<Login />} />
+                <Route path="/test" element={
+                  <div className="p-8">
+                    <h1>Testing API...</h1>
+                    <div id="test-result">Loading...</div>
+                  </div>
+                } />
                 <Route path="/register" element={<Register />} />
                 <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
                   <Route path="/dashboard" element={<Dashboard />} />

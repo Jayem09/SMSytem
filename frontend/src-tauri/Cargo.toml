@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "3.0.0"
+version = "4.0.0"
 description = "A Tauri App"
 authors = ["you"]
 license = ""
@@ -26,3 +26,4 @@ tauri-plugin-log = "2"
 tauri-plugin-shell = "2"
 tauri-plugin-http = "2"
 tauri-plugin-updater = "2"
+reqwest = { version = "0.12", features = ["rustls-tls", "json"] }

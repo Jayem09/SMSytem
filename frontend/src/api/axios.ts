@@ -1,29 +1,6 @@
-import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
+import { invoke } from '@tauri-apps/api/core';
 
-declare global {
-  interface Window {
-    __TAURI__?: unknown;
-    __TAURI_INTERNALS__?: unknown;
-  }
-}
-
-const getFetch = () => {
-  const isTauriEnv = typeof window !== 'undefined' && (window as any).__TAURI__ != null;
-  // Use Tauri fetch only when running inside a real TAURI environment
-  if (isTauriEnv && typeof tauriFetch === 'function') {
-    return tauriFetch;
-  }
-  // Fall back to native fetch in browser/dev environments
-  const gf = (typeof globalThis !== 'undefined' ? (globalThis as any).fetch : undefined);
-  if (typeof gf === 'function') {
-    return gf;
-  }
-  throw new Error('No fetch available');
-};
-
-export const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
-
-const fetchFn = getFetch();
+const API_BASE = 'http://168.144.46.137:8080';
 
 interface ApiResponse {
   data: unknown;
@@ -54,6 +31,10 @@ class TauriApi {
     return url.startsWith('http') ? url : this.baseURL + url;
   }
 
+  private getToken(): string | null {
+    return localStorage.getItem('token');
+  }
+
   private async request(
     method: string,
     url: string,
@@ -61,41 +42,31 @@ class TauriApi {
     config?: ApiConfig
   ): Promise<ApiResponse> {
     const fullUrl = this.getFullUrl(url, config);
-    const token = localStorage.getItem('token');
-
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
+    
+    // Use Tauri command for API calls
+    try {
+      if (method === 'GET') {
+        const result = await invoke<{data: unknown; status: number; status_text: string}>('api_get', { url: fullUrl });
+        return {
+          data: result.data,
+          status: result.status,
+          statusText: result.status_text,
+          headers: {},
+        };
+      } else {
+        const body = data ? JSON.stringify(data) : '{}';
+        const result = await invoke<{data: unknown; status: number; status_text: string}>('api_post', { url: fullUrl, body });
+        return {
+          data: result.data,
+          status: result.status,
+          statusText: result.status_text,
+          headers: {},
+        };
+      }
+    } catch (err) {
+      console.error('[API] Tauri invoke error:', err);
+      throw err;
     }
-
-    if (config?.headers) {
-      Object.assign(headers, config.headers);
-    }
-
-     const response = await fetchFn(fullUrl, {
-       method,
-       headers,
-       body: data ? JSON.stringify(data) : undefined,
-       connectTimeout: config?.timeout || 30000,
-     });
-
-    let responseData: unknown;
-    const contentType = response.headers.get('content-type');
-    if (contentType?.includes('application/json')) {
-      responseData = await response.json();
-    } else {
-      responseData = await response.text();
-    }
-
-    return {
-      data: responseData,
-      status: response.status,
-      statusText: response.statusText,
-      headers: {},
-    };
   }
 
   get(url: string, config?: ApiConfig): Promise<ApiResponse> {
@@ -119,18 +90,9 @@ class TauriApi {
   }
 }
 
-const api = new TauriApi(baseURL);
+const api = new TauriApi(API_BASE);
 
-const handle401 = () => {
-  const isAuthPage = window.location.pathname === '/login' || window.location.pathname === '/register';
-  if (!isAuthPage) {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    window.location.href = '/login';
-  }
-};
-
-const wrapMethod = (originalFn: Function): ((
+const wrapMethod = (originalFn: (url: string, dataOrConfig?: unknown, config?: ApiConfig) => Promise<ApiResponse>): ((
   url: string,
   dataOrConfig?: unknown,
   config?: ApiConfig
@@ -152,78 +114,23 @@ const wrapMethod = (originalFn: Function): ((
     } catch (error) {
       const err = error as { status?: number };
       if (err.status === 401) {
-        handle401();
+        const isAuthPage = window.location.pathname === '/login' || window.location.pathname === '/register';
+        if (!isAuthPage) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          window.location.href = '/login';
+        }
       }
       throw error;
     }
   };
 };
 
-api.get = wrapMethod(api.get.bind(api));
-api.post = wrapMethod(api.post.bind(api));
-api.put = wrapMethod(api.put.bind(api));
-api.delete = wrapMethod(api.delete.bind(api));
-api.patch = wrapMethod(api.patch.bind(api));
+const apiGet = wrapMethod(api.get.bind(api));
+const apiPost = wrapMethod(api.post.bind(api));
+const apiPut = wrapMethod(api.put.bind(api));
+const apiDelete = wrapMethod(api.delete.bind(api));
+const apiPatch = wrapMethod(api.patch.bind(api));
 
-export const checkHealthNative = async (): Promise<boolean> => {
-  const healthUrl = `${baseURL}/api/health`;
-
-  // Simple delay helper
-  const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-  // Retry strategy: try methods in order, with backoff between attempts
-  const maxAttempts = 3;
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    // Step 1: Try Tauri HTTP plugin
-    try {
-      const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
-      const response = await tauriFetch(healthUrl, {
-        method: 'GET',
-      });
-      if (response.ok || response.status === 200) {
-        return true;
-      }
-    } catch (err) {
-      // Silently continue to next method
-    }
-
-    // Step 2: Try native fetch
-    try {
-      const response = await fetch(healthUrl);
-      if (response.ok || response.status === 200) {
-        return true;
-      }
-    } catch (err) {
-      // Silently continue to next method
-    }
-
-    // Step 3: Try shell curl
-    try {
-      const { Command } = await import('@tauri-apps/plugin-shell');
-      const command = Command.create('curl', ['-s', '-o', '/dev/null', '-w', '%{http_code}', healthUrl]);
-      const output = await command.execute();
-      if (output.code === 0) {
-        const status = parseInt(output.stdout.trim(), 10);
-        if (status >= 200 && status < 400) {
-          return true;
-        }
-      }
-    } catch (err) {
-      // Silently continue to next method
-    }
-
-    // Backoff before the next attempt (avoid hammering the server)
-    if (attempt < maxAttempts) {
-      const backoff = 500 * attempt; // 500ms, 1000ms, 1500ms
-      await delay(backoff);
-    }
-  }
-
-  return false;
-};
-
-export const createAbortController = (): AbortController => {
-  return new AbortController();
-};
-
+export { apiGet as get, apiPost as post, apiPut as put, apiDelete as delete, apiPatch as patch };
 export default api;

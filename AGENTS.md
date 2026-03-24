@@ -39,16 +39,9 @@ npm run tauri dev
 
 # Build production executable
 npm run tauri build
-```
 
-### Testing
-
-```bash
-# Run all Playwright tests
-npx playwright test
-
-# Run specific test file
-npx playwright test tests/filename.spec.ts
+# Rust linting
+cd src-tauri && cargo clippy
 ```
 
 ## Code Style Guidelines
@@ -88,6 +81,25 @@ export default function MyComponent() {
 - Components/Functions: PascalCase/camelCase
 - Interfaces: PascalCase
 - Constants: SCREAMING_SNAKE_CASE
+
+### Tauri/Rust Guidelines
+
+The desktop app uses Rust-side HTTP requests to bypass webview network restrictions:
+
+```rust
+// Rust command for GET requests
+#[tauri::command]
+async fn api_get(url: String) -> Result<ApiResponse, String> {
+    let client = reqwest::Client::new();
+    let response = client.get(&url).send().await?;
+    let data = response.json().await?;
+    Ok(ApiResponse { data, status: response.status().as_u16(), status_text: response.status().canonical_reason().unwrap_or("").to_string() })
+}
+```
+
+- Always use `reqwest` in Rust commands for API calls, not JavaScript fetch
+- Frontend uses `invoke` from `@tauri-apps/api/core` to call Rust commands
+- See `frontend/src/api/axios.ts` for the TauriApi wrapper pattern
 
 ### Error Handling
 
@@ -138,12 +150,8 @@ frontend/
 2. Add route in `App.tsx`
 3. Add link in `Layout.tsx`
 
-### Running a Single Test
-```bash
-npx playwright test tests/filename.spec.ts
-```
-
 ## Notes for Agents
 
 - Backend defaults to `http://168.144.46.137:8080` - check if online
 - Run `npm run lint` and `npx tsc --noEmit` before committing
+- The webview blocks JavaScript fetch/XHR - always use Rust commands via `invoke` for HTTP

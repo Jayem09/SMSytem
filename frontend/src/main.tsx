@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import './index.css'
 import App from './App'
 
+console.log('[MAIN] SMSytem starting...');
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

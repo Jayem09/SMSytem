@@ -7,41 +7,11 @@
   ],
   "permissions": [
     "core:default",
-    {
-      "identifier": "http:default",
-      "allow": [
-        { "url": "http://**" },
-        { "url": "https://**" }
-      ]
-    },
-    {
-      "identifier": "http:allow-fetch",
-      "allow": [
-        { "url": "http://**" },
-        { "url": "https://**" }
-      ]
-    },
-    {
-      "identifier": "http:allow-fetch-cancel",
-      "allow": [
-        { "url": "http://**" },
-        { "url": "https://**" }
-      ]
-    },
-    {
-      "identifier": "http:allow-fetch-read-body",
-      "allow": [
-        { "url": "http://**" },
-        { "url": "https://**" }
-      ]
-    },
-    {
-      "identifier": "http:allow-fetch-send",
-      "allow": [
-        { "url": "http://**" },
-        { "url": "https://**" }
-      ]
-    },
+    "http:default",
+    "http:allow-fetch",
+    "http:allow-fetch-cancel",
+    "http:allow-fetch-read-body", 
+    "http:allow-fetch-send",
     "core:webview:allow-print",
     "shell:allow-execute",
     "updater:default"
