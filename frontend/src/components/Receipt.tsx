@@ -166,7 +166,7 @@ export function generateReceiptHTML(order: ReceiptOrder, tin?: string, businessA
   return html;
 }
 
-export function printReceipt(order: ReceiptOrder, tin?: string, businessAddress?: string, withholdingTaxRate?: number) {
+export async function printReceipt(order: ReceiptOrder, tin?: string, businessAddress?: string, withholdingTaxRate?: number) {
   const htmlContent = generateReceiptHTML(order, tin, businessAddress, withholdingTaxRate);
 
   // Use the #print-area from index.css for high-reliability, glitch-free printing
@@ -186,14 +186,17 @@ export function printReceipt(order: ReceiptOrder, tin?: string, businessAddress?
     ${bodyInner}
   `;
 
-  // Standard main-window print call (most stable in Tauri v2)
-  // We use timeouts to ensure Tauri captures the content before it's deleted
-  setTimeout(() => {
+  // Use Tauri print API if available, fallback to window.print
+  try {
+    const { print } = await import('@tauri-apps/api/webview');
+    await print();
+  } catch (e) {
+    // Fallback to window.print for browser dev
     window.print();
-    
-    // DELAYED CLEANUP: Wait 2 seconds for the print dialog to finish capturing
-    setTimeout(() => {
-      if (container) container.innerHTML = '';
-    }, 2000);
-  }, 500);
+  }
+  
+  // DELAYED CLEANUP: Wait for print dialog to finish
+  setTimeout(() => {
+    if (container) container.innerHTML = '';
+  }, 2000);
 }

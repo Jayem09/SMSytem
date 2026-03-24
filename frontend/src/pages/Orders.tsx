@@ -89,11 +89,11 @@ export default function Orders() {
     }
   };
 
-  const handlePrint = (order: Order) => {
+  const handlePrint = async (order: Order) => {
     if (order.receipt_type === 'SI') {
-      printReceipt(order, order.tin || '', order.business_address || '', order.withholding_tax_rate || 0);
+      await printReceipt(order, order.tin || '', order.business_address || '', order.withholding_tax_rate || 0);
     } else {
-      printDeliveryReceipt(order, order.tin || '', order.business_address || '', order.withholding_tax_rate || 0);
+      await printDeliveryReceipt(order, order.tin || '', order.business_address || '', order.withholding_tax_rate || 0);
     }
   };
 

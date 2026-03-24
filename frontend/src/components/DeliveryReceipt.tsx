@@ -157,11 +157,34 @@ export function generateDeliveryReceiptHTML(order: ReceiptOrder, _tin?: string, 
   `;
 }
 
-export function printDeliveryReceipt(order: ReceiptOrder, tin?: string, businessAddress?: string, withholdingTaxRate?: number) {
-  const html = generateDeliveryReceiptHTML(order, tin, businessAddress, withholdingTaxRate);
-  const printWindow = window.open('', '_blank', 'width=1100,height=650');
-  if (printWindow) {
-    printWindow.document.write(html);
-    printWindow.document.close();
+export async function printDeliveryReceipt(order: ReceiptOrder, tin?: string, businessAddress?: string, withholdingTaxRate?: number) {
+  const htmlContent = generateDeliveryReceiptHTML(order, tin, businessAddress, withholdingTaxRate);
+
+  // Use the #print-area for consistent printing
+  let container = document.getElementById('print-area');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'print-area';
+    document.body.appendChild(container);
   }
+
+  const headContent = htmlContent.match(/<head[^>]*>([\s\S]*)<\/head>/)?.[1] || '';
+  const bodyInner = htmlContent.match(/<body[^>]*>([\s\S]*)<\/body>/)?.[1] || htmlContent;
+
+  container.innerHTML = `
+    ${headContent}
+    ${bodyInner}
+  `;
+
+  // Use Tauri print API if available, fallback to window.print
+  try {
+    const { print } = await import('@tauri-apps/api/webview');
+    await print();
+  } catch (e) {
+    window.print();
+  }
+  
+  setTimeout(() => {
+    if (container) container.innerHTML = '';
+  }, 2000);
 }

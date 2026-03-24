@@ -616,12 +616,12 @@ export default function POS() {
           
           <div className="grid grid-cols-2 gap-3 mb-4">
             <button
-               onClick={() => { 
+               onClick={async () => { 
                  if (lastOrder) {
                    if (lastReceiptType === 'SI') {
-                     printReceipt(lastOrder, lastTin, lastBusinessAddress, lastWithholdingTaxRate); 
+                     await printReceipt(lastOrder, lastTin, lastBusinessAddress, lastWithholdingTaxRate); 
                    } else {
-                     printDeliveryReceipt(lastOrder, lastTin, lastBusinessAddress, lastWithholdingTaxRate);
+                     await printDeliveryReceipt(lastOrder, lastTin, lastBusinessAddress, lastWithholdingTaxRate);
                    }
                  }
                  setSuccessModalOpen(false); 
