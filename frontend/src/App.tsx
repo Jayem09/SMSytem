@@ -27,9 +27,69 @@ import Branches from './pages/Branches';
 import Transfers from './pages/Transfers';
 import Analytics from './pages/Analytics';
 import MaintenanceGuard from './components/MaintenanceGuard';
-
+import { checkHealthNative } from './api/axios';
+import { useState, useEffect } from 'react';
 function App() {
-  return (
+  // Startup health check to auto-retry until backend is online
+  const [booting, setBooting] = useState(true);
+  const [backendOnline, setBackendOnline] = useState(false);
+  const [startupError, setStartupError] = useState<string>('');
+
+  useEffect(() => {
+    let retryInterval: any;
+    const bootstrap = async () => {
+      try {
+        const ok = await checkHealthNative();
+        if (ok) {
+          setBackendOnline(true);
+          setBooting(false);
+        } else {
+          setStartupError('Backend unreachable at ' + 'http://168.144.46.137:8080');
+          // Retry every 5 seconds until success
+          retryInterval = setInterval(async () => {
+            const ok2 = await checkHealthNative();
+            if (ok2) {
+              clearInterval(retryInterval);
+              setBackendOnline(true);
+              setBooting(false);
+            }
+          }, 5000);
+        }
+      } catch (e) {
+        setStartupError((e as Error)?.message ?? 'Startup health check failed');
+      }
+    };
+    bootstrap();
+    return () => {
+      if (retryInterval) clearInterval(retryInterval);
+    };
+  }, []);
+
+  // Inline startup overlay while booting
+  if (booting || !backendOnline) {
+    return (
+      <div style={{
+        position: 'fixed', left: 0, top: 0, right: 0, bottom: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        backgroundColor: 'rgba(0,0,0,0.6)', color: 'white', zIndex: 9999
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div className="mb-4" style={{ display: 'inline-flex', width: 40, height: 40,
+              borderRadius: '50%', border: '4px solid rgba(255,255,255,.3)', borderTopColor: 'white', animation: 'spin 1s linear infinite'}} />
+          <div style={{ marginTop: 12, fontSize: 16 }}>Connecting to backend...</div>
+          {startupError && <div style={{ marginTop: 6, fontSize: 12 }}>{startupError}</div>}
+          <button
+            onClick={async () => {
+              const ok = await checkHealthNative();
+              if (ok) { setBackendOnline(true); setBooting(false); }
+            }}
+            style={{ marginTop: 12, padding: '6px 12px', borderRadius: 6, border: '1px solid #fff', background: '#374151', color: '#fff' }}
+          >Retry</button>
+        </div>
+      </div>
+    );
+  }
+
     <ErrorBoundary>
       <BrowserRouter>
         <AuthProvider>
