@@ -1,8 +1,7 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../context/ToastContext';
-import { checkHealthNative, baseURL } from '../api/axios';
 
 export default function Register() {
   const [name, setName] = useState('');
@@ -13,35 +12,8 @@ export default function Register() {
   const { register } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
-  const [backendStatus, setBackendStatus] = useState<'checking' | 'online' | 'offline'>('checking');
-  const [debugError, setDebugError] = useState<string>('');
-  const [isRetrying, setIsRetrying] = useState(false);
-
-  const checkBackend = async (isRetry = false) => {
-    if (isRetry) setIsRetrying(true);
-    setBackendStatus('checking');
-    setDebugError('');
-    
-    try {
-      const isOnline = await checkHealthNative();
-      if (isOnline) {
-        setBackendStatus('online');
-      } else {
-        setBackendStatus('offline');
-        setDebugError('Backend unreachable');
-      }
-    } catch (err) {
-      console.error('Initialization failed:', err);
-      setBackendStatus('offline');
-      setDebugError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setIsRetrying(false);
-    }
-  };
-
-  useEffect(() => {
-    checkBackend();
-  }, []);
+  // Backend connection checking happens silently in background
+  // No UI feedback during connection attempts
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -74,25 +46,7 @@ export default function Register() {
         <div className="text-center mb-6">
           <img src="/logo.png" alt="SMSystem Logo" className="w-64 h-auto max-h-32 object-contain mx-auto mb-4 drop-shadow-md scale-110" />
           <p className="text-sm text-gray-500 mt-1">Create a new account</p>
-          <div className="mt-2 flex justify-center">
-            {backendStatus === 'checking' && <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest animate-pulse">Checking connection...</span>}
-            {backendStatus === 'online' && <span className="text-[10px] text-green-500 font-bold uppercase tracking-widest flex items-center gap-1">● Backend Online</span>}
-            {backendStatus === 'offline' && (
-              <div className="flex flex-col items-center gap-1">
-                <span className="text-[10px] text-red-500 font-bold uppercase tracking-widest flex items-center gap-1">● Backend Offline</span>
-                <span className="text-[8px] text-gray-400 font-medium">Trying: {baseURL}</span>
-                {debugError && <span className="text-[7px] text-red-400/70 block max-w-[200px] break-all text-center">Error: {debugError}</span>}
-                <button
-                  type="button"
-                  onClick={() => checkBackend(true)}
-                  disabled={isRetrying}
-                  className="mt-2 text-[10px] px-3 py-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium transition-colors disabled:opacity-50"
-                >
-                  {isRetrying ? 'Retrying...' : 'Retry Connection'}
-                </button>
-              </div>
-            )}
-          </div>
+
         </div>
 
         <div className="bg-white border border-gray-200 rounded-lg p-6">

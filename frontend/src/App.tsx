@@ -35,7 +35,7 @@ function App() {
   const [backendOnline, setBackendOnline] = useState(false);
   const [startupError, setStartupError] = useState<string>('');
 
-  useEffect(() => {
+    useEffect(() => {
     let retryInterval: any;
     const bootstrap = async () => {
       try {
@@ -44,7 +44,6 @@ function App() {
           setBackendOnline(true);
           setBooting(false);
         } else {
-          setStartupError('Backend unreachable');
           // Retry every 5 seconds until success
           retryInterval = setInterval(async () => {
             const ok2 = await checkHealthNative();
@@ -56,7 +55,7 @@ function App() {
           }, 5000);
         }
       } catch (e) {
-        setStartupError((e as Error)?.message ?? 'Startup health check failed');
+        // Silently handle error - no error message displayed
       }
     };
     bootstrap();
@@ -65,22 +64,10 @@ function App() {
     };
   }, []);
 
-  // Inline startup overlay while booting
-  if (booting || !backendOnline) {
-    return (
-      <div style={{
-        position: 'fixed', left: 0, top: 0, right: 0, bottom: 0,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        backgroundColor: 'rgba(0,0,0,0.6)', color: 'white', zIndex: 9999
-      }}>
-        <div style={{ textAlign: 'center' }}>
-           <div className="mb-4" style={{ display: 'inline-flex', width: 40, height: 40,
-               borderRadius: '50%', border: '4px solid rgba(255,255,255,.3)', borderTopColor: 'white', animation: 'spin 1s linear infinite'}} />
-           {startupError && <div style={{ marginTop: 6, fontSize: 12 }}>{startupError}</div>}
-        </div>
-      </div>
-    );
-  }
+   // Inline startup overlay while booting - removed to show nothing during connection attempts
+   if (booting || !backendOnline) {
+     return null;
+   }
 
     return (
       <ErrorBoundary>
