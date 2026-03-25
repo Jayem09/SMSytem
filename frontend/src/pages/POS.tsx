@@ -168,8 +168,9 @@ export default function POS() {
             return;
           }
           
-        } catch (termErr: any) {
-          showToast(`Failed to communicate with terminal: ${termErr.message}`, 'error');
+        } catch (termErr: unknown) {
+          const err = termErr instanceof Error ? termErr.message : 'Unknown error';
+          showToast(`Failed to communicate with terminal: ${err}`, 'error');
           setIsProcessingTerminal(false);
           return;
         }

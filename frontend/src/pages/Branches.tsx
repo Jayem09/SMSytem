@@ -78,8 +78,9 @@ export default function Branches() {
       }
       setIsModalOpen(false);
       fetchBranches();
-    } catch (error: any) {
-      alert(error.response?.data?.error || 'Failed to save branch');
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { error?: string } } };
+      alert(err.response?.data?.error || 'Failed to save branch');
     }
   };
 

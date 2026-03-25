@@ -43,8 +43,8 @@ export default function Expenses() {
       // Handle both array and {expenses: []} response formats
       const expensesData = res.data?.expenses ?? res.data;
       setExpenses(Array.isArray(expensesData) ? expensesData : []);
-    } catch {
-      
+    } catch (err) {
+      console.error('Failed to fetch expenses:', err);
     } finally {
       setLoading(false);
     }

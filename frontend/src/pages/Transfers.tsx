@@ -78,6 +78,7 @@ export default function Transfers() {
 
   useEffect(() => {
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [branchFilter, user?.id]);
 
   const fetchData = async () => {
@@ -92,19 +93,21 @@ export default function Transfers() {
       ]);
 
       if (results[0].status === 'fulfilled') {
-        const res = (results[0] as PromiseFulfilledResult<any>).value;
+        const res = (results[0] as PromiseFulfilledResult<{ data: { transfers?: unknown[] } }>).value;
         setTransfers(res.data.transfers || []);
       }
 
       if (results[1].status === 'fulfilled') {
-        setBranches((results[1] as PromiseFulfilledResult<any>).value.data.branches || []);
+        const branchesRes = (results[1] as PromiseFulfilledResult<{ data: { branches?: unknown[] } }>).value;
+        setBranches(branchesRes.data.branches || []);
       }
 
       if (results[2].status === 'fulfilled') {
-        setProducts((results[2] as PromiseFulfilledResult<any>).value.data.products || []);
+        const productsRes = (results[2] as PromiseFulfilledResult<{ data: { products?: unknown[] } }>).value;
+        setProducts(productsRes.data.products || []);
       }
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to fetch transfers data', err);
     } finally {
       setLoading(false);
@@ -139,9 +142,10 @@ export default function Transfers() {
               setTimeout(() => setViewModalOpen(false), 500);
           }
         }
-      } catch (err: any) {
-        const errorMsg = err.response?.data?.error || 'Failed to update transfer status';
-        const details = err.response?.data?.details ? `: ${err.response.data.details}` : '';
+      } catch (err: unknown) {
+        const e = err as { response?: { data?: { error?: string; details?: string } } };
+        const errorMsg = e.response?.data?.error || 'Failed to update transfer status';
+        const details = e.response?.data?.details ? `: ${e.response.data.details}` : '';
         showToast(`${errorMsg}${details}`, 'error');
       }
     };
@@ -177,8 +181,9 @@ export default function Transfers() {
       setTargetBranchId('');
       window.dispatchEvent(new Event('transfer_updated'));
       showToast('Transfer request sent successfully!', 'success');
-    } catch (err: any) {
-      showToast(err.response?.data?.error || 'Failed to submit request', 'error');
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      showToast(e.response?.data?.error || 'Failed to submit request', 'error');
     }
   };
 

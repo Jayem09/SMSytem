@@ -1,9 +1,25 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import api from '../api/axios';
-import { AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { PieChart, Pie, Cell, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { AlertCircle, TrendingUp, Package, Users, ShoppingCart, PhilippinePeso, MoreVertical, Download } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
-import { Skeleton, SkeletonCard, SkeletonTable, SkeletonList } from '../components/EmptyState';
+import { Skeleton, SkeletonCard } from '../components/EmptyState';
+
+interface OrderItem {
+  product?: { name: string };
+  quantity: number;
+}
+
+interface Order {
+  id: number;
+  created_at: string;
+  customer?: { name: string };
+  guest_name?: string;
+  status: string;
+  payment_method: string;
+  total_amount: number;
+  items?: OrderItem[];
+}
 
 // Theme colors - indigo based
 const CHART_COLORS = ['#4f46e5', '#6366f1', '#818cf8', '#a5b4fc', '#6366f1', '#818cf8', '#4f46e5', '#3730a3'];
@@ -69,30 +85,6 @@ export default function Dashboard() {
     return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(val);
   };
 
-  const filteredSalesTrend = useMemo(() => {
-    const data = [];
-    const now = new Date();
-
-
-    for (let i = timeRange - 1; i >= 0; i--) {
-      const d = new Date(now);
-      d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
-
-
-      const existing = stats.sales_trend.find(s => {
-        const sDate = new Date(s.date).toISOString().split('T')[0];
-        return sDate === dateStr;
-      });
-
-      data.push({
-        date: dateStr,
-        amount: existing ? existing.amount : 0
-      });
-    }
-    return data;
-  }, [stats.sales_trend, timeRange]);
-
   const exportToCSV = async () => {
     try {
       setExporting(true);
@@ -106,18 +98,19 @@ export default function Dashboard() {
       }
 
       const headers = ['Order ID', 'Date', 'Customer', 'Status', 'Payment Method', 'Total Amount', 'Items Summary'];
-      const rows = orders.map((o: any) => {
-        const customerName = o.customer?.name || o.guest_name || 'Walk-In';
-        const date = new Date(o.created_at).toLocaleDateString();
-        const itemsSummary = o.items ? o.items.map((i: any) => `${i.product?.name || 'Unknown'} (x${i.quantity})`).join('; ') : '';
+      const rows = orders.map((o) => {
+        const order = o as Order;
+        const customerName = order.customer?.name || order.guest_name || 'Walk-In';
+        const date = new Date(order.created_at).toLocaleDateString();
+        const itemsSummary = order.items ? order.items.map((i) => `${i.product?.name || 'Unknown'} (x${i.quantity})`).join('; ') : '';
 
         return [
-          o.id,
+          order.id,
           `"${date}"`,
           `"${customerName.replace(/"/g, '""')}"`,
-          `"${o.status}"`,
-          `"${o.payment_method}"`,
-          o.total_amount,
+          `"${order.status}"`,
+          `"${order.payment_method}"`,
+          order.total_amount,
           `"${itemsSummary.replace(/"/g, '""')}"`
         ].join(',');
       });
@@ -244,7 +237,7 @@ export default function Dashboard() {
                   const res = await api.post('/api/inventory/generate-pos');
                   const data = res.data as { message?: string };
                   alert(data.message || 'POs generated');
-                } catch (err) {
+                } catch {
                   alert('Failed to generate POs');
                 }
               }}

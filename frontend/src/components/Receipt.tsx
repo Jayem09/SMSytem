@@ -190,7 +190,7 @@ export async function printReceipt(order: ReceiptOrder, tin?: string, businessAd
   try {
     const { print } = await import('@tauri-apps/api/webview');
     await print();
-  } catch (e) {
+  } catch {
     // Fallback to window.print for browser dev
     window.print();
   }

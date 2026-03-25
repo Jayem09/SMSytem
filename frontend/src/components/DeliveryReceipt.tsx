@@ -24,14 +24,9 @@ interface ReceiptOrder {
   items?: ReceiptOrderItem[];
 }
 
-function escapeHtml(text: string | undefined | null): string {
-  if (!text) return '';
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-
 export function generateDeliveryReceiptHTML(order: ReceiptOrder, _tin?: string, businessAddress?: string, _withholdingTaxRate?: number): string {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _whTaxRate = _withholdingTaxRate;
   const date = new Date(order.created_at);
   const dateStr = date.toLocaleDateString('en-PH', { year: 'numeric', month: '2-digit', day: '2-digit' });
 
@@ -180,7 +175,7 @@ export async function printDeliveryReceipt(order: ReceiptOrder, tin?: string, bu
   try {
     const { print } = await import('@tauri-apps/api/webview');
     await print();
-  } catch (e) {
+  } catch {
     window.print();
   }
   

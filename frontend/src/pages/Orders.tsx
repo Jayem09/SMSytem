@@ -84,8 +84,9 @@ export default function Orders() {
     try {
       await api.patch(`/api/orders/${order.id}/status`, { status: 'completed' });
       fetchOrders();
-    } catch (err: any) {
-      alert(`Failed to complete order: ${err.response?.data?.details || err.message}`);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { details?: string } }; message?: string };
+      alert(`Failed to complete order: ${e.response?.data?.details || e.message}`);
     }
   };
 

@@ -17,11 +17,23 @@ import {
 import { useToast } from '../context/ToastContext';
 import BatchHistoryModal from '../components/BatchHistoryModal';
 import { Activity, ChevronDown, ChevronUp } from 'lucide-react';
-import { Skeleton, SkeletonTable, SkeletonList } from '../components/EmptyState';
+import { SkeletonTable } from '../components/EmptyState';
 
 interface Warehouse {
   id: number;
   name: string;
+}
+
+interface Supplier {
+  id: number;
+  name: string;
+}
+
+interface Batch {
+  id: number;
+  batch_number: string;
+  expiry_date: string;
+  quantity: number;
 }
 
 interface Product {
@@ -69,7 +81,7 @@ export default function Inventory() {
   const [activeTab, setActiveTab] = useState<'levels' | 'in' | 'out' | 'logs'>('levels');
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [productSearch, setProductSearch] = useState('');
   
   
@@ -105,9 +117,9 @@ export default function Inventory() {
 
   
   const [expandedProduct, setExpandedProduct] = useState<number | null>(null);
-  const [productBatches, setProductBatches] = useState<any[]>([]);
+  const [productBatches, setProductBatches] = useState<Batch[]>([]);
   const [batchLoading, setBatchLoading] = useState(false);
-  const [selectedBatch, setSelectedBatch] = useState<any>(null);
+  const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
 
   useEffect(() => {
@@ -123,6 +135,7 @@ export default function Inventory() {
   useEffect(() => {
     if (activeTab === 'levels') fetchStockLevels();
     if (activeTab === 'logs') fetchLogs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, search]);
 
   const fetchWarehouses = async () => {
@@ -208,8 +221,9 @@ export default function Inventory() {
       });
       setEditLog(null);
       fetchLogs();
-    } catch (err: any) {
-      setEditError(err.response?.data?.error || 'Failed to update');
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      setEditError(e.response?.data?.error || 'Failed to update');
     } finally {
       setEditSubmitting(false);
     }
@@ -271,8 +285,9 @@ export default function Inventory() {
         setBatchNumber('');
         setExpiryDate('');
       }
-    } catch (err: any) {
-      showToast(err.response?.data?.error || 'Failed to submit', 'error');
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      showToast(e.response?.data?.error || 'Failed to submit', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -293,15 +308,15 @@ export default function Inventory() {
 
       {}
       <div className="flex space-x-1 border-b border-gray-200">
-        {[
-          { id: 'levels', label: 'Stock Levels', icon: Package },
-          { id: 'in', label: 'Stock In (Receive)', icon: ArrowDownToLine },
-          { id: 'out', label: 'Stock Out (Dispatch)', icon: ArrowUpFromLine },
-          { id: 'logs', label: 'Movement Logs', icon: History }
-        ].map(tab => (
+        {([
+          { id: 'levels' as const, label: 'Stock Levels', icon: Package },
+          { id: 'in' as const, label: 'Stock In (Receive)', icon: ArrowDownToLine },
+          { id: 'out' as const, label: 'Stock Out (Dispatch)', icon: ArrowUpFromLine },
+          { id: 'logs' as const, label: 'Movement Logs', icon: History }
+        ]).map(tab => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
+            onClick={() => setActiveTab(tab.id)}
             className={`flex items-center px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
               activeTab === tab.id 
               ? 'border-indigo-600 text-indigo-600' 
@@ -335,8 +350,9 @@ export default function Inventory() {
                   try {
                     const res = await api.post('/api/inventory/generate-pos');
                     showToast(res.data.message, 'success');
-                  } catch (err: any) {
-                    showToast(err.response?.data?.error || 'Failed to generate POs', 'error');
+                  } catch (err: unknown) {
+                    const e = err as { response?: { data?: { error?: string } } };
+                    showToast(e.response?.data?.error || 'Failed to generate POs', 'error');
                   }
                 }}
                 className="text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-4 py-2 rounded-lg border border-indigo-100 transition-colors"

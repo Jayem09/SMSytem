@@ -68,8 +68,9 @@ export default function Staff() {
     try {
       await api.put(`/api/users/${userId}/role`, { role: newRole });
       fetchUsers();
-    } catch (error: any) {
-      alert(error.response?.data?.error || 'Failed to update user role');
+    } catch (error: unknown) {
+      const e = error as { response?: { data?: { error?: string } } };
+      alert(e.response?.data?.error || 'Failed to update user role');
       fetchUsers();
     }
   };
@@ -78,8 +79,9 @@ export default function Staff() {
     try {
       await api.put(`/api/users/${userId}/branch`, { branch_id: branchId });
       fetchUsers();
-    } catch (error: any) {
-      alert(error.response?.data?.error || 'Failed to update user branch');
+    } catch (error: unknown) {
+      const e = error as { response?: { data?: { error?: string } } };
+      alert(e.response?.data?.error || 'Failed to update user branch');
       fetchUsers();
     }
   };
@@ -96,8 +98,9 @@ export default function Staff() {
       setIsDeleteModalOpen(false);
       setUserToDelete(null);
       fetchUsers();
-    } catch (error: any) {
-      alert(error.response?.data?.error || 'Failed to delete user');
+    } catch (error: unknown) {
+      const e = error as { response?: { data?: { error?: string } } };
+      alert(e.response?.data?.error || 'Failed to delete user');
     }
   };
 
@@ -129,8 +132,9 @@ export default function Staff() {
       setIsResetModalOpen(false);
       setUserToReset(null);
       alert('Password reset successfully.');
-    } catch (error: any) {
-      setResetError(error.response?.data?.error || 'Failed to reset password');
+    } catch (error: unknown) {
+      const e = error as { response?: { data?: { error?: string } } };
+      setResetError(e.response?.data?.error || 'Failed to reset password');
     } finally {
       setIsResetting(false);
     }

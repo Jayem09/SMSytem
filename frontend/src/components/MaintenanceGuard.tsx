@@ -21,7 +21,7 @@ export default function MaintenanceGuard({ children }: { children: React.ReactNo
             try {
                 const res = await api.get('/api/status');
                 setStatus(res.data);
-            } catch (err) {
+            } catch {
                 // Silently fail to let the app continue if the backend is down
             } finally {
                 setLoading(false);

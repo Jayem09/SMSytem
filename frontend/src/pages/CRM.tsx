@@ -54,7 +54,7 @@ export default function CRM() {
           at_risk: [],
           popular_categories: []
         });
-      } catch (err) {
+      } catch {
         setError('Failed to load CRM data');
       } finally {
         setLoading(false);

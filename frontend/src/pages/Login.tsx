@@ -17,8 +17,8 @@ export default function Login() {
   try {
       await login(email, password);
       navigate('/dashboard');
-    } catch (err: any) {
-      const message = err?.message ?? 'Login failed. Please try again.';
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Login failed. Please try again.';
       showToast(message, 'error');
     } finally {
       setIsSubmitting(false);

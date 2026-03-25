@@ -30,20 +30,21 @@ export default function DailyReport() {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [data, setData] = useState<DailySummary | null>(null);
 
-  useEffect(() => {
-    fetchReport();
-    const interval = setInterval(() => fetchReport(), 15000);
-    return () => clearInterval(interval);
-  }, [date]);
-
   const fetchReport = async () => {
     try {
       const res = await api.get(`/api/reports/daily-summary?date=${date}&_t=${Date.now()}`);
-      setData(res.data);
+      setData(res.data as DailySummary);
     } catch (error) {
       console.error('Failed to fetch report:', error);
     }
   };
+
+  useEffect(() => {
+    fetchReport();
+    const interval = setInterval(() => fetchReport(), 15000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date]);
 
   const handlePrint = () => {
     window.print();
