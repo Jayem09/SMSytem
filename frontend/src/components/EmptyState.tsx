@@ -36,11 +36,31 @@ const icons = {
 };
 
 export function EmptyState({ icon = 'inbox', title, description, action, children }: EmptyStateProps) {
+  const iconGradients: Record<string, string> = {
+    search: 'from-blue-50 to-indigo-100',
+    list: 'from-emerald-50 to-teal-100',
+    chart: 'from-violet-50 to-purple-100',
+    inbox: 'from-amber-50 to-orange-100',
+    file: 'from-slate-50 to-gray-100',
+    users: 'from-rose-50 to-pink-100',
+    cart: 'from-cyan-50 to-sky-100',
+  };
+
+  const iconColors: Record<string, string> = {
+    search: 'text-blue-500',
+    list: 'text-emerald-500',
+    chart: 'text-violet-500',
+    inbox: 'text-amber-500',
+    file: 'text-slate-500',
+    users: 'text-rose-500',
+    cart: 'text-cyan-500',
+  };
+
   return (
     <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center mb-6">
+      <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${iconGradients[icon]} flex items-center justify-center mb-6 shadow-sm`}>
         <svg 
-          className="w-8 h-8 text-gray-400" 
+          className={`w-10 h-10 ${iconColors[icon]}`}
           fill="none" 
           stroke="currentColor" 
           viewBox="0 0 24 24"
@@ -52,13 +72,13 @@ export function EmptyState({ icon = 'inbox', title, description, action, childre
       <h3 className="text-lg font-semibold text-gray-900 mb-2">{title}</h3>
       
       {description && (
-        <p className="text-sm text-gray-500 max-w-sm mb-6">{description}</p>
+        <p className="text-sm text-gray-500 max-w-sm mb-6 leading-relaxed">{description}</p>
       )}
       
       {action && (
         <button
           onClick={action.onClick}
-          className="px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-700 transition-colors cursor-pointer"
+          className="px-5 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-700 transition-all duration-200 cursor-pointer hover:shadow-lg hover:shadow-indigo-200"
         >
           {action.label}
         </button>
@@ -88,6 +108,109 @@ export function PageLoader() {
     <div className="flex flex-col items-center justify-center min-h-[400px]">
       <div className="w-12 h-12 border-4 border-gray-200 border-t-indigo-600 rounded-full animate-spin mb-4" />
       <p className="text-gray-500 text-sm">Loading...</p>
+    </div>
+  );
+}
+
+interface SkeletonProps {
+  className?: string;
+  variant?: 'text' | 'circular' | 'rectangular';
+  width?: string;
+  height?: string;
+  animation?: 'pulse' | 'wave' | 'none';
+}
+
+export function Skeleton({ 
+  className = '', 
+  variant = 'text', 
+  width, 
+  height,
+  animation = 'pulse' 
+}: SkeletonProps) {
+  const baseClasses = 'bg-gray-200';
+  
+  const variantClasses = {
+    text: 'rounded',
+    circular: 'rounded-full',
+    rectangular: 'rounded-lg',
+  };
+  
+  const animationClasses = {
+    pulse: 'animate-pulse',
+    wave: 'skeleton-wave',
+    none: '',
+  };
+  
+  const style: React.CSSProperties = {
+    width: width || (variant === 'circular' ? '40px' : '100%'),
+    height: height || (variant === 'text' ? '16px' : variant === 'circular' ? '40px' : '100%'),
+  };
+  
+  return (
+    <div 
+      className={`${baseClasses} ${variantClasses[variant]} ${animationClasses[animation]} ${className}`}
+      style={style}
+    />
+  );
+}
+
+export function SkeletonCard() {
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+      <div className="flex items-center gap-3">
+        <Skeleton variant="circular" width="40px" height="40px" />
+        <div className="flex-1 space-y-2">
+          <Skeleton width="60%" height="14px" />
+          <Skeleton width="40%" height="12px" />
+        </div>
+      </div>
+      <Skeleton height="60px" variant="rectangular" />
+      <div className="flex gap-2">
+        <Skeleton width="30%" height="32px" variant="rectangular" />
+        <Skeleton width="30%" height="32px" variant="rectangular" />
+      </div>
+    </div>
+  );
+}
+
+export function SkeletonTable({ rows = 5, cols = 4 }: { rows?: number; cols?: number }) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-gray-50 border-b border-gray-200">
+        <div className="grid gap-4 p-4" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+          {Array.from({ length: cols }).map((_, i) => (
+            <Skeleton key={i} width="80%" height="14px" />
+          ))}
+        </div>
+      </div>
+      {Array.from({ length: rows }).map((_, rowIndex) => (
+        <div 
+          key={rowIndex}
+          className="grid gap-4 p-4 border-b border-gray-100 last:border-0"
+          style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+        >
+          {Array.from({ length: cols }).map((_, colIndex) => (
+            <Skeleton key={colIndex} width="90%" height="14px" />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function SkeletonList({ items = 4 }: { items?: number }) {
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: items }).map((_, i) => (
+        <div key={i} className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200">
+          <Skeleton variant="circular" width="36px" height="36px" />
+          <div className="flex-1 space-y-2">
+            <Skeleton width="50%" height="14px" />
+            <Skeleton width="30%" height="12px" />
+          </div>
+          <Skeleton width="20%" height="20px" />
+        </div>
+      ))}
     </div>
   );
 }

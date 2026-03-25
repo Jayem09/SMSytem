@@ -19,7 +19,7 @@ export default function ToastContainer() {
             backdrop-blur-md bg-opacity-90
           `}
         >
-          <div className={`p-2 rounded-lg ${
+          <div className={`p-1.5 rounded-lg ${
             toast.type === 'success' ? 'bg-emerald-100 text-emerald-600' : 
             toast.type === 'error' ? 'bg-rose-100 text-rose-600' : 
             'bg-blue-100 text-blue-600'
@@ -35,7 +35,7 @@ export default function ToastContainer() {
 
           <button 
             onClick={() => removeToast(toast.id)}
-            className="p-1 hover:bg-black/5 rounded-lg transition-colors text-gray-400 hover:text-gray-900"
+            className="p-1.5 hover:bg-black/10 rounded-lg transition-colors text-gray-400 hover:text-gray-700"
           >
             <X className="w-4 h-4" />
           </button>

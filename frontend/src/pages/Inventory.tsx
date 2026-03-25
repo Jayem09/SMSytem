@@ -17,6 +17,7 @@ import {
 import { useToast } from '../context/ToastContext';
 import BatchHistoryModal from '../components/BatchHistoryModal';
 import { Activity, ChevronDown, ChevronUp } from 'lucide-react';
+import { Skeleton, SkeletonTable, SkeletonList } from '../components/EmptyState';
 
 interface Warehouse {
   id: number;
@@ -343,7 +344,7 @@ export default function Inventory() {
                 Prepare Draft POs
               </button>
             </div>
-            {loading ? <div className="p-12 text-center text-gray-500">Loading stock data...</div> : (
+            {loading ? <SkeletonTable rows={6} cols={6} /> : (
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
@@ -666,7 +667,7 @@ export default function Inventory() {
                 Export Excel
               </button>
             </div>
-            {loading ? <div className="p-12 text-center text-gray-500">Loading movement logs...</div> : (
+            {loading ? <SkeletonTable rows={8} cols={7} /> : (
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>

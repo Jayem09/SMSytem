@@ -80,20 +80,38 @@ export default function DataTable<T extends { id: number | string }>({
 
   const sortedData = useMemo(() => {
     if (!data || !Array.isArray(data)) return [];
-    if (!sortKey || !sortDirection) return data;
 
-    return [...data].sort((a, b) => {
-      const aVal = (a as Record<string, unknown>)[sortKey];
-      const bVal = (b as Record<string, unknown>)[sortKey];
+    let result = data;
 
-      if (aVal === bVal) return 0;
-      if (aVal === null || aVal === undefined) return 1;
-      if (bVal === null || bVal === undefined) return -1;
+    // Filter by search
+    if (searchValue && searchValue.trim()) {
+      const search = searchValue.toLowerCase();
+      result = result.filter(item => {
+        const values = Object.values(item as Record<string, unknown>);
+        return values.some(val => {
+          if (val === null || val === undefined) return false;
+          return String(val).toLowerCase().includes(search);
+        });
+      });
+    }
 
-      const comparison = aVal < bVal ? -1 : 1;
-      return sortDirection === 'asc' ? comparison : -comparison;
-    });
-  }, [data, sortKey, sortDirection]);
+    // Sort if needed
+    if (sortKey && sortDirection) {
+      result = [...result].sort((a, b) => {
+        const aVal = (a as Record<string, unknown>)[sortKey];
+        const bVal = (b as Record<string, unknown>)[sortKey];
+
+        if (aVal === bVal) return 0;
+        if (aVal === null || aVal === undefined) return 1;
+        if (bVal === null || bVal === undefined) return -1;
+
+        const comparison = aVal < bVal ? -1 : 1;
+        return sortDirection === 'asc' ? comparison : -comparison;
+      });
+    }
+
+    return result;
+  }, [data, searchValue, sortKey, sortDirection]);
 
   const totalPages = Math.ceil(sortedData.length / pageSize);
   const paginatedData = sortedData.slice(
@@ -113,7 +131,7 @@ export default function DataTable<T extends { id: number | string }>({
   };
 
   return (
-    <div>
+    <div className="mt-4">
       <div className="flex items-center justify-between mb-4">
         {onSearchChange && (
           <div className="relative">
@@ -125,7 +143,7 @@ export default function DataTable<T extends { id: number | string }>({
                 setCurrentPage(1);
               }}
               placeholder={searchPlaceholder}
-              className="w-full max-w-xs pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all placeholder:text-gray-400"
+              className="w-full max-w-xs pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all placeholder:text-gray-400 shadow-sm"
             />
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -134,7 +152,7 @@ export default function DataTable<T extends { id: number | string }>({
         )}
         {data && data.length > 0 && (
           <span className="text-sm text-gray-500">
-            {sortedData.length} {sortedData.length === 1 ? 'record' : 'records'}
+            {searchValue ? `${sortedData.length} of ` : ''}{data.length} {data.length === 1 ? 'record' : 'records'}
           </span>
         )}
       </div>
@@ -172,13 +190,13 @@ export default function DataTable<T extends { id: number | string }>({
                 ))
               ) : paginatedData.length === 0 ? (
                 <tr>
-                  <td colSpan={columns.length + 1} className="px-4 py-16 text-center">
+                  <td colSpan={columns.length + 1} className="px-4 py-20 text-center">
                     <div className="flex flex-col items-center">
-                      <svg className="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-14 h-14 text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                       </svg>
-                      <p className="text-gray-500 font-medium">{emptyMessage}</p>
-                      <p className="text-gray-400 text-sm mt-1">Try adjusting your search or filters</p>
+                      <p className="text-gray-500 font-medium text-base">{emptyMessage}</p>
+                      <p className="text-gray-400 text-sm mt-2">Try adjusting your search or filters</p>
                     </div>
                   </td>
                 </tr>
@@ -204,7 +222,7 @@ export default function DataTable<T extends { id: number | string }>({
                               {onView && (
                                 <button
                                   onClick={() => onView(item)}
-                                  className="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
+                                  className="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all duration-200 hover:shadow-md hover:scale-105 cursor-pointer"
                                 >
                                   View
                                 </button>
@@ -212,7 +230,7 @@ export default function DataTable<T extends { id: number | string }>({
                               {onEdit && (
                                 <button
                                   onClick={() => onEdit(item)}
-                                  className="px-3 py-1.5 text-xs font-medium text-indigo-600 hover:text-white hover:bg-indigo-600 rounded-lg transition-colors cursor-pointer"
+                                  className="px-3 py-1.5 text-xs font-medium text-indigo-600 hover:text-white hover:bg-indigo-600 rounded-lg transition-all duration-200 hover:shadow-md hover:scale-105 cursor-pointer"
                                 >
                                   Edit
                                 </button>
@@ -220,7 +238,7 @@ export default function DataTable<T extends { id: number | string }>({
                               {onDelete && (
                                 <button
                                   onClick={() => onDelete(item)}
-                                  className="px-3 py-1.5 text-xs font-medium text-red-600 hover:text-white hover:bg-red-600 rounded-lg transition-colors cursor-pointer"
+                                  className="px-3 py-1.5 text-xs font-medium text-red-600 hover:text-white hover:bg-red-600 rounded-lg transition-all duration-200 hover:shadow-md hover:scale-105 cursor-pointer"
                                 >
                                   Delete
                                 </button>
@@ -247,7 +265,7 @@ export default function DataTable<T extends { id: number | string }>({
               <button
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className="p-2 rounded-lg text-gray-500 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                className="p-2 rounded-lg text-gray-500 hover:bg-gray-200 hover:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 cursor-pointer"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
@@ -266,10 +284,10 @@ export default function DataTable<T extends { id: number | string }>({
                   <button
                     key={pageNum}
                     onClick={() => setCurrentPage(pageNum)}
-                    className={`w-8 h-8 text-sm font-medium rounded-lg transition-colors cursor-pointer ${
+                    className={`w-8 h-8 text-sm font-medium rounded-lg transition-all duration-200 hover:shadow-sm ${
                       currentPage === pageNum
                         ? 'bg-indigo-600 text-white'
-                        : 'text-gray-600 hover:bg-gray-200'
+                        : 'text-gray-600 hover:bg-gray-200 hover:scale-105'
                     }`}
                   >
                     {pageNum}
@@ -279,7 +297,7 @@ export default function DataTable<T extends { id: number | string }>({
               <button
                 onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
-                className="p-2 rounded-lg text-gray-500 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                className="p-2 rounded-lg text-gray-500 hover:bg-gray-200 hover:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 cursor-pointer"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>

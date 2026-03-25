@@ -9,6 +9,7 @@ import {
   Briefcase,
   DollarSign
 } from 'lucide-react';
+import { Skeleton, SkeletonCard } from '../components/EmptyState';
 
 interface TopSpender {
   id: number;
@@ -72,8 +73,18 @@ export default function CRM() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64 text-gray-400 font-medium animate-pulse">
-        Analyzing customer data...
+      <div className="p-6 mx-auto space-y-8">
+        <div>
+          <Skeleton width="200px" height="36px" className="mb-2" />
+          <Skeleton width="300px" height="20px" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
+        <Skeleton height="300px" variant="rectangular" />
       </div>
     );
   }

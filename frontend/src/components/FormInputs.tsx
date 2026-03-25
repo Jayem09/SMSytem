@@ -28,14 +28,14 @@ const InputWrapper = ({
   hint?: string;
   required?: boolean;
 }) => {
-  const inputId = `input-${label?.toLowerCase().replace(/\s+/g, '-') || Math.random().toString(36).slice(2)}`;
+  const inputId = `input-${label?.toLowerCase().replace(/\s+/g, '-') || 'field'}`;
 
   return (
     <div className="space-y-1.5">
       {label && (
         <label 
           htmlFor={inputId}
-          className="block text-xs font-semibold text-gray-700 uppercase tracking-wider"
+          className="block text-xs font-medium text-gray-700"
         >
           {label}
           {required && <span className="text-red-500 ml-1">*</span>}

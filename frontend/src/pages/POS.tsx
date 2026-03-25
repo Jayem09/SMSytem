@@ -396,11 +396,11 @@ export default function POS() {
                   
                   <div className="flex items-center gap-3 mt-3">
                     <div className="flex items-center bg-white border border-gray-200 rounded-lg">
-                      <button onClick={() => updateQuantity(item.id, -1)} className="px-2 py-1 text-gray-400 hover:text-gray-900 transition-colors">-</button>
+                      <button onClick={() => updateQuantity(item.id, -1)} className="px-2 py-1 text-gray-400 hover:text-gray-900 transition-all duration-200">-</button>
                       <span className="text-xs font-black min-w-6 text-center">{item.quantity}</span>
-                      <button onClick={() => updateQuantity(item.id, 1)} className="px-2 py-1 text-gray-400 hover:text-gray-900 transition-colors">+</button>
+                      <button onClick={() => updateQuantity(item.id, 1)} className="px-2 py-1 text-gray-400 hover:text-gray-900 transition-all duration-200">+</button>
                     </div>
-                    <button onClick={() => removeFromCart(item.id)} className="text-gray-400 hover:text-red-500 transition-colors">
+                    <button onClick={() => removeFromCart(item.id)} className="text-gray-400 hover:text-red-500 transition-all duration-200">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>

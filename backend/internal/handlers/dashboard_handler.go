@@ -33,6 +33,29 @@ type Product_Performance struct {
 	TotalSales   float64 `json:"total_sales"`
 }
 
+type ProductRevenue struct {
+	Product string  `json:"product"`
+	Revenue float64 `json:"revenue"`
+	Profit  float64 `json:"profit"`
+	Income  float64 `json:"income"`
+}
+
+type ProductProfit struct {
+	ProductName string  `json:"product_name"`
+	Percentage  float64 `json:"percentage"`
+}
+
+type CategoryRevenue struct {
+	Category string  `json:"category"`
+	Revenue  float64 `json:"revenue"`
+	Income   float64 `json:"income"`
+}
+
+type CategoryProfit struct {
+	CategoryName string  `json:"category_name"`
+	Percentage   float64 `json:"percentage"`
+}
+
 func (h *DashboardHandler) GetStats(c *gin.Context) {
 	branchIDValue, _ := c.Get("branchID")
 	userRole, _ := c.Get("userRole")
@@ -41,11 +64,10 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 		branchID = branchIDValue.(uint)
 	}
 
-	
 	if userRole == "super_admin" {
 		branchQuery := c.Query("branch_id")
 		if branchQuery == "ALL" {
-			branchID = 0 
+			branchID = 0
 		} else if branchQuery != "" {
 			var bID uint
 			fmt.Sscanf(branchQuery, "%d", &bID)
@@ -61,7 +83,6 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 	var orderCount int64
 	var customerCount int64
 
-	
 	ordersQuery := database.DB.Model(&models.Order{})
 	expensesQuery := database.DB.Model(&models.Expense{})
 	if branchID != 0 {
@@ -113,7 +134,7 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 		Joins("JOIN products ON products.id = order_items.product_id").
 		Joins("LEFT JOIN categories ON categories.id = products.category_id").
 		Where("DATE(orders.created_at) = CURDATE()")
-	
+
 	if branchID != 0 {
 		topProductsQuery = topProductsQuery.Where("orders.branch_id = ?", branchID)
 	}
@@ -123,13 +144,60 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 		Limit(5).
 		Scan(&topProducts)
 
-	
+	// Get category revenue for pie chart
+	var categoryRevenue []CategoryRevenue
+	crQuery := database.DB.Table("order_items").
+		Select("COALESCE(categories.name, 'Uncategorized') as category, COALESCE(SUM(order_items.subtotal), 0) as revenue, COALESCE(SUM(order_items.subtotal), 0) as income").
+		Joins("JOIN orders ON orders.id = order_items.order_id").
+		Joins("JOIN products ON products.id = order_items.product_id").
+		Joins("LEFT JOIN categories ON categories.id = products.category_id").
+		Group("categories.id, categories.name").
+		Order("revenue DESC")
+
+	if branchID != 0 {
+		crQuery = crQuery.Where("orders.branch_id = ?", branchID)
+	}
+	crQuery.Scan(&categoryRevenue)
+
+	// Calculate revenue percentages for pie chart (by category)
+	var totalCategoryRevenue float64
+	for _, c := range categoryRevenue {
+		totalCategoryRevenue += c.Revenue
+	}
+	var categoryProfits []CategoryProfit
+	if totalCategoryRevenue > 0 {
+		for _, c := range categoryRevenue {
+			percentage := (c.Revenue / totalCategoryRevenue) * 100
+			if percentage > 0 {
+				categoryProfits = append(categoryProfits, CategoryProfit{
+					CategoryName: c.Category,
+					Percentage:   percentage,
+				})
+			}
+		}
+	}
+
+	// Get product revenue for bar/line charts (top 8 products)
+	// revenue = total sales, profit = sales - (cost × qty), income = total sales
+	var productRevenue []ProductRevenue
+	prQuery := database.DB.Table("order_items").
+		Select("products.name as product, COALESCE(SUM(order_items.subtotal), 0) as revenue, COALESCE(SUM(order_items.subtotal) - SUM(order_items.quantity * COALESCE(products.cost_price, 0)), 0) as profit, COALESCE(SUM(order_items.subtotal), 0) as income").
+		Joins("JOIN orders ON orders.id = order_items.order_id").
+		Joins("JOIN products ON products.id = order_items.product_id").
+		Group("products.id, products.name").
+		Order("revenue DESC").
+		Limit(8)
+
+	if branchID != 0 {
+		prQuery = prQuery.Where("orders.branch_id = ?", branchID)
+	}
+	prQuery.Scan(&productRevenue)
+
 	var currentSales, prevSales float64
 	var currentExpenses, prevExpenses float64
 
-	
 	cmStart := "DATE_FORMAT(NOW() ,'%Y-%m-01')"
-	
+
 	pmStart := "DATE_FORMAT(DATE_SUB(NOW(), INTERVAL 1 MONTH) ,'%Y-%m-01')"
 	pmEnd := "LAST_DAY(DATE_SUB(NOW(), INTERVAL 1 MONTH))"
 
@@ -172,7 +240,7 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 
 	salesChange := calculateChange(currentSales, prevSales)
 	expensesChange := calculateChange(currentExpenses, prevExpenses)
-	
+
 	currentProfit := currentSales - currentExpenses
 	prevProfit := prevSales - prevExpenses
 	profitChange := calculateChange(currentProfit, prevProfit)
@@ -191,5 +259,7 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 		"low_stock_products": lowStockProducts,
 		"top_advisors_today": topAdvisors,
 		"top_products_today": topProducts,
+		"category_profits":   categoryProfits,
+		"product_revenue":    productRevenue,
 	})
 }

@@ -113,9 +113,9 @@ export default function Layout() {
                 key={item.to}
                 to={item.to}
                 className={({ isActive }) =>
-                  `flex items-center justify-between px-3 py-2 rounded-md text-sm transition-colors ${isActive
-                    ? 'bg-indigo-50 text-indigo-700 font-medium'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  `flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-all duration-200 hover:bg-gray-100 ${isActive
+                    ? 'bg-indigo-50 text-indigo-700 font-medium border-l-4 border-indigo-600'
+                    : 'text-gray-600'
                   }`
                 }
               >
@@ -130,18 +130,18 @@ export default function Layout() {
         </nav>
 
         <div className="border-t border-gray-200 px-4 py-3">
-          <p className="text-sm font-medium text-gray-900 truncate">{user?.name}</p>
-          <div className="flex justify-between items-center">
-            <p className="text-xs text-gray-400 capitalize">{user?.role}</p>
-            {user?.branch && (
-              <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-tighter">
-                {user.branch.name}
-              </p>
-            )}
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-sm font-bold">
+              {user?.name?.charAt(0).toUpperCase() || 'U'}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-900 truncate">{user?.name}</p>
+              <p className="text-xs text-gray-400 capitalize">{user?.role}</p>
+            </div>
           </div>
           <button
             onClick={handleLogout}
-            className="mt-2 w-full px-3 py-1.5 text-xs border border-gray-200 rounded-md text-gray-500 hover:bg-gray-50 transition-colors cursor-pointer"
+            className="w-full px-3 py-1.5 text-xs border border-gray-200 rounded-md text-gray-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors cursor-pointer"
           >
             Logout
           </button>
@@ -150,7 +150,7 @@ export default function Layout() {
 
       { }
       <main className="flex-1 ml-56 min-h-screen flex flex-col">
-        <header className="h-16 bg-white border-b border-gray-100 flex items-center px-6 sticky top-0 z-40 no-print">
+        <header className="h-16 bg-white border-b border-gray-100 shadow-sm flex items-center px-6 sticky top-0 z-40 no-print">
           <div className="flex-1 flex justify-center">
             <GlobalSearch />
           </div>

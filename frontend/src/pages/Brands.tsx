@@ -25,7 +25,8 @@ export default function Brands() {
   const fetchBrands = async () => {
     try {
       const res = await api.get('/api/brands');
-      setBrands(res.data.brands || []);
+      const data = res.data as { brands?: Brand[] };
+      setBrands(data.brands || []);
     } catch {
       setError('Failed to load brands');
     } finally {

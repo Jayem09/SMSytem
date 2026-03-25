@@ -24,6 +24,10 @@ type Migration struct {
 func RunMigrations(db *gorm.DB) error {
 	log.Println("Running database migrations...")
 
+	// Create indexes for stock_transfers if they don't exist
+	db.Exec("CREATE INDEX IF NOT EXISTS idx_stock_transfers_source_status ON stock_transfers(source_branch_id, status)")
+	db.Exec("CREATE INDEX IF NOT EXISTS idx_stock_transfers_dest_status ON stock_transfers(destination_branch_id, status)")
+
 	migrations, err := loadMigrations()
 	if err != nil {
 		return fmt.Errorf("failed to load migrations: %w", err)
