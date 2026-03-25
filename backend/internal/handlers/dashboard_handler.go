@@ -77,6 +77,12 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 		}
 	}
 
+	days := c.DefaultQuery("days", "0")
+	var dateFilter string
+	if days != "0" {
+		dateFilter = fmt.Sprintf("DATE_SUB(NOW(), INTERVAL %s DAY)", days)
+	}
+
 	var totalSales float64
 	var totalExpenses float64
 	var productCount int64
@@ -157,6 +163,9 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 	if branchID != 0 {
 		crQuery = crQuery.Where("orders.branch_id = ?", branchID)
 	}
+	if dateFilter != "" {
+		crQuery = crQuery.Where("orders.created_at >= ?", dateFilter)
+	}
 	crQuery.Scan(&categoryRevenue)
 
 	// Calculate revenue percentages for pie chart (by category)
@@ -190,6 +199,9 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 
 	if branchID != 0 {
 		prQuery = prQuery.Where("orders.branch_id = ?", branchID)
+	}
+	if dateFilter != "" {
+		prQuery = prQuery.Where("orders.created_at >= ?", dateFilter)
 	}
 	prQuery.Scan(&productRevenue)
 

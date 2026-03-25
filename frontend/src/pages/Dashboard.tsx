@@ -60,7 +60,7 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const res = await api.get('/api/dashboard');
+        const res = await api.get(`/api/dashboard?days=${timeRange}`);
         const data = res.data as Record<string, unknown>;
         setStats(prev => ({
           ...prev,
@@ -79,7 +79,7 @@ export default function Dashboard() {
       }
     };
     fetchStats();
-  }, []);
+  }, [timeRange]);
 
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(val);
