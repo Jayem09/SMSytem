@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { Settings } from 'lucide-react';
+import { Settings, Monitor, FileText, Upload, ChevronDown, LogOut } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import api from '../api/axios';
 import GlobalSearch from './GlobalSearch';
@@ -22,7 +22,6 @@ const navItems = [
   { to: '/daily-report', label: 'Daily Summary', roles: ['super_admin', 'admin'] },
   { to: '/expenses', label: 'Expenses', roles: ['super_admin', 'admin', 'purchasing', 'purchaser'] },
   { to: '/staff', label: 'Staff & Roles', roles: ['super_admin', 'admin'] },
-  { to: '/logs', label: 'Activity Logs', roles: ['super_admin', 'admin'] },
   { to: '/branches', label: 'Branches', roles: ['super_admin'] },
 ];
 
@@ -30,6 +29,7 @@ export default function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [pendingCounts, setPendingCounts] = useState(0);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   useEffect(() => {
     const fetchCounts = async () => {
@@ -129,24 +129,56 @@ export default function Layout() {
             ))}
         </nav>
 
-        <div className="border-t border-gray-200 px-4 py-3">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-sm font-bold">
-              {user?.name?.charAt(0).toUpperCase() || 'U'}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">{user?.name}</p>
-              <p className="text-xs text-gray-400 capitalize">{user?.role}</p>
+         <div className="border-t border-gray-200 px-4 py-3">
+           {/* User Profile - Clickable Dropdown */}
+           <div className="relative">
+             <button
+               onClick={() => setUserMenuOpen(!userMenuOpen)}
+               className="w-full flex items-center gap-3 mb-2 hover:bg-gray-50 p-2 -m-2 rounded-lg transition-colors"
+             >
+               <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-sm font-bold">
+                 {user?.name?.charAt(0).toUpperCase() || 'U'}
+               </div>
+               <div className="flex-1 min-w-0 text-left">
+                 <p className="text-sm font-medium text-gray-900 truncate">{user?.name}</p>
+                 <p className="text-xs text-gray-400 capitalize">{user?.role}</p>
+               </div>
+               <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
+             </button>
+             
+              {/* Dropdown Menu */}
+              {userMenuOpen && (
+                <div className="absolute bottom-full left-0 right-0 mb-2 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+                  {/* Monitoring Section - Only for admin/superadmin */}
+                  {(user?.role === 'admin' || user?.role === 'super_admin') && (
+                    <div>
+                      <div className="px-3 py-2 text-xs font-medium text-gray-500 border-b bg-gray-50">
+                        System
+                      </div>
+                      <a href="/monitoring" className="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center">
+                        <Monitor className="mr-2 h-4 w-4" /> Monitoring
+                      </a>
+                      <a href="/logs" className="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center">
+                        <FileText className="mr-2 h-4 w-4" /> Logs
+                      </a>
+                      <a href="/backups" className="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center">
+                        <Upload className="mr-2 h-4 w-4" /> Backup
+                      </a>
+                      <div className="border-t border-gray-100" />
+                    </div>
+                  )}
+                  
+                  <button
+                    onClick={handleLogout}
+                    className="w-full px-3 py-2 text-sm text-left text-red-600 hover:bg-red-50 flex items-center"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" /> Logout
+                  </button>
+                </div>
+              )}
             </div>
           </div>
-          <button
-            onClick={handleLogout}
-            className="w-full px-3 py-1.5 text-xs border border-gray-200 rounded-md text-gray-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors cursor-pointer"
-          >
-            Logout
-          </button>
-        </div>
-      </aside>
+       </aside>
 
       { }
       <main className="flex-1 ml-56 min-h-screen flex flex-col">

@@ -13,6 +13,7 @@ import (
 	"smsystem-backend/internal/config"
 	"smsystem-backend/internal/database"
 	"smsystem-backend/internal/handlers"
+	"smsystem-backend/internal/middleware"
 	"smsystem-backend/internal/routes"
 	"smsystem-backend/internal/services"
 
@@ -48,6 +49,7 @@ func main() {
 
 	authService := services.NewAuthService(cfg)
 	logService := services.NewLogService()
+	backupService := services.NewBackupService(cfg)
 
 	terminalService := services.NewTerminalService(true, "COM1")
 
@@ -72,13 +74,14 @@ func main() {
 		Branch:        handlers.NewBranchHandler(logService),
 		Transfer:      handlers.NewTransferHandler(logService),
 		Search:        handlers.NewSearchHandler(),
-		System:        handlers.NewSystemHandler(),
+		System:        handlers.NewSystemHandler(backupService),
 		Analytics:     handlers.NewAnalyticsHandler(),
 	}
 
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 	router.Use(gin.Recovery())
+	router.Use(middleware.MetricsMiddleware())
 
 	router.Use(func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")

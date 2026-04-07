@@ -5,7 +5,7 @@ import Modal from '../components/Modal';
 import FormField from '../components/FormField';
 import RFIDField from '../components/RFIDField';
 import { useAuth } from '../hooks/useAuth';
-import { History, Edit2, Trash2, User, Phone, Mail, MapPin } from 'lucide-react';
+import { History, Edit2, Trash2, User, Phone, Mail, MapPin, ShoppingBag, CheckCircle, XCircle, Clock, CreditCard } from 'lucide-react';
 
 interface Order {
   id: number;
@@ -24,6 +24,12 @@ interface Customer {
   rfidCardId?: string;
   loyaltyPoints?: number;
 }
+
+const getTier = (points: number) => {
+  if (points >= 200) return { name: 'Gold', bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-300' };
+  if (points >= 50) return { name: 'Silver', bg: 'bg-gray-100', text: 'text-gray-600', border: 'border-gray-300' };
+  return { name: 'Bronze', bg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-300' };
+};
 
 export default function Customers() {
   const { user } = useAuth();
@@ -166,16 +172,22 @@ export default function Customers() {
             )
           },
           {
-            key: 'loyaltyPoints', label: 'Points', render: (c: Customer) => (
-              <div className="flex items-center gap-2">
-                <span className={`px-2 py-1 rounded-full text-xs font-bold ${(c.loyaltyPoints || 0) > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-400'}`}>
-                  {(c.loyaltyPoints || 0).toFixed(0)} pts
-                </span>
-                {c.rfidCardId && (
-                  <span className="text-[10px] text-indigo-500 bg-indigo-50 px-1.5 py-0.5 rounded" title="RFID Linked">⚡</span>
-                )}
-              </div>
-            )
+            key: 'loyaltyPoints', label: 'Points', render: (c: Customer) => {
+              const tier = getTier(c.loyaltyPoints || 0);
+              return (
+                <div className="flex items-center gap-2">
+                  <span className={`px-2 py-1 rounded-full text-xs font-bold ${tier.bg} ${tier.text}`}>
+                    {tier.name}
+                  </span>
+                  <span className={`text-xs font-medium ${(c.loyaltyPoints || 0) > 0 ? 'text-gray-600' : 'text-gray-400'}`}>
+                    {c.loyaltyPoints ? c.loyaltyPoints.toFixed(0) : 0} pts
+                  </span>
+                  {c.rfidCardId && (
+                    <span className="text-[10px] text-indigo-500 bg-indigo-50 px-1.5 py-0.5 rounded" title="RFID Linked">⚡</span>
+                  )}
+                </div>
+              );
+            }
           },
         ]}
         data={customers}
@@ -229,37 +241,73 @@ export default function Customers() {
       </Modal>
 
       { }
-      <Modal open={historyModalOpen} onClose={() => setHistoryModalOpen(false)} title="Purchase History">
-        <div className="p-4">
-          <div className="mb-6 pb-6 border-b border-gray-100">
-            <h2 className="text-xl font-bold text-gray-900">{selectedCustomer?.name}</h2>
-            <p className="text-sm text-gray-500">{selectedCustomer?.email || 'No email provided'}</p>
-          </div>
+      <Modal open={historyModalOpen} onClose={() => setHistoryModalOpen(false)} title="Purchase History" wide>
+        <div className="p-6">
+          {selectedCustomer && (
+            <div className="flex items-center gap-4 mb-6 pb-6 border-b border-gray-100">
+              <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center">
+                <span className="text-lg font-bold text-indigo-600">
+                  {selectedCustomer.name.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase()}
+                </span>
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">{selectedCustomer.name}</h2>
+                <p className="text-sm text-gray-500">{selectedCustomer.phone || selectedCustomer.email || 'No contact'}</p>
+              </div>
+              <div className="ml-auto text-right">
+                <p className="text-xs text-gray-400 uppercase tracking-wider">Total Spent</p>
+                <p className="text-xl font-black text-gray-900">
+                  ₱{customerOrders.reduce((sum, o) => sum + (o.total_amount || 0), 0).toLocaleString()}
+                </p>
+              </div>
+            </div>
+          )}
 
-          <div className="max-h-[60vh] overflow-y-auto">
+          <div className="max-h-[50vh] overflow-y-auto -mx-2 px-2">
             {historyLoading ? (
               <div className="py-12 text-center text-gray-400 animate-pulse">Loading history...</div>
             ) : customerOrders.length === 0 ? (
-              <div className="py-12 text-center text-gray-400">No transactions found for this customer.</div>
+              <div className="py-12 text-center">
+                <ShoppingBag className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500">No transactions yet</p>
+              </div>
             ) : (
               <div className="space-y-3">
                 {customerOrders.map((order) => (
-                  <div key={order.id} className="p-4 border border-gray-100 rounded-2xl bg-gray-50 hover:bg-white hover:shadow-md transition-all group">
-                    <div className="flex justify-between items-start mb-2">
-                      <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Order #{order.id}</span>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${order.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
-                        order.status === 'cancelled' ? 'bg-rose-100 text-rose-700' :
-                          'bg-amber-100 text-amber-700'
+                  <div key={order.id} className="group relative p-4 rounded-2xl border border-gray-100 bg-white hover:border-indigo-200 hover:shadow-lg hover:shadow-indigo-50/50 transition-all">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                          order.status === 'completed' ? 'bg-emerald-100' :
+                          order.status === 'cancelled' ? 'bg-rose-100' : 'bg-amber-100'
                         }`}>
+                          {order.status === 'completed' ? (
+                            <CheckCircle className="w-5 h-5 text-emerald-600" />
+                          ) : order.status === 'cancelled' ? (
+                            <XCircle className="w-5 h-5 text-rose-600" />
+                          ) : (
+                            <Clock className="w-5 h-5 text-amber-600" />
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-gray-900">Order #{order.id}</p>
+                          <p className="text-xs text-gray-400">{new Date(order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                        </div>
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${
+                        order.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                        order.status === 'cancelled' ? 'bg-rose-50 text-rose-700 border border-rose-200' :
+                        'bg-amber-50 text-amber-700 border border-amber-200'
+                      }`}>
                         {order.status}
                       </span>
                     </div>
-                    <div className="flex justify-between items-end">
-                      <div>
-                        <p className="text-sm font-bold text-gray-900">₱{order.total_amount.toLocaleString()}</p>
-                        <p className="text-[10px] text-gray-500 font-medium">{new Date(order.created_at).toLocaleDateString()} via {order.payment_method.toUpperCase()}</p>
+                    <div className="flex items-center justify-between pt-3 border-t border-gray-50">
+                      <div className="flex items-center gap-2 text-xs text-gray-500">
+                        <CreditCard className="w-3.5 h-3.5" />
+                        {order.payment_method.toUpperCase()}
                       </div>
-                      <a href="/orders" className="text-[10px] font-black text-gray-900 opacity-0 group-hover:opacity-100 transition-opacity uppercase tracking-tighter">View Details →</a>
+                      <p className="text-lg font-black text-gray-900">₱{order.total_amount.toLocaleString()}</p>
                     </div>
                   </div>
                 ))}

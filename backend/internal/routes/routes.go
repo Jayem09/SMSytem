@@ -46,6 +46,15 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 	})
 
 	router.GET("/api/status", h.System.GetStatus)
+	router.GET("/api/system/metrics", h.System.GetMetrics)
+
+	// Backup routes - protected
+	router.GET("/api/backups", h.System.GetBackups)
+	router.POST("/api/backups", h.System.CreateBackup)
+	router.POST("/api/backups/:id/restore", h.System.RestoreBackup)
+	router.DELETE("/api/backups/:id", h.System.DeleteBackup)
+	router.GET("/api/backups/:id/download", h.System.DownloadBackup)
+
 	router.GET("/api/analytics", h.Analytics.Query)
 	router.POST("/api/analytics", h.Analytics.Query)
 

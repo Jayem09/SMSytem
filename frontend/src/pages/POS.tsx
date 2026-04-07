@@ -1,12 +1,10 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import api from '../api/axios';
 import Modal from '../components/Modal';
-import FormField from '../components/FormField';
 import { printReceipt } from '../components/Receipt';
 import { printDeliveryReceipt } from '../components/DeliveryReceipt';
 import { 
-  Search, ShoppingCart, Trash2, Printer, CheckCircle, Package, 
-  Wifi, AlertCircle, UserPlus, Banknote, Wallet, CreditCard, Info 
+  Search, ShoppingCart, Trash2, Printer, CheckCircle, Package
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 
@@ -49,11 +47,25 @@ interface Order {
   customer?: { name: string };
 }
 
+interface Customer {
+  id: number;
+  name: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  rfid_card_id?: string;
+  loyalty_points?: number;
+}
+
+interface SettingsData {
+  service_advisors?: string;
+}
+
 export default function POS() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<{ id: number; name: string }[]>([]);
-  const [customers, setCustomers] = useState<{ id: number; name: string; rfid_card_id?: string; loyalty_points?: number }[]>([]);
-  const [serviceAdvisors, setServiceAdvisors] = useState<string[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [serviceAdvisors] = useState<string[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
@@ -84,7 +96,7 @@ export default function POS() {
   const [isRfidScanning, setIsRfidScanning] = useState(false);
   const [rfidBuffer, setRfidBuffer] = useState('');
   const [rfidError, setRfidError] = useState(false);
-  const [rfidCustomer, setRfidCustomer] = useState<any>(null);
+  const [rfidCustomer, setRfidCustomer] = useState<Customer | null>(null);
   const [redeemPoints, setRedeemPoints] = useState('0');
 
   const { showToast } = useToast();
@@ -99,25 +111,12 @@ export default function POS() {
         api.get('/api/customers'),
         api.get('/api/settings'),
       ]);
-      setProducts((pRes.data as any).products || []);
-      setCategories((cRes.data as any).categories || []);
-      setCustomers((custRes.data as any).customers || []);
-      
-      
-      const settingsData = settingsRes.data as any;
-      if (settingsData?.service_advisors) {
-        try {
-          const parsed = Array.isArray(settingsData.service_advisors)
-            ? settingsData.service_advisors
-            : JSON.parse(settingsData.service_advisors);
-          setServiceAdvisors(parsed);
-        } catch (e) {
-          console.error("Failed to parse SAs", e);
-        }
-      }
-    } catch (err) {
-      console.error('POS data fetch failed', err);
-      setError('Failed to sync with inventory system. Please check your connection.');
+setProducts((pRes.data as { products?: Product[] }).products || []);
+      setCategories((cRes.data as { categories?: { id: number; name: string }[] }).categories || []);
+      setCustomers((custRes.data as { customers?: Customer[] }).customers || []);
+     } catch {
+       console.error('POS data fetch failed');
+       setError('Failed to sync with inventory system. Please check your connection.');
     } finally {
       setLoading(false);
     }
@@ -156,7 +155,7 @@ export default function POS() {
   const handleRfidScan = async (uid: string) => {
     try {
       const res = await api.get(`/api/customers/rfid/${uid}`);
-      const data = res.data as any;
+      const data = res.data as { customer?: Customer };
       if (data?.customer) {
         setRfidCustomer(data.customer);
         setCustomerId(data.customer.id.toString());
@@ -167,7 +166,7 @@ export default function POS() {
         setRfidCustomer(null);
         showToast('RFID card not recognized.', 'error');
       }
-    } catch (err) {
+    } catch {
       setRfidError(true);
       setRfidCustomer(null);
     }
@@ -218,7 +217,9 @@ export default function POS() {
   };
 
   const subtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
-  const finalTotal = Math.max(0, subtotal - parseFloat(discount || '0') - parseFloat(redeemPoints || '0'));
+  const pointsDiscountPesos = parseFloat(redeemPoints || '0') * 2;
+  const finalTotal = Math.max(0, subtotal - parseFloat(discount || '0') - pointsDiscountPesos);
+  const earnedPoints = Math.floor(subtotal / 200);
 
   const handleCheckout = async (status: 'pending' | 'completed' = 'completed') => {
     if (cart.length === 0) return;
@@ -236,7 +237,7 @@ export default function POS() {
         setIsProcessingTerminal(true);
         try {
           const terminalRes = await api.post('/api/terminal/payment', { amount: finalTotal });
-          const terminalData = terminalRes.data as any;
+          const terminalData = terminalRes.data as { status: string; error_message?: string };
           if (terminalData.status !== "APPROVED") {
             showToast(`Terminal Error: ${terminalData.error_message || "Transaction Declined"}`, 'error');
             setIsProcessingTerminal(false);
@@ -272,7 +273,7 @@ export default function POS() {
       };
       
       const res = await api.post('/api/orders', payload);
-      const orderResData = res.data as any;
+      const orderResData = res.data as { order: Order };
       setLastOrder(orderResData.order);
       setLastTin(tin);
       setLastBusinessAddress(businessAddress);
@@ -641,36 +642,48 @@ export default function POS() {
             )}
 
             {/* Loyalty Points Redemption */}
-            {rfidCustomer && (rfidCustomer.loyalty_points || 0) > 0 && (
-              <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-amber-700 uppercase">Loyalty Points</span>
-                  <span className="text-sm font-bold text-amber-800">{Math.floor(rfidCustomer.loyalty_points || 0)} available</span>
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    type="number"
-                    value={redeemPoints}
-                    onChange={(e) => setRedeemPoints(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-amber-300 rounded-lg text-sm"
-                    placeholder="Points to redeem"
-                  />
-                  <span className="flex items-center text-sm font-medium text-amber-700">
-                    = ₱{parseFloat(redeemPoints || '0').toLocaleString()}
-                  </span>
-                </div>
-                <div className="flex gap-1 mt-2">
-                  {[10, 25, 50, 100].map(p => (
-                    <button
-                      key={p}
-                      onClick={() => setRedeemPoints(p.toString())}
-                      className="px-2 py-1 text-xs bg-amber-100 text-amber-700 rounded hover:bg-amber-200"
-                    >
-                      -{p}
-                    </button>
-                  ))}
-                </div>
-              </div>
+            {rfidCustomer && (
+              <>
+                {rfidCustomer.loyalty_points > 0 && (
+                  <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold text-amber-700 uppercase">Available Points</span>
+                      <span className="text-sm font-bold text-amber-800">{Math.floor(rfidCustomer.loyalty_points || 0)} pts</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        value={redeemPoints}
+                        onChange={(e) => setRedeemPoints(e.target.value)}
+                        className="flex-1 px-3 py-2 border border-amber-300 rounded-lg text-sm"
+                        placeholder="Points to redeem"
+                      />
+                      <span className="flex items-center text-sm font-medium text-amber-700">
+                        = ₱{ (parseFloat(redeemPoints || '0') * 2).toLocaleString() }
+                      </span>
+                    </div>
+                    <div className="flex gap-1 mt-2">
+                      {[10, 25, 50, 100].map(p => (
+                        <button
+                          key={p}
+                          onClick={() => setRedeemPoints(p.toString())}
+                          className="px-2 py-1 text-xs bg-amber-100 text-amber-700 rounded hover:bg-amber-200"
+                        >
+                          -{p}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {earnedPoints > 0 && (
+                  <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-emerald-700 uppercase">Earn Points</span>
+                      <span className="text-sm font-bold text-emerald-800">+{earnedPoints} pts</span>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
 

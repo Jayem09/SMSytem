@@ -26,6 +26,8 @@ import DailyReport from './pages/DailyReport';
 import Branches from './pages/Branches';
 import Transfers from './pages/Transfers';
 import Analytics from './pages/Analytics';
+import Monitoring from './pages/Monitoring';
+import Backups from './pages/Backups';
 import MaintenanceGuard from './components/MaintenanceGuard';
 import { checkHealthNative } from './api/axios';
 import { useState, useEffect } from 'react';
@@ -33,10 +35,8 @@ function App() {
   // Startup health check to auto-retry until backend is online
   const [booting, setBooting] = useState(true);
   const [backendOnline, setBackendOnline] = useState(false);
-  const [startupError, setStartupError] = useState<string>('');
-
   useEffect(() => {
-    let retryInterval: any;
+    let retryInterval: ReturnType<typeof setInterval>;
     const bootstrap = async () => {
       try {
         const ok = await checkHealthNative();
@@ -44,7 +44,6 @@ function App() {
           setBackendOnline(true);
           setBooting(false);
         } else {
-          setStartupError('Backend unreachable');
           // Retry every 5 seconds until success
           retryInterval = setInterval(async () => {
             const ok2 = await checkHealthNative();
@@ -55,8 +54,8 @@ function App() {
             }
           }, 5000);
         }
-      } catch (e) {
-        setStartupError((e as Error)?.message ?? 'Startup health check failed');
+      } catch {
+        // Startup health check failed
       }
     };
     bootstrap();
@@ -117,6 +116,8 @@ function App() {
                 <Route path="/branches" element={<ProtectedRoute requiredRole="admin"><Branches /></ProtectedRoute>} />
                 <Route path="/transfers" element={<ProtectedRoute requiredRole={["admin", "purchasing", "purchaser", "cashier", "user"]}><Transfers /></ProtectedRoute>} />
                 <Route path="/settings" element={<ProtectedRoute requiredRole="admin"><SettingsPage /></ProtectedRoute>} />
+                <Route path="/monitoring" element={<ProtectedRoute requiredRole="admin"><Monitoring /></ProtectedRoute>} />
+                <Route path="/backups" element={<ProtectedRoute requiredRole="admin"><Backups /></ProtectedRoute>} />
               </Route>
 
               <Route path="*" element={<Navigate to="/dashboard" replace />} />

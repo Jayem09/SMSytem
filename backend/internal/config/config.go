@@ -19,6 +19,9 @@ type Config struct {
 	ServerPort  string
 	JWTSecret   string
 	JWTExpiry   string
+	RedisHost   string
+	RedisPort   string
+	BackupPath  string
 }
 
 func Load() *Config {
@@ -51,6 +54,9 @@ func Load() *Config {
 		ServerPort:  getEnv("SERVER_PORT", "8080"),
 		JWTSecret:   jwtSecret,
 		JWTExpiry:   getEnv("JWT_EXPIRY", "24h"),
+		RedisHost:   getEnv("REDIS_HOST", "127.0.0.1"),
+		RedisPort:   getEnv("REDIS_PORT", "6379"),
+		BackupPath:  getEnv("BACKUP_PATH", "/var/backups/smsystem"),
 	}
 }
 

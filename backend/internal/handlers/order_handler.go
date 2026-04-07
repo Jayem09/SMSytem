@@ -52,7 +52,7 @@ type checkoutInput struct {
 	TIN                string  `json:"tin"`
 	BusinessAddress    string  `json:"business_address"`
 	WithholdingTaxRate float64 `json:"withholding_tax_rate"`
-	RedeemPoints       float64 `json:"redeem_points"` // Points to redeem (1 point = ₱1 discount)
+	RedeemPoints       float64 `json:"redeem_points"` // Points to redeem (1 point = ₱2 discount)
 }
 
 func (h *OrderHandler) List(c *gin.Context) {
@@ -276,21 +276,21 @@ func (h *OrderHandler) Create(c *gin.Context) {
 				return fmt.Errorf("insufficient loyalty points: have %.2f, need %.2f", customer.LoyaltyPoints, input.RedeemPoints)
 			}
 
-			// Deduct points from customer (1 point = ₱1 discount)
+			// Deduct points from customer (1 point = ₱2 discount)
 			if err := tx.Model(&customer).Update("loyalty_points", customer.LoyaltyPoints-input.RedeemPoints).Error; err != nil {
 				return fmt.Errorf("failed to deduct loyalty points: %v", err)
 			}
 
-			// Apply discount to order
-			order.DiscountAmount = order.DiscountAmount + input.RedeemPoints
-			order.TotalAmount = order.TotalAmount - input.RedeemPoints
+			// Apply discount to order (1 point = ₱2 discount)
+			order.DiscountAmount = order.DiscountAmount + (input.RedeemPoints * 2.0)
+			order.TotalAmount = order.TotalAmount - (input.RedeemPoints * 2.0)
 
 			// Create loyalty ledger entry for redemption
 			ledgerEntry := models.LoyaltyLedger{
 				CustomerID:     *input.CustomerID,
 				OrderID:        &order.ID,
 				PointsRedeemed: input.RedeemPoints,
-				Remarks:        fmt.Sprintf("Redeemed %v points for ₱%.2f discount on Order #%d", input.RedeemPoints, input.RedeemPoints, order.ID),
+				Remarks:        fmt.Sprintf("Redeemed %v points for ₱%.2f discount on Order #%d", input.RedeemPoints, input.RedeemPoints*2.0, order.ID),
 			}
 			if err := tx.Create(&ledgerEntry).Error; err != nil {
 				fmt.Printf("Warning: failed to create loyalty ledger entry: %v\n", err)
