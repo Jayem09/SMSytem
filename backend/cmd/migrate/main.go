@@ -13,6 +13,8 @@ import (
 )
 
 func main() {
+	flag.Parse()
+
 	upCmd := flag.NewFlagSet("up", flag.ExitOnError)
 	downCmd := flag.NewFlagSet("down", flag.ExitOnError)
 	resetCmd := flag.NewFlagSet("reset", flag.ExitOnError)

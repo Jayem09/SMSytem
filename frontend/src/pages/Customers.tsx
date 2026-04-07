@@ -3,6 +3,7 @@ import api from '../api/axios';
 import DataTable from '../components/DataTable';
 import Modal from '../components/Modal';
 import FormField from '../components/FormField';
+import RFIDField from '../components/RFIDField';
 import { useAuth } from '../hooks/useAuth';
 import { History, Edit2, Trash2, User, Phone, Mail, MapPin } from 'lucide-react';
 
@@ -20,6 +21,8 @@ interface Customer {
   email: string;
   phone: string;
   address: string;
+  rfidCardId?: string;
+  loyaltyPoints?: number;
 }
 
 export default function Customers() {
@@ -40,13 +43,15 @@ export default function Customers() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
+  const [rfidCardId, setRfidCardId] = useState('');
 
   const fetchCustomers = useCallback(async () => {
     try {
       const params: Record<string, string> = {};
       if (search) params.search = search;
       const res = await api.get('/api/customers', { params });
-      setCustomers(res.data.customers || []);
+      const data = res.data as { customers?: Customer[] };
+      setCustomers(data.customers || []);
     } catch {
       setError('Failed to load customers');
     } finally {
@@ -62,8 +67,9 @@ export default function Customers() {
     setHistoryLoading(true);
     setHistoryModalOpen(true);
     try {
-      const res = await api.get('/api/orders', { params: { customer_id: customer.id } });
-      setCustomerOrders(res.data.orders || []);
+      const res = await api.get('/api/orders', { params: { customer_id: String(customer.id) } });
+      const data = res.data as { orders?: Order[] };
+      setCustomerOrders(data.orders || []);
     } catch {
       alert('Failed to load purchase history');
     } finally {
@@ -73,7 +79,7 @@ export default function Customers() {
 
   const openCreate = () => {
     setEditing(null);
-    setName(''); setEmail(''); setPhone(''); setAddress('');
+    setName(''); setEmail(''); setPhone(''); setAddress(''); setRfidCardId('');
     setError('');
     setModalOpen(true);
   };
@@ -81,6 +87,7 @@ export default function Customers() {
   const openEdit = (c: Customer) => {
     setEditing(c);
     setName(c.name); setEmail(c.email); setPhone(c.phone); setAddress(c.address);
+    setRfidCardId(c.rfidCardId || '');
     setError('');
     setModalOpen(true);
   };
@@ -88,7 +95,7 @@ export default function Customers() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
-    const payload = { name, email, phone, address };
+    const payload = { name, email, phone, address, rfidCardId };
     try {
       if (editing) {
         await api.put(`/api/customers/${editing.id}`, payload);
@@ -120,8 +127,8 @@ export default function Customers() {
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Customers</h1>
           <p className="text-gray-500 mt-1">Manage client profiles and view transaction history.</p>
         </div>
-        <button 
-          onClick={openCreate} 
+        <button
+          onClick={openCreate}
           className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-500 rounded-md transition-all shadow-sm hover:shadow-md active:scale-95 cursor-pointer"
         >
           Add Customer
@@ -132,26 +139,44 @@ export default function Customers() {
 
       <DataTable
         columns={[
-          { key: 'name', label: 'Name', render: (c) => (
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gray-50 rounded-lg text-gray-400 group-hover:text-gray-900 transition-colors">
-                <User className="w-4 h-4" />
+          {
+            key: 'name', label: 'Name', render: (c) => (
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gray-50 rounded-lg text-gray-400 group-hover:text-gray-900 transition-colors">
+                  <User className="w-4 h-4" />
+                </div>
+                <span className="font-semibold text-gray-900">{c.name}</span>
               </div>
-              <span className="font-semibold text-gray-900">{c.name}</span>
-            </div>
-          )},
-          { key: 'email', label: 'Email', render: (c) => (
-            <div className="flex items-center gap-2 text-gray-500">
-              <Mail className="w-3.5 h-3.5" />
-              <span>{c.email || '--'}</span>
-            </div>
-          )},
-          { key: 'phone', label: 'Phone', render: (c) => (
-            <div className="flex items-center gap-2 text-gray-500">
-              <Phone className="w-3.5 h-3.5" />
-              <span>{c.phone || '--'}</span>
-            </div>
-          )},
+            )
+          },
+          {
+            key: 'email', label: 'Email', render: (c) => (
+              <div className="flex items-center gap-2 text-gray-500">
+                <Mail className="w-3.5 h-3.5" />
+                <span>{c.email || '--'}</span>
+              </div>
+            )
+          },
+          {
+            key: 'phone', label: 'Phone', render: (c) => (
+              <div className="flex items-center gap-2 text-gray-500">
+                <Phone className="w-3.5 h-3.5" />
+                <span>{c.phone || '--'}</span>
+              </div>
+            )
+          },
+          {
+            key: 'loyaltyPoints', label: 'Points', render: (c: Customer) => (
+              <div className="flex items-center gap-2">
+                <span className={`px-2 py-1 rounded-full text-xs font-bold ${(c.loyaltyPoints || 0) > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-400'}`}>
+                  {(c.loyaltyPoints || 0).toFixed(0)} pts
+                </span>
+                {c.rfidCardId && (
+                  <span className="text-[10px] text-indigo-500 bg-indigo-50 px-1.5 py-0.5 rounded" title="RFID Linked">⚡</span>
+                )}
+              </div>
+            )
+          },
         ]}
         data={customers}
         loading={loading}
@@ -195,6 +220,7 @@ export default function Customers() {
             <FormField label="Email Address" type="email" value={email} onChange={setEmail} placeholder="juan@example.com" icon={<Mail className="w-4 h-4" />} />
             <FormField label="Phone Number" value={phone} onChange={setPhone} placeholder="09XX XXX XXXX" icon={<Phone className="w-4 h-4" />} />
             <FormField label="Home Address" type="textarea" value={address} onChange={setAddress} placeholder="Street, City, Province" icon={<MapPin className="w-4 h-4" />} />
+            <RFIDField value={rfidCardId} onChange={setRfidCardId} />
           </div>
           <button type="submit" className="w-full mt-8 py-4 text-sm font-black text-white bg-gray-900 hover:bg-gray-800 rounded-2xl transition-all shadow-lg hover:shadow-xl active:scale-95 cursor-pointer uppercase tracking-widest">
             {editing ? 'Update Profile' : 'Save Customer'}
@@ -202,7 +228,7 @@ export default function Customers() {
         </form>
       </Modal>
 
-      {}
+      { }
       <Modal open={historyModalOpen} onClose={() => setHistoryModalOpen(false)} title="Purchase History">
         <div className="p-4">
           <div className="mb-6 pb-6 border-b border-gray-100">
@@ -221,11 +247,10 @@ export default function Customers() {
                   <div key={order.id} className="p-4 border border-gray-100 rounded-2xl bg-gray-50 hover:bg-white hover:shadow-md transition-all group">
                     <div className="flex justify-between items-start mb-2">
                       <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Order #{order.id}</span>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                        order.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${order.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
                         order.status === 'cancelled' ? 'bg-rose-100 text-rose-700' :
-                        'bg-amber-100 text-amber-700'
-                      }`}>
+                          'bg-amber-100 text-amber-700'
+                        }`}>
                         {order.status}
                       </span>
                     </div>

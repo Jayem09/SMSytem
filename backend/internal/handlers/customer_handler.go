@@ -22,10 +22,12 @@ func NewCustomerHandler(logService *services.LogService) *CustomerHandler {
 }
 
 type customerInput struct {
-	Name    string `json:"name" binding:"required,min=2,max=255"`
-	Email   string `json:"email" binding:"omitempty,email"`
-	Phone   string `json:"phone" binding:"max=50"`
-	Address string `json:"address"`
+	Name          string  `json:"name" binding:"required,min=2,max=255"`
+	Email         string  `json:"email" binding:"omitempty,email"`
+	Phone         string  `json:"phone" binding:"max=50"`
+	Address       string  `json:"address"`
+	RFIDCardID    string  `json:"rfid_card_id"`
+	LoyaltyPoints float64 `json:"loyalty_points"`
 }
 
 func (h *CustomerHandler) List(c *gin.Context) {
@@ -59,6 +61,21 @@ func (h *CustomerHandler) GetByID(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"customer": customer})
 }
 
+func (h *CustomerHandler) GetByRFID(c *gin.Context) {
+	rfid := c.Param("rfid")
+	if rfid == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "RFID card ID is required"})
+		return
+	}
+
+	var customer models.Customer
+	if err := database.DB.Where("rfid_card_id = ?", rfid).First(&customer).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "No customer found with this RFID card"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"customer": customer})
+}
+
 func (h *CustomerHandler) Create(c *gin.Context) {
 	var input customerInput
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -67,10 +84,12 @@ func (h *CustomerHandler) Create(c *gin.Context) {
 	}
 
 	customer := models.Customer{
-		Name:    input.Name,
-		Email:   input.Email,
-		Phone:   input.Phone,
-		Address: input.Address,
+		Name:          input.Name,
+		Email:         input.Email,
+		Phone:         input.Phone,
+		Address:       input.Address,
+		RFIDCardID:    input.RFIDCardID,
+		LoyaltyPoints: input.LoyaltyPoints,
 	}
 
 	if err := database.DB.Create(&customer).Error; err != nil {
@@ -111,6 +130,10 @@ func (h *CustomerHandler) Update(c *gin.Context) {
 	customer.Email = input.Email
 	customer.Phone = input.Phone
 	customer.Address = input.Address
+	customer.RFIDCardID = input.RFIDCardID
+	if input.LoyaltyPoints > 0 {
+		customer.LoyaltyPoints = input.LoyaltyPoints
+	}
 
 	if err := database.DB.Save(&customer).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update customer"})

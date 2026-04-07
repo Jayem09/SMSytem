@@ -87,6 +87,7 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 		{
 			customers.GET("", h.Customer.List)
 			customers.GET("/crm-stats", h.Customer.GetCRMStats)
+			customers.GET("/rfid/:rfid", h.Customer.GetByRFID)
 			customers.GET("/:id", h.Customer.GetByID)
 			customers.POST("", h.Customer.Create)
 			customers.PUT("/:id", h.Customer.Update)

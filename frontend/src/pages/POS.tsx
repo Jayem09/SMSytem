@@ -1,10 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../api/axios';
 import Modal from '../components/Modal';
 import FormField from '../components/FormField';
 import { printReceipt } from '../components/Receipt';
 import { printDeliveryReceipt } from '../components/DeliveryReceipt';
-import { Search, ShoppingCart, Trash2, Printer, CheckCircle, Package } from 'lucide-react';
+import { 
+  Search, ShoppingCart, Trash2, Printer, CheckCircle, Package, 
+  Wifi, AlertCircle, UserPlus, Banknote, Wallet, CreditCard, Info 
+} from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 
 interface Product {
@@ -49,7 +52,7 @@ interface Order {
 export default function POS() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<{ id: number; name: string }[]>([]);
-  const [customers, setCustomers] = useState<{ id: number; name: string }[]>([]);
+  const [customers, setCustomers] = useState<{ id: number; name: string; rfid_card_id?: string; loyalty_points?: number }[]>([]);
   const [serviceAdvisors, setServiceAdvisors] = useState<string[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [search, setSearch] = useState('');
@@ -76,6 +79,14 @@ export default function POS() {
   const [lastWithholdingTaxRate, setLastWithholdingTaxRate] = useState(0);
   const [lastReceiptType, setLastReceiptType] = useState<'SI' | 'DR'>('SI');
   const [isProcessingTerminal, setIsProcessingTerminal] = useState(false);
+  
+  // RFID & Loyalty State
+  const [isRfidScanning, setIsRfidScanning] = useState(false);
+  const [rfidBuffer, setRfidBuffer] = useState('');
+  const [rfidError, setRfidError] = useState(false);
+  const [rfidCustomer, setRfidCustomer] = useState<any>(null);
+  const [redeemPoints, setRedeemPoints] = useState('0');
+
   const { showToast } = useToast();
 
   const fetchData = async () => {
@@ -88,16 +99,17 @@ export default function POS() {
         api.get('/api/customers'),
         api.get('/api/settings'),
       ]);
-      setProducts(pRes.data.products || []);
-      setCategories(cRes.data.categories || []);
-      setCustomers(custRes.data.customers || []);
+      setProducts((pRes.data as any).products || []);
+      setCategories((cRes.data as any).categories || []);
+      setCustomers((custRes.data as any).customers || []);
       
       
-      if (settingsRes.data?.service_advisors) {
+      const settingsData = settingsRes.data as any;
+      if (settingsData?.service_advisors) {
         try {
-          const parsed = Array.isArray(settingsRes.data.service_advisors)
-            ? settingsRes.data.service_advisors
-            : JSON.parse(settingsRes.data.service_advisors);
+          const parsed = Array.isArray(settingsData.service_advisors)
+            ? settingsData.service_advisors
+            : JSON.parse(settingsData.service_advisors);
           setServiceAdvisors(parsed);
         } catch (e) {
           console.error("Failed to parse SAs", e);
@@ -109,6 +121,64 @@ export default function POS() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // RFID Scanner Logic - Only active when explicitly scanning
+  const rfidInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isRfidScanning && rfidInputRef.current) {
+      rfidInputRef.current.focus();
+    }
+  }, [isRfidScanning]);
+
+  const handleRfidInputChange = (value: string) => {
+    // Check for Enter key ( RFID scanner sends Enter at the end )
+    if (value.includes('\n') || value.endsWith('\r')) {
+      const cleanValue = value.replace(/[\r\n]/g, '').trim();
+      if (cleanValue.length >= 8) {
+        handleRfidScan(cleanValue);
+      }
+      setRfidBuffer('');
+      setIsRfidScanning(false);
+      return;
+    }
+    setRfidBuffer(value);
+  };
+
+  const handleRfidInputKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      setRfidBuffer('');
+      setIsRfidScanning(false);
+    }
+  };
+
+  const handleRfidScan = async (uid: string) => {
+    try {
+      const res = await api.get(`/api/customers/rfid/${uid}`);
+      const data = res.data as any;
+      if (data?.customer) {
+        setRfidCustomer(data.customer);
+        setCustomerId(data.customer.id.toString());
+        setRfidError(false);
+        showToast(`Welcome back, ${data.customer.name}!`, 'success');
+      } else {
+        setRfidError(true);
+        setRfidCustomer(null);
+        showToast('RFID card not recognized.', 'error');
+      }
+    } catch (err) {
+      setRfidError(true);
+      setRfidCustomer(null);
+    }
+  };
+
+  const clearRfidCustomer = () => {
+    setRfidCustomer(null);
+    setCustomerId('');
+    setRfidBuffer('');
+    setRedeemPoints('0');
+    setRfidError(false);
   };
 
   useEffect(() => {
@@ -148,7 +218,7 @@ export default function POS() {
   };
 
   const subtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
-  const finalTotal = Math.max(0, subtotal - parseFloat(discount || '0'));
+  const finalTotal = Math.max(0, subtotal - parseFloat(discount || '0') - parseFloat(redeemPoints || '0'));
 
   const handleCheckout = async (status: 'pending' | 'completed' = 'completed') => {
     if (cart.length === 0) return;
@@ -156,14 +226,19 @@ export default function POS() {
       showToast('Business Address is required for a Sales Invoice (SI).', 'error');
       return;
     }
+    // Validate: If RFID was scanned but not found, block checkout
+    if (rfidError) {
+      showToast('Invalid RFID card. Please scan a registered card or select customer manually.', 'error');
+      return;
+    }
     try {
       if (paymentMethod === 'card') {
         setIsProcessingTerminal(true);
         try {
-          
           const terminalRes = await api.post('/api/terminal/payment', { amount: finalTotal });
-          if (terminalRes.data.status !== "APPROVED") {
-            showToast(`Terminal Error: ${terminalRes.data.error_message || "Transaction Declined"}`, 'error');
+          const terminalData = terminalRes.data as any;
+          if (terminalData.status !== "APPROVED") {
+            showToast(`Terminal Error: ${terminalData.error_message || "Transaction Declined"}`, 'error');
             setIsProcessingTerminal(false);
             return;
           }
@@ -189,6 +264,7 @@ export default function POS() {
         tin: tin,
         business_address: businessAddress,
         withholding_tax_rate: parseFloat(withholdingTaxRate) || 0,
+        redeem_points: parseFloat(redeemPoints) || 0,
         items: cart.map(item => ({
           product_id: item.id,
           quantity: item.quantity
@@ -196,7 +272,8 @@ export default function POS() {
       };
       
       const res = await api.post('/api/orders', payload);
-      setLastOrder(res.data.order);
+      const orderResData = res.data as any;
+      setLastOrder(orderResData.order);
       setLastTin(tin);
       setLastBusinessAddress(businessAddress);
       setLastWithholdingTaxRate(parseFloat(withholdingTaxRate) || 0);
@@ -455,149 +532,269 @@ export default function POS() {
       </div>
 
       {}
-      <Modal open={checkoutModalOpen} onClose={() => setCheckoutModalOpen(false)} title="Finalize Sale" maxWidth="max-w-4xl">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-2">
-          {}
-          <div className="space-y-5">
-            <div>
-              <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2 mb-4">Customer Details</h3>
-              <div className="space-y-4">
-                <FormField
-                  label="Customer Identity"
-                  type="select"
-                  value={customerId}
-                  onChange={setCustomerId}
-                  placeholder="Search customer..."
-                  options={[
-                    { value: '', label: 'WALK-IN CUSTOMER' },
-                    ...customers.map(c => ({ value: c.id, label: c.name.toUpperCase() }))
-                  ]}
-                />
-                {!customerId && (
-                  <div className="grid grid-cols-2 gap-3 animate-in fade-in duration-200">
-                    <FormField label="Guest Name" value={guestName} onChange={setGuestName} placeholder="Enter full name" />
-                    <FormField label="Contact" value={guestPhone} onChange={setGuestPhone} placeholder="09XX XXX XXXX" />
-                  </div>
+      <Modal open={checkoutModalOpen} onClose={() => {
+        setCheckoutModalOpen(false);
+        setIsRfidScanning(false);
+        setRfidBuffer('');
+        setRfidError(false);
+      }} title="Finalize Sale" maxWidth="max-w-4xl">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Left Column: Customer */}
+          <div className="space-y-4">
+            {/* RFID Card Section */}
+            <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">RFID Card</span>
+                {rfidCustomer && (
+                  <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">Linked</span>
                 )}
-                <FormField
-                  label="Assigned Advisor (Optional)"
-                  type="select"
-                  value={serviceAdvisorName}
-                  onChange={setServiceAdvisorName}
-                  placeholder="Select a Service Advisor..."
-                  options={[
-                    { value: '', label: 'NONE SELECTED' },
-                    ...serviceAdvisors.map(sa => ({ value: sa, label: sa.toUpperCase() }))
-                  ]}
-                />
               </div>
-            </div>
-          </div>
-
-          {}
-          <div className="space-y-5 md:pl-6 md:border-l border-gray-100">
-             <div>
-              <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2 mb-4">Paperwork & Payment</h3>
-              <div className="space-y-4">
-                <div className="flex bg-gray-100 rounded-xl p-1">
-                  <button 
-                    onClick={() => setReceiptType('SI')}
-                    className={`flex-1 py-2 text-[10px] font-black tracking-widest uppercase transition-all rounded-lg ${
-                      receiptType === 'SI' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400 hover:text-gray-900'
-                    }`}
-                  >
-                    Sales Invoice
-                  </button>
-                  <button 
-                    onClick={() => setReceiptType('DR')}
-                    className={`flex-1 py-2 text-[10px] font-black tracking-widest uppercase transition-all rounded-lg ${
-                      receiptType === 'DR' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400 hover:text-gray-900'
-                    }`}
-                  >
-                    Delivery Receipt
+              
+              {isRfidScanning ? (
+                <div className="relative">
+                  <input
+                    ref={rfidInputRef}
+                    type="text"
+                    autoFocus
+                    readOnly
+                    placeholder="Tap RFID card or type ID..."
+                    className="w-full px-4 py-3 border-2 border-indigo-500 rounded-lg text-sm font-medium bg-white"
+                    onChange={(e) => handleRfidInputChange(e.target.value)}
+                    onKeyDown={handleRfidInputKeyDown}
+                  />
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                    <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                  </div>
+                  {rfidBuffer && (
+                    <div className="text-xs text-gray-400 mt-1 ml-1">Receiving: {rfidBuffer}</div>
+                  )}
+                </div>
+              ) : rfidCustomer ? (
+                <div className="flex items-center justify-between bg-white rounded-lg p-3 border border-emerald-200">
+                  <div>
+                    <p className="text-sm font-bold text-gray-900">{rfidCustomer.name}</p>
+                    <p className="text-xs text-gray-500">{rfidCustomer.loyalty_points?.toFixed(0) || 0} points</p>
+                  </div>
+                  <button onClick={clearRfidCustomer} className="text-gray-400 hover:text-red-500">
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
+              ) : rfidError ? (
+                <div className="bg-red-50 rounded-lg p-3 border border-red-200">
+                  <p className="text-sm text-red-600">RFID card not recognized</p>
+                </div>
+              ) : (
+                <button 
+                  onClick={() => {
+                    setIsRfidScanning(true);
+                    setRfidBuffer('');
+                  }}
+                  className="w-full py-3 border-2 border-dashed border-gray-300 rounded-lg text-sm font-medium text-gray-500 hover:border-indigo-400 hover:text-indigo-600 transition-colors"
+                >
+                  Click to Scan RFID Card
+                </button>
+              )}
+            </div>
 
-                {receiptType === 'SI' && (
-                  <div className="grid grid-cols-2 gap-3 animate-in fade-in zoom-in-95 duration-200 bg-gray-50 p-4 rounded-2xl border border-gray-100">
-                    <FormField label="Tax Identification (TIN) — Optional" value={tin} onChange={setTin} placeholder="000-000-000" />
-                    <FormField label="Withholding (%)" type="number" value={withholdingTaxRate} onChange={setWithholdingTaxRate} placeholder="0" />
-                    <div className="col-span-2">
-                      <FormField label="Business Address" value={businessAddress} onChange={setBusinessAddress} required placeholder="Full registered address" />
-                    </div>
-                  </div>
-                )}
+            {/* Customer Select */}
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Customer</label>
+              <select
+                value={customerId}
+                onChange={(e) => {
+                  setCustomerId(e.target.value);
+                  setRfidCustomer(null);
+                  setRedeemPoints('0');
+                }}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="">Walk-in Customer</option>
+                {customers.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
 
+            {!customerId && !rfidCustomer && (
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Payment Method</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { id: 'cash', label: 'Cash' },
-                    { id: 'gcash', label: 'GCash' },
-                    { id: 'card', label: 'Credit Card' },
-                    { id: 'bank_transfer', label: 'Bank Transfer' },
-                    { id: 'dated_check', label: 'Dated Check' },
-                    { id: 'post_dated_check', label: 'Post-Dated Check' },
-                    { id: 'claimed_downpayment', label: 'Claimed Downpayment' },
-                    { id: 'goodyear_voucher', label: 'Goodyear Voucher' },
-                    { id: 'ewt', label: 'EWT' },
-                    { id: 'trade_in', label: 'Trade In' },
-                  ].map((method) => (
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Guest Name</label>
+                  <input
+                    type="text"
+                    value={guestName}
+                    onChange={(e) => setGuestName(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="Full name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Contact</label>
+                  <input
+                    type="text"
+                    value={guestPhone}
+                    onChange={(e) => setGuestPhone(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="09XX XXX XXXX"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Loyalty Points Redemption */}
+            {rfidCustomer && (rfidCustomer.loyalty_points || 0) > 0 && (
+              <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-amber-700 uppercase">Loyalty Points</span>
+                  <span className="text-sm font-bold text-amber-800">{Math.floor(rfidCustomer.loyalty_points || 0)} available</span>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    value={redeemPoints}
+                    onChange={(e) => setRedeemPoints(e.target.value)}
+                    className="flex-1 px-3 py-2 border border-amber-300 rounded-lg text-sm"
+                    placeholder="Points to redeem"
+                  />
+                  <span className="flex items-center text-sm font-medium text-amber-700">
+                    = ₱{parseFloat(redeemPoints || '0').toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex gap-1 mt-2">
+                  {[10, 25, 50, 100].map(p => (
                     <button
-                      key={method.id}
-                      type="button"
-                      onClick={() => setPaymentMethod(method.id)}
-                      className={`px-3 py-2 text-xs font-bold rounded-lg border transition-all ${
-                        paymentMethod === method.id
-                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-md'
-                          : 'bg-white text-gray-600 border-gray-200 hover:border-gray-900'
-                      }`}
+                      key={p}
+                      onClick={() => setRedeemPoints(p.toString())}
+                      className="px-2 py-1 text-xs bg-amber-100 text-amber-700 rounded hover:bg-amber-200"
                     >
-                      {method.label}
+                      -{p}
                     </button>
                   ))}
                 </div>
               </div>
+            )}
+          </div>
+
+          {/* Right Column: Payment & Summary */}
+          <div className="space-y-4">
+            {/* Receipt Type */}
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Receipt Type</label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setReceiptType('SI')}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                    receiptType === 'SI' 
+                      ? 'bg-gray-900 text-white border-gray-900' 
+                      : 'bg-white text-gray-600 border-gray-200 hover:border-gray-900'
+                  }`}
+                >
+                  Sales Invoice
+                </button>
+                <button
+                  onClick={() => setReceiptType('DR')}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                    receiptType === 'DR' 
+                      ? 'bg-gray-900 text-white border-gray-900' 
+                      : 'bg-white text-gray-600 border-gray-200 hover:border-gray-900'
+                  }`}
+                >
+                  Delivery Receipt
+                </button>
               </div>
             </div>
-          </div>
-        </div>
 
-        {}
-        <div className="mt-8 pt-6 border-t border-gray-100">
-          <div className="flex items-center justify-between px-6 py-4 bg-gray-50 rounded-2xl border border-gray-100 mb-6">
-            <span className="text-[11px] font-black text-gray-500 uppercase tracking-widest">Final Amount Due</span>
-            <span className="text-4xl font-black text-gray-900 tracking-tighter">₱{finalTotal.toLocaleString()}</span>
-          </div>
+            {receiptType === 'SI' && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">TIN</label>
+                  <input
+                    type="text"
+                    value={tin}
+                    onChange={(e) => setTin(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                    placeholder="000-000-000"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">WHT %</label>
+                  <input
+                    type="number"
+                    value={withholdingTaxRate}
+                    onChange={(e) => setWithholdingTaxRate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Business Address</label>
+                  <input
+                    type="text"
+                    value={businessAddress}
+                    onChange={(e) => setBusinessAddress(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                  />
+                </div>
+              </div>
+            )}
 
-          <div className="flex gap-4">
-            <button
-              onClick={() => handleCheckout('pending')}
-              disabled={isProcessingTerminal}
-              className={`w-1/3 py-5 bg-white border-2 border-gray-200 text-gray-600 rounded-2xl hover:border-gray-900 hover:text-gray-900 text-[11px] font-black uppercase tracking-widest transition-all ${
-                isProcessingTerminal ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
-            >
-              SAVE PENDING
-            </button>
-            <button
-              onClick={() => handleCheckout('completed')}
-              disabled={isProcessingTerminal}
-              className={`flex-1 py-5 text-white rounded-2xl font-black text-[12px] uppercase tracking-widest transition-all shadow-xl active:scale-[0.98] ${
-                isProcessingTerminal 
-                  ? 'bg-gray-300 cursor-not-allowed shadow-none border border-transparent text-gray-500' 
-                  : 'bg-gray-900 hover:bg-black shadow-gray-200/50'
-              }`}
-            >
-              {isProcessingTerminal ? (
-                <span className="flex items-center justify-center gap-3">
-                  <div className="w-5 h-5 border-[3px] border-white/20 border-t-white rounded-full animate-spin" />
-                  WAITING ON TERMINAL
-                </span>
-              ) : (
-                'CONFIRM & PRINT'
+            {/* Payment Method */}
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Payment Method</label>
+              <select
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="cash">Cash</option>
+                <option value="gcash">GCash</option>
+                <option value="card">Credit Card</option>
+                <option value="bank_transfer">Bank Transfer</option>
+                <option value="dated_check">Dated Check</option>
+                <option value="post_dated_check">Post-Dated Check</option>
+              </select>
+            </div>
+
+            {/* Discount */}
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Additional Discount</label>
+              <input
+                type="number"
+                value={discount}
+                onChange={(e) => setDiscount(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="0"
+              />
+            </div>
+
+            {/* Total */}
+            <div className="bg-gray-900 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-gray-400 uppercase">Total Amount</span>
+                <span className="text-2xl font-black text-white">₱{finalTotal.toLocaleString()}</span>
+              </div>
+              {(parseFloat(redeemPoints) || 0) > 0 && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-amber-400">Points Redeemed</span>
+                  <span className="text-amber-400">-₱{parseFloat(redeemPoints).toLocaleString()}</span>
+                </div>
               )}
-            </button>
+            </div>
+
+            {/* Actions */}
+            <div className="grid grid-cols-2 gap-3">
+              <button 
+                onClick={() => handleCheckout('pending')}
+                className="py-3 bg-white border-2 border-gray-200 text-gray-700 rounded-xl text-sm font-bold hover:border-gray-900 transition-colors"
+              >
+                Hold Sale
+              </button>
+              <button 
+                onClick={() => handleCheckout('completed')}
+                disabled={isProcessingTerminal}
+                className="py-3 bg-gray-900 text-white rounded-xl text-sm font-bold hover:bg-black disabled:opacity-50 transition-colors"
+              >
+                {isProcessingTerminal ? 'Processing...' : 'Confirm Sale'}
+              </button>
+            </div>
           </div>
         </div>
       </Modal>

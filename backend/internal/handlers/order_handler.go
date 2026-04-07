@@ -52,6 +52,7 @@ type checkoutInput struct {
 	TIN                string  `json:"tin"`
 	BusinessAddress    string  `json:"business_address"`
 	WithholdingTaxRate float64 `json:"withholding_tax_rate"`
+	RedeemPoints       float64 `json:"redeem_points"` // Points to redeem (1 point = ₱1 discount)
 }
 
 func (h *OrderHandler) List(c *gin.Context) {
@@ -262,6 +263,66 @@ func (h *OrderHandler) Create(c *gin.Context) {
 				}
 			}
 		}
+
+		// === LOYALTY POINTS SYSTEM ===
+		// Handle points redemption (discount) if customer provided
+		if input.CustomerID != nil && *input.CustomerID > 0 && input.RedeemPoints > 0 {
+			var customer models.Customer
+			if err := tx.First(&customer, *input.CustomerID).Error; err != nil {
+				return fmt.Errorf("customer not found: %v", err)
+			}
+
+			if customer.LoyaltyPoints < input.RedeemPoints {
+				return fmt.Errorf("insufficient loyalty points: have %.2f, need %.2f", customer.LoyaltyPoints, input.RedeemPoints)
+			}
+
+			// Deduct points from customer (1 point = ₱1 discount)
+			if err := tx.Model(&customer).Update("loyalty_points", customer.LoyaltyPoints-input.RedeemPoints).Error; err != nil {
+				return fmt.Errorf("failed to deduct loyalty points: %v", err)
+			}
+
+			// Apply discount to order
+			order.DiscountAmount = order.DiscountAmount + input.RedeemPoints
+			order.TotalAmount = order.TotalAmount - input.RedeemPoints
+
+			// Create loyalty ledger entry for redemption
+			ledgerEntry := models.LoyaltyLedger{
+				CustomerID:     *input.CustomerID,
+				OrderID:        &order.ID,
+				PointsRedeemed: input.RedeemPoints,
+				Remarks:        fmt.Sprintf("Redeemed %v points for ₱%.2f discount on Order #%d", input.RedeemPoints, input.RedeemPoints, order.ID),
+			}
+			if err := tx.Create(&ledgerEntry).Error; err != nil {
+				fmt.Printf("Warning: failed to create loyalty ledger entry: %v\n", err)
+			}
+		}
+
+		// Handle points earned if order is completed
+		if orderStatus == "completed" && input.CustomerID != nil && *input.CustomerID > 0 {
+			var customer models.Customer
+			if err := tx.First(&customer, *input.CustomerID).Error; err == nil {
+				// Calculate points earned: 1 point per ₱200 spent
+				pointsEarned := finalTotal / 200.0
+				if pointsEarned > 0 {
+					if err := tx.Model(&customer).Update("loyalty_points", customer.LoyaltyPoints+pointsEarned).Error; err != nil {
+						// Log but don't fail the order
+						fmt.Printf("Warning: failed to add loyalty points: %v\n", err)
+					}
+
+					// Create loyalty ledger entry for earning
+					ledgerEntry := models.LoyaltyLedger{
+						CustomerID:   *input.CustomerID,
+						OrderID:      &order.ID,
+						PointsEarned: pointsEarned,
+						Remarks:      fmt.Sprintf("Earned %v points from ₱%.2f purchase on Order #%d", pointsEarned, finalTotal, order.ID),
+					}
+					if err := tx.Create(&ledgerEntry).Error; err != nil {
+						fmt.Printf("Warning: failed to create loyalty ledger entry: %v\n", err)
+					}
+				}
+			}
+		}
+		// === END LOYALTY POINTS SYSTEM ===
 
 		return nil
 	})
