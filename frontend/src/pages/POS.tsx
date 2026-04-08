@@ -602,10 +602,23 @@ setProducts((pRes.data as { products?: Product[] }).products || []);
               <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Customer</label>
               <select
                 value={customerId}
-                onChange={(e) => {
-                  setCustomerId(e.target.value);
+                onChange={async (e) => {
+                  const cid = e.target.value;
+                  setCustomerId(cid);
                   setRfidCustomer(null);
                   setRedeemPoints('0');
+                  // Fetch customer data if selected
+                  if (cid) {
+                    try {
+                      const res = await api.get(`/api/customers/${cid}`);
+                      const data = res.data as { customer?: Customer };
+                      if (data?.customer) {
+                        setRfidCustomer(data.customer);
+                      }
+                    } catch {
+                      // ignore
+                    }
+                  }
                 }}
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
@@ -642,13 +655,13 @@ setProducts((pRes.data as { products?: Product[] }).products || []);
             )}
 
             {/* Loyalty Points Redemption */}
-            {rfidCustomer && (
+            {customerId && (
               <>
-                {rfidCustomer.loyalty_points > 0 && (
+                {(rfidCustomer?.loyalty_points || 0) > 0 && (
                   <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs font-bold text-amber-700 uppercase">Available Points</span>
-                      <span className="text-sm font-bold text-amber-800">{Math.floor(rfidCustomer.loyalty_points || 0)} pts</span>
+                      <span className="text-sm font-bold text-amber-800">{Math.floor(rfidCustomer?.loyalty_points || 0)} pts</span>
                     </div>
                     <div className="flex gap-2">
                       <input
