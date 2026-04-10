@@ -1,28 +1,33 @@
 package services
 
 import (
+	"crypto/tls"
 	"fmt"
 	"log"
+	"net/smtp"
 	"os"
 	"strings"
-
-	"github.com/sendgrid/sendgrid-go"
-	"github.com/sendgrid/sendgrid-go/helpers/mail"
 )
 
 type EmailService struct {
-	APIKey     string
-	FromEmail  string
-	FromName   string
-	AdminBcc   string
+	SMTPHost     string
+	SMTPPort     string
+	SMTPUser     string
+	SMTPPassword string
+	FromEmail    string
+	FromName     string
+	AdminBcc     string
 }
 
 func NewEmailService() *EmailService {
 	return &EmailService{
-		APIKey:    os.Getenv("SENDGRID_API_KEY"),
-		FromEmail: getEmailEnv("SENDGRID_FROM_EMAIL", "noreply@smsystem.com"),
-		FromName:  getEmailEnv("SENDGRID_FROM_NAME", "SMSystem"),
-		AdminBcc:  os.Getenv("ADMIN_BCC_EMAIL"),
+		SMTPHost:     getEmailEnv("SMTP_HOST", "smtp.gmail.com"),
+		SMTPPort:     getEmailEnv("SMTP_PORT", "587"),
+		SMTPUser:     os.Getenv("SMTP_USER"),
+		SMTPPassword: os.Getenv("SMTP_PASSWORD"),
+		FromEmail:    getEmailEnv("SMTP_FROM_EMAIL", ""),
+		FromName:     getEmailEnv("SMTP_FROM_NAME", "SMSystem"),
+		AdminBcc:     os.Getenv("ADMIN_BCC_EMAIL"),
 	}
 }
 
@@ -34,8 +39,8 @@ func getEmailEnv(key, fallback string) string {
 }
 
 func (e *EmailService) Send(toEmail, toName, subject, htmlContent string) error {
-	if e.APIKey == "" {
-		log.Printf("[EMAIL] SENDGRID_API_KEY not set, skipping email to %s | Subject: %s", toEmail, subject)
+	if e.SMTPUser == "" || e.SMTPPassword == "" {
+		log.Printf("[EMAIL] SMTP credentials not set, skipping email to %s | Subject: %s", toEmail, subject)
 		return nil
 	}
 
@@ -43,30 +48,90 @@ func (e *EmailService) Send(toEmail, toName, subject, htmlContent string) error 
 		return nil
 	}
 
-	from := mail.NewEmail(e.FromName, e.FromEmail)
-	to := mail.NewEmail(toName, toEmail)
-	message := mail.NewSingleEmail(from, subject, to, "", htmlContent)
-
-	// Add admin BCC if configured
+	// Build recipient list
+	recipients := []string{toEmail}
 	if e.AdminBcc != "" && e.AdminBcc != toEmail {
-		bcc := mail.NewEmail("Admin", e.AdminBcc)
-		personalization := message.Personalizations[0]
-		personalization.AddBCCs(bcc)
+		recipients = append(recipients, e.AdminBcc)
 	}
 
-	client := sendgrid.NewSendClient(e.APIKey)
-	response, err := client.Send(message)
+	// Determine from email
+	fromEmail := e.FromEmail
+	if fromEmail == "" {
+		fromEmail = e.SMTPUser
+	}
+
+	// Build email headers and body
+	var msg strings.Builder
+	msg.WriteString(fmt.Sprintf("From: %s <%s>\r\n", e.FromName, fromEmail))
+	msg.WriteString(fmt.Sprintf("To: %s <%s>\r\n", toName, toEmail))
+	if e.AdminBcc != "" && e.AdminBcc != toEmail {
+		msg.WriteString(fmt.Sprintf("Bcc: %s\r\n", e.AdminBcc))
+	}
+	msg.WriteString(fmt.Sprintf("Subject: %s\r\n", subject))
+	msg.WriteString("MIME-Version: 1.0\r\n")
+	msg.WriteString("Content-Type: text/html; charset=\"UTF-8\"\r\n")
+	msg.WriteString("\r\n")
+	msg.WriteString(htmlContent)
+
+	// Connect to SMTP server with TLS
+	auth := smtp.PlainAuth("", e.SMTPUser, e.SMTPPassword, e.SMTPHost)
+	addr := e.SMTPHost + ":" + e.SMTPPort
+
+	// Use TLS for port 587 (STARTTLS)
+	tlsConfig := &tls.Config{
+		ServerName: e.SMTPHost,
+	}
+
+	conn, err := smtp.Dial(addr)
 	if err != nil {
-		log.Printf("[EMAIL] ERROR sending to %s: %v", toEmail, err)
-		return fmt.Errorf("failed to send email: %w", err)
+		log.Printf("[EMAIL] ERROR connecting to SMTP %s: %v", addr, err)
+		return fmt.Errorf("failed to connect to SMTP: %w", err)
+	}
+	defer conn.Close()
+
+	// STARTTLS
+	if err = conn.StartTLS(tlsConfig); err != nil {
+		log.Printf("[EMAIL] ERROR STARTTLS: %v", err)
+		return fmt.Errorf("STARTTLS failed: %w", err)
 	}
 
-	if response.StatusCode >= 400 {
-		log.Printf("[EMAIL] ERROR SendGrid returned %d to %s: %s", response.StatusCode, toEmail, response.Body)
-		return fmt.Errorf("sendgrid returned status %d: %s", response.StatusCode, response.Body)
+	// Authenticate
+	if err = conn.Auth(auth); err != nil {
+		log.Printf("[EMAIL] ERROR auth as %s: %v", e.SMTPUser, err)
+		return fmt.Errorf("SMTP auth failed: %w", err)
 	}
 
-	log.Printf("[EMAIL] OK sent to %s | Subject: %s | Status: %d", toEmail, subject, response.StatusCode)
+	// Set sender
+	if err = conn.Mail(fromEmail); err != nil {
+		return fmt.Errorf("MAIL FROM failed: %w", err)
+	}
+
+	// Set recipients
+	for _, rcpt := range recipients {
+		if err = conn.Rcpt(rcpt); err != nil {
+			log.Printf("[EMAIL] ERROR adding recipient %s: %v", rcpt, err)
+		}
+	}
+
+	// Send body
+	w, err := conn.Data()
+	if err != nil {
+		return fmt.Errorf("DATA failed: %w", err)
+	}
+
+	_, err = w.Write([]byte(msg.String()))
+	if err != nil {
+		return fmt.Errorf("write failed: %w", err)
+	}
+
+	err = w.Close()
+	if err != nil {
+		return fmt.Errorf("close failed: %w", err)
+	}
+
+	conn.Quit()
+
+	log.Printf("[EMAIL] OK sent to %s | Subject: %s", toEmail, subject)
 	return nil
 }
 
@@ -88,12 +153,12 @@ func statusLabel(status string) string {
 
 func statusColor(status string) string {
 	colors := map[string]string{
-		"pending":    "#f59e0b", // amber
-		"approved":   "#3b82f6", // blue
-		"in_transit": "#8b5cf6", // purple
-		"completed":  "#10b981", // green
-		"rejected":   "#ef4444", // red
-		"cancelled":  "#6b7280", // gray
+		"pending":    "#f59e0b",
+		"approved":   "#3b82f6",
+		"in_transit": "#8b5cf6",
+		"completed":  "#10b981",
+		"rejected":   "#ef4444",
+		"cancelled":  "#6b7280",
 	}
 	if color, ok := colors[status]; ok {
 		return color
@@ -133,7 +198,6 @@ func statusActionMessage(status, recipientType string) string {
 			return "The transfer status has been updated."
 		}
 	}
-	// destination
 	switch status {
 	case "in_transit":
 		return "A shipment is on its way to your branch. Please prepare to receive and verify the items, then click <strong>Receive</strong> to confirm."
@@ -152,7 +216,6 @@ func (e *EmailService) SendTransferNotification(toEmail, branchName, refNumber, 
 
 	log.Printf("[EMAIL] Sending transfer notification to %s (ref: %s, status: %s)", toEmail, refNumber, status)
 
-	// Determine if recipient is source or destination
 	recipientType := "source"
 	if branchName == toBranch {
 		recipientType = "destination"
@@ -163,46 +226,26 @@ func (e *EmailService) SendTransferNotification(toEmail, branchName, refNumber, 
 	color := statusColor(status)
 	actionMsg := statusActionMessage(status, recipientType)
 
-	subject := fmt.Sprintf("%s [%s] Transfer %s — %s", emoji, branchName, refNumber, label)
+	subject := fmt.Sprintf("%s [%s] Transfer %s - %s", emoji, branchName, refNumber, label)
 
-	html := fmt.Sprintf(`
-<!DOCTYPE html>
+	html := fmt.Sprintf(`<!DOCTYPE html>
 <html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
 <body style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
   <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-    
-    <!-- Header -->
     <div style="background: linear-gradient(135deg, #4f46e5 0%%, #7c3aed 100%%); border-radius: 12px 12px 0 0; padding: 30px; text-align: center;">
-      <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 600;">
-        %s Stock Transfer Update
-      </h1>
+      <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 600;">%s Stock Transfer Update</h1>
       <p style="color: #c7d2fe; margin: 8px 0 0 0; font-size: 14px;">Reference: %s</p>
     </div>
-
-    <!-- Body -->
     <div style="background: #ffffff; padding: 30px; border-radius: 0 0 12px 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
-      
-      <!-- Status Badge -->
       <div style="text-align: center; margin-bottom: 24px;">
-        <span style="display: inline-block; background-color: %s; color: #ffffff; padding: 8px 20px; border-radius: 20px; font-size: 14px; font-weight: 600; letter-spacing: 0.5px;">
-          %s %s
-        </span>
+        <span style="display: inline-block; background-color: %s; color: #ffffff; padding: 8px 20px; border-radius: 20px; font-size: 14px; font-weight: 600;">%s %s</span>
       </div>
-
-      <!-- Action Message -->
-      <p style="color: #374151; font-size: 15px; line-height: 1.6; margin-bottom: 24px;">
-        %s
-      </p>
-
-      <!-- Transfer Details Table -->
+      <p style="color: #374151; font-size: 15px; line-height: 1.6; margin-bottom: 24px;">%s</p>
       <table style="width: 100%%; border-collapse: collapse; margin: 0 0 24px 0;">
         <tr>
           <td style="padding: 12px 16px; background: #f9fafb; border: 1px solid #e5e7eb; font-weight: 600; color: #374151; width: 40%%;">Reference</td>
-          <td style="padding: 12px 16px; border: 1px solid #e5e7eb; color: #111827; font-family: monospace; font-size: 14px;">%s</td>
+          <td style="padding: 12px 16px; border: 1px solid #e5e7eb; color: #111827; font-family: monospace;">%s</td>
         </tr>
         <tr>
           <td style="padding: 12px 16px; background: #f9fafb; border: 1px solid #e5e7eb; font-weight: 600; color: #374151;">From Branch</td>
@@ -214,45 +257,22 @@ func (e *EmailService) SendTransferNotification(toEmail, branchName, refNumber, 
         </tr>
         <tr>
           <td style="padding: 12px 16px; background: #f9fafb; border: 1px solid #e5e7eb; font-weight: 600; color: #374151;">Status</td>
-          <td style="padding: 12px 16px; border: 1px solid #e5e7eb;">
-            <span style="color: %s; font-weight: 600;">%s</span>
-          </td>
+          <td style="padding: 12px 16px; border: 1px solid #e5e7eb;"><span style="color: %s; font-weight: 600;">%s</span></td>
         </tr>
       </table>
-
-      <!-- CTA -->
-      <div style="text-align: center; margin: 24px 0;">
-        <a href="http://168.144.46.137:8080" style="display: inline-block; background: #4f46e5; color: #ffffff; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">
-          Open SMSystem
-        </a>
-      </div>
-
-      <!-- Footer -->
       <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;">
-      <p style="color: #9ca3af; font-size: 12px; text-align: center; margin: 0;">
-        This is an automated notification from SMSystem. Please do not reply to this email.
-      </p>
+      <p style="color: #9ca3af; font-size: 12px; text-align: center; margin: 0;">This is an automated notification from SMSystem.</p>
     </div>
   </div>
 </body>
 </html>`,
-		emoji,          // header emoji
-		refNumber,      // header ref
-		color,          // status badge bg
-		emoji,          // status badge emoji
-		label,          // status badge text
-		actionMsg,      // action message
-		refNumber,      // table ref
-		fromBranch,     // table from
-		toBranch,       // table to
-		color,          // table status color
-		label,          // table status label
+		emoji, refNumber, color, emoji, label, actionMsg,
+		refNumber, fromBranch, toBranch, color, label,
 	)
 
 	err := e.Send(toEmail, "Branch Manager", subject, html)
 	if err != nil {
 		log.Printf("[EMAIL] FAILED to send transfer notification to %s for %s: %v", toEmail, refNumber, err)
-		// Don't return error — email failure should not block the transfer
 		return nil
 	}
 
