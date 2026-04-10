@@ -4,6 +4,7 @@ import { PieChart, Pie, Cell, BarChart, Bar, LineChart, Line, XAxis, YAxis, Cart
 import { AlertCircle, TrendingUp, Package, Users, ShoppingCart, PhilippinePeso, MoreVertical, Download, Building2 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { Skeleton, SkeletonCard } from '../components/EmptyState';
+import { useDataFetch } from '../hooks/useDataFetch';
 
 interface OrderItem {
   product?: { name: string };
@@ -74,31 +75,30 @@ export default function Dashboard() {
     }
   }, [isSuperAdmin]);
 
+  const { data: statsData, isLoading: statsLoading } = useDataFetch({
+    queryKey: ['dashboard', 'stats', timeRange, branchFilter],
+    queryFn: () => {
+      const branchParam = isSuperAdmin && branchFilter !== 'ALL' ? `&branch_id=${branchFilter}` : '';
+      return api.get(`/api/dashboard?days=${timeRange}${branchParam}`);
+    },
+  });
+
   useEffect(() => {
-    const fetchStats = async () => {
-      setLoading(true);
-      try {
-        const branchParam = isSuperAdmin && branchFilter !== 'ALL' ? `&branch_id=${branchFilter}` : '';
-        const res = await api.get(`/api/dashboard?days=${timeRange}${branchParam}`);
-        const data = res.data as Record<string, unknown>;
-        setStats(prev => ({
-          ...prev,
-          ...data,
-          sales_trend: (data.sales_trend as typeof prev.sales_trend) || [],
-          low_stock_products: (data.low_stock_products as typeof prev.low_stock_products) || [],
-          top_advisors_today: (data.top_advisors_today as typeof prev.top_advisors_today) || [],
-          top_products_today: (data.top_products_today as typeof prev.top_products_today) || [],
-          category_profits: (data.category_profits as typeof prev.category_profits) || [],
-          product_revenue: (data.product_revenue as typeof prev.product_revenue) || []
-        }));
-      } catch (err) {
-        console.error('Failed to fetch dashboard stats', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchStats();
-  }, [timeRange, branchFilter, isSuperAdmin]);
+    if (statsData) {
+      const data = statsData as Record<string, unknown>;
+      setStats(prev => ({
+        ...prev,
+        ...data,
+        sales_trend: (data.sales_trend as typeof prev.sales_trend) || [],
+        low_stock_products: (data.low_stock_products as typeof prev.low_stock_products) || [],
+        top_advisors_today: (data.top_advisors_today as typeof prev.top_advisors_today) || [],
+        top_products_today: (data.top_products_today as typeof prev.top_products_today) || [],
+        category_profits: (data.category_profits as typeof prev.category_profits) || [],
+        product_revenue: (data.product_revenue as typeof prev.product_revenue) || []
+      }));
+      setLoading(false);
+    }
+  }, [statsData]);
 
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(val);
