@@ -35,7 +35,10 @@ export default function Branches() {
   const fetchBranches = async () => {
     try {
       const res = await api.get('/api/branches');
+      console.log('Branches response:', res.data);
+      console.log('Setting branches:', res.data.branches);
       setBranches(res.data.branches);
+      console.log('Branches state set to:', res.data.branches);
     } catch (error) {
       console.error('Failed to fetch branches:', error);
     } finally {
@@ -74,9 +77,13 @@ export default function Branches() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('formData before submit:', formData);
+    console.log('editingBranch:', editingBranch);
     try {
       if (editingBranch) {
-        await api.put(`/api/branches/${editingBranch.id}`, formData);
+        console.log('Sending PUT to:', `/api/branches/${editingBranch.id}`, 'with data:', formData);
+        const res = await api.put(`/api/branches/${editingBranch.id}`, formData);
+        console.log('Update response:', res.data);
       } else {
         await api.post('/api/branches', formData);
       }
@@ -84,6 +91,7 @@ export default function Branches() {
       fetchBranches();
     } catch (error: unknown) {
       const err = error as { response?: { data?: { error?: string } } };
+      console.error('Save error:', error);
       alert(err.response?.data?.error || 'Failed to save branch');
     }
   };
@@ -91,7 +99,7 @@ export default function Branches() {
   const columns = [
     { 
       key: 'name', 
-      label: 'Branch Details',
+      label: 'Branch',
       render: (item: Branch): ReactNode => (
         <div className="flex items-center">
           <div className="h-10 w-10 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-700 mr-3">
@@ -105,23 +113,17 @@ export default function Branches() {
       )
     },
     { 
-      key: 'address', 
-      label: 'Location',
+      key: 'email', 
+      label: 'Email',
       render: (item: Branch): ReactNode => (
-        <div className="flex items-center text-sm text-gray-600">
-          <MapPin className="w-4 h-4 mr-2 text-gray-400" />
-          {item.address || 'No address set'}
-        </div>
+        <span className="text-gray-900">{item.email || '-'}</span>
       )
     },
     { 
       key: 'phone', 
-      label: 'Contact',
+      label: 'Phone',
       render: (item: Branch): ReactNode => (
-        <div className="flex items-center text-sm text-gray-600">
-          <Phone className="w-4 h-4 mr-2 text-gray-400" />
-          {item.phone || 'No phone set'}
-        </div>
+        <span className="text-gray-600">{item.phone || '-'}</span>
       )
     },
     { 
@@ -138,16 +140,7 @@ export default function Branches() {
     {
       key: 'actions',
       label: '',
-      render: (item: Branch): ReactNode => (
-        <div className="flex justify-end pr-4">
-          <button
-            onClick={() => handleOpenModal(item)}
-            className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-          >
-            <Edit className="w-4 h-4" />
-          </button>
-        </div>
-      )
+      className: 'w-20',
     }
   ];
 
@@ -195,6 +188,7 @@ export default function Branches() {
           columns={columns}
           data={filteredBranches}
           loading={loading}
+          onEdit={(branch) => handleOpenModal(branch)}
         />
       </div>
 
