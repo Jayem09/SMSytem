@@ -52,52 +52,73 @@ type productInput struct {
 func (h *ProductHandler) List(c *gin.Context) {
 	branchID, _ := GetUintFromContext(c, "branchID")
 
-	var queryArgs []interface{}
-	var stockSubquery string
-	if branchID != 0 {
-		stockSubquery = "(SELECT COALESCE(SUM(quantity), 0) FROM batches WHERE batches.product_id = p.id AND batches.branch_id = ?)"
-		queryArgs = append(queryArgs, branchID)
-	} else {
-		stockSubquery = "(SELECT COALESCE(SUM(quantity), 0) FROM batches WHERE batches.product_id = p.id)"
-	}
-
 	var results []map[string]interface{}
-	err := database.DB.Raw(`
-		SELECT p.id, p.name, p.description, p.price, p.cost_price, `+stockSubquery+` as branch_stock, 
-		p.size, p.parent_id, p.image_url, p.category_id, p.brand_id, p.reorder_level,
-		p.primary_supplier_id, p.is_service, p.pcd, p.offset_et, p.width, p.bore, p.finish,
-		p.speed_rating, p.load_index, p.dot_code, p.ply_rating, p.points_required, p.is_reward,
-		p.created_at, p.updated_at,
-		c.name as category_name, b.name as brand_name
-		FROM products p 
-		LEFT JOIN categories c ON p.category_id = c.id
-		LEFT JOIN brands b ON p.brand_id = b.id
-		WHERE p.deleted_at IS NULL 
-		ORDER BY p.created_at DESC`,
-		queryArgs...).
-		Scan(&results).Error
 
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch products"})
-		return
+	if branchID != 0 {
+		err := database.DB.Raw(`
+			SELECT p.id, p.name, p.description, p.price, p.cost_price, 
+				COALESCE(b_stock.quantity, 0) as branch_stock, 
+				p.size, p.parent_id, p.image_url, p.category_id, p.brand_id, p.reorder_level,
+				p.primary_supplier_id, p.is_service, p.pcd, p.offset_et, p.width, p.bore, p.finish,
+				p.speed_rating, p.load_index, p.dot_code, p.ply_rating, p.points_required, p.is_reward,
+				p.created_at, p.updated_at,
+				c.name as category_name, br.name as brand_name
+			FROM products p 
+			LEFT JOIN categories c ON p.category_id = c.id
+			LEFT JOIN brands br ON p.brand_id = br.id
+			LEFT JOIN (
+				SELECT product_id, SUM(quantity) as quantity 
+				FROM batches 
+				WHERE branch_id = ? 
+				GROUP BY product_id
+			) b_stock ON p.id = b_stock.product_id
+			WHERE p.deleted_at IS NULL 
+			ORDER BY p.created_at DESC`,
+			branchID).
+			Scan(&results).Error
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch products"})
+			return
+		}
+	} else {
+		err := database.DB.Raw(`
+			SELECT p.id, p.name, p.description, p.price, p.cost_price, 
+				COALESCE(b_stock.quantity, 0) as branch_stock, 
+				p.size, p.parent_id, p.image_url, p.category_id, p.brand_id, p.reorder_level,
+				p.primary_supplier_id, p.is_service, p.pcd, p.offset_et, p.width, p.bore, p.finish,
+				p.speed_rating, p.load_index, p.dot_code, p.ply_rating, p.points_required, p.is_reward,
+				p.created_at, p.updated_at,
+				c.name as category_name, br.name as brand_name
+			FROM products p 
+			LEFT JOIN categories c ON p.category_id = c.id
+			LEFT JOIN brands br ON p.brand_id = br.id
+			LEFT JOIN (
+				SELECT product_id, SUM(quantity) as quantity 
+				FROM batches 
+				GROUP BY product_id
+			) b_stock ON p.id = b_stock.product_id
+			WHERE p.deleted_at IS NULL 
+			ORDER BY p.created_at DESC`).
+			Scan(&results).Error
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch products"})
+			return
+		}
 	}
 
 	for _, r := range results {
-		// Add category object
 		if catName, ok := r["category_name"].(string); ok && catName != "" {
 			r["category"] = map[string]interface{}{"name": catName}
 		} else {
 			r["category"] = nil
 		}
 
-		// Add brand object
 		if brandName, ok := r["brand_name"].(string); ok && brandName != "" {
 			r["brand"] = map[string]interface{}{"name": brandName}
 		} else {
 			r["brand"] = nil
 		}
 
-		// Clean up temporary fields
 		delete(r, "category_name")
 		delete(r, "brand_name")
 

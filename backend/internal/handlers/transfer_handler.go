@@ -225,21 +225,30 @@ func (h *TransferHandler) Create(c *gin.Context) {
 }
 
 func (h *TransferHandler) UpdateStatus(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid transfer ID"})
-		return
+	idParam := c.Param("id")
+	var transfer models.StockTransfer
+
+	// Try to find by numeric ID first
+	id, err := strconv.ParseUint(idParam, 10, 64)
+	if err == nil {
+		if err := database.DB.Preload("Items").First(&transfer, id).Error; err != nil {
+			// If numeric ID fails, try reference number
+			if err := database.DB.Preload("Items").Where("reference_number = ?", idParam).First(&transfer).Error; err != nil {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Transfer not found"})
+				return
+			}
+		}
+	} else {
+		// Not a number, try as reference number
+		if err := database.DB.Preload("Items").Where("reference_number = ?", idParam).First(&transfer).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Transfer not found"})
+			return
+		}
 	}
 
 	var input updateTransferStatusInput
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Validation failed"})
-		return
-	}
-
-	var transfer models.StockTransfer
-	if err := database.DB.Preload("Items").First(&transfer, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Transfer not found"})
 		return
 	}
 
@@ -280,6 +289,9 @@ func (h *TransferHandler) UpdateStatus(c *gin.Context) {
 
 	oldStatus := transfer.Status
 	newStatus := input.Status
+
+	log.Printf("TRANSFER UPDATE: ID=%d, Ref=%s, UserID=%d, BranchID=%d, Role=%s, %s -> %s",
+		transfer.ID, transfer.ReferenceNumber, userID, userBranchID, userRole, oldStatus, newStatus)
 
 	if oldStatus == newStatus {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Status is already " + newStatus})

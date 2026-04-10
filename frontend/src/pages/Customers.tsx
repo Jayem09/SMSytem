@@ -56,8 +56,12 @@ export default function Customers() {
       const params: Record<string, string> = {};
       if (search) params.search = search;
       const res = await api.get('/api/customers', { params });
-      const data = res.data as { customers?: Customer[] };
-      setCustomers(data.customers || []);
+      const data = res.data as { customers?: (Customer & { loyalty_points?: number })[] };
+      const mapped = (data.customers || []).map(c => ({
+        ...c,
+        loyaltyPoints: c.loyalty_points,
+      }));
+      setCustomers(mapped);
     } catch {
       setError('Failed to load customers');
     } finally {

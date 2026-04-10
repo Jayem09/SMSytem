@@ -157,3 +157,23 @@ export function useUpdateBrand() {
     },
   });
 }
+
+export function usePOSData() {
+  return useQuery({
+    queryKey: ['pos', 'data'],
+    queryFn: async () => {
+      const [pRes, cRes, custRes] = await Promise.all([
+        get('/api/products?all=1'),
+        get('/api/categories'),
+        get('/api/customers'),
+      ]);
+      return {
+        products: (pRes.data as { products?: unknown[] }).products || [],
+        categories: (cRes.data as { categories?: unknown[] }).categories || [],
+        customers: (custRes.data as { customers?: unknown[] }).customers || [],
+      };
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+}

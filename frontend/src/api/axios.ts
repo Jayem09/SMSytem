@@ -191,7 +191,7 @@ const apiPut = wrapMethod(api.put.bind(api));
 const apiDelete = wrapMethod(api.delete.bind(api));
 const apiPatch = wrapMethod(api.patch.bind(api));
 
-export { apiGet as get, apiPost as post, apiPut as put, apiDelete as delete, apiPatch as patch };
+export { apiGet as get, apiPost as post, apiPut as put, apiDelete as delete, apiDelete as del, apiPatch as patch };
 export const checkHealthNative = async () => {
   const res = await api.get('/api/health');
   return res.data;

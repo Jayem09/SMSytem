@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import api from '../api/axios';
 import Modal from '../components/Modal';
 import { printReceipt } from '../components/Receipt';
@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { usePOS, type POSProduct } from '../hooks/usePOS';
+import { usePOSData } from '../hooks/useQueries';
 
 interface Product {
   id: number;
@@ -88,25 +89,21 @@ export default function POS() {
 
   const { showToast } = useToast();
 
-  const fetchData = useCallback(async () => {
-    dispatch({ type: 'SET_LOADING', payload: true });
-    dispatch({ type: 'SET_ERROR', payload: null });
-    try {
-      const [pRes, cRes, custRes] = await Promise.all([
-        api.get('/api/products?all=1'),
-        api.get('/api/categories'),
-        api.get('/api/customers'),
-      ]);
-      dispatch({ type: 'SET_PRODUCTS', payload: (pRes.data as { products?: POSProduct[] }).products || [] });
-      dispatch({ type: 'SET_CATEGORIES', payload: (cRes.data as { categories?: { id: number; name: string }[] }).categories || [] });
-      dispatch({ type: 'SET_CUSTOMERS', payload: (custRes.data as { customers?: { id: number; name: string }[] }).customers || [] });
-    } catch {
-      console.error('POS data fetch failed');
-      dispatch({ type: 'SET_ERROR', payload: 'Failed to sync with inventory system. Please check your connection.' });
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
+  const { data: posData, isLoading: posLoading, error: posError, refetch } = usePOSData();
+
+  useEffect(() => {
+    dispatch({ type: 'SET_LOADING', payload: posLoading });
+    if (posData) {
+      dispatch({ type: 'SET_PRODUCTS', payload: posData.products as POSProduct[] });
+      dispatch({ type: 'SET_CATEGORIES', payload: posData.categories as { id: number; name: string }[] });
+      dispatch({ type: 'SET_CUSTOMERS', payload: posData.customers as { id: number; name: string }[] });
     }
-  }, [dispatch]);
+    if (posError) {
+      dispatch({ type: 'SET_ERROR', payload: 'Failed to sync with inventory system. Please check your connection.' });
+    }
+  }, [posData, posLoading, posError, dispatch]);
+
+  const fetchData = () => refetch();
 
   // RFID Scanner Logic - Only active when explicitly scanning
   const rfidInputRef = useRef<HTMLInputElement>(null);
@@ -165,10 +162,6 @@ export default function POS() {
     setSelectedReward(null);
     setRfidError(false);
   };
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
 
   const finalTotal = Math.max(0, posSubtotal - parseFloat(discount || '0'));
   const earnedPoints = Math.floor(posSubtotal / 200);
@@ -442,28 +435,15 @@ export default function POS() {
         </div>
 
         <div className="flex-none p-6 bg-gray-50 border-t border-gray-200 space-y-4">
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500 font-medium tracking-tight">Processing Subtotal</span>
-              <span className="font-bold text-gray-900">₱{subtotal.toLocaleString()}</span>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <div className="flex items-center gap-2">
-                <span className="text-gray-500 font-medium tracking-tight">Applied Discount</span>
-              </div>
-              <input
-                type="number"
-                className="w-20 text-right bg-transparent border-b border-gray-300 text-sm font-bold focus:border-indigo-600 outline-none"
-                value={discount}
-                onChange={(e) => setDiscount(e.target.value)}
-              />
-            </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-500 font-medium tracking-tight">Processing Subtotal</span>
+            <span className="font-bold text-gray-900">₱{posSubtotal.toLocaleString()}</span>
           </div>
 
           <div className="pt-4 border-t border-gray-200">
             <div className="flex justify-between items-end">
               <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Grand Total Amount</span>
-              <span className="text-3xl font-black text-gray-900 tracking-tighter leading-none">₱{finalTotal.toLocaleString()}</span>
+              <span className="text-3xl font-black text-gray-900 tracking-tighter leading-none">₱{posSubtotal.toLocaleString()}</span>
             </div>
           </div>
 
