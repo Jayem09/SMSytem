@@ -57,8 +57,9 @@ export default function Monitoring() {
       setLastUpdated(new Date());
     } catch (err) {
       console.error('Failed to fetch metrics', err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   useEffect(() => {

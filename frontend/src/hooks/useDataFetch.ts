@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import type { ApiResponse } from '../types/api';
 
 interface UseDataFetchOptions<T> {
-  queryKey: (string | number | undefined)[];
   queryFn: () => Promise<ApiResponse<T>>;
   enabled?: boolean;
 }
@@ -15,7 +14,6 @@ interface UseDataFetchResult<T> {
 }
 
 export function useDataFetch<T>({
-  queryKey,
   queryFn,
   enabled = true,
 }: UseDataFetchOptions<T>): UseDataFetchResult<T> {

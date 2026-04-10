@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import api from '../api/axios';
 import Modal from '../components/Modal';
 import { printReceipt } from '../components/Receipt';
@@ -21,10 +21,6 @@ interface Product {
   category?: { name: string };
   points_required?: number;
   is_reward?: boolean;
-}
-
-interface CartItem extends Product {
-  quantity: number;
 }
 
 interface OrderItem {
@@ -60,14 +56,9 @@ interface Customer {
   loyalty_points?: number;
 }
 
-interface SettingsData {
-  service_advisors?: string;
-}
-
 export default function POS() {
   const { state, dispatch, addToCart, removeFromCart, updateQuantity, clearCart, setSearch, setCategory, subtotal: posSubtotal, filteredProducts } = usePOS();
   const { products, categories, customers, cart, search, selectedCategory, loading, error } = state;
-  const [serviceAdvisors] = useState<string[]>([]);
 
   const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
   const [customerId, setCustomerId] = useState('');
@@ -97,7 +88,7 @@ export default function POS() {
 
   const { showToast } = useToast();
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     dispatch({ type: 'SET_LOADING', payload: true });
     dispatch({ type: 'SET_ERROR', payload: null });
     try {
@@ -115,7 +106,7 @@ export default function POS() {
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
-  };
+  }, [dispatch]);
 
   // RFID Scanner Logic - Only active when explicitly scanning
   const rfidInputRef = useRef<HTMLInputElement>(null);
@@ -177,7 +168,7 @@ export default function POS() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   const finalTotal = Math.max(0, posSubtotal - parseFloat(discount || '0'));
   const earnedPoints = Math.floor(posSubtotal / 200);

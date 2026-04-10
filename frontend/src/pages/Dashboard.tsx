@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import api from '../api/axios';
 import { PieChart, Pie, Cell, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { AlertCircle, TrendingUp, Package, Users, ShoppingCart, PhilippinePeso, MoreVertical, Download, Building2 } from 'lucide-react';
+import { TrendingUp, Package, Users, ShoppingCart, PhilippinePeso, MoreVertical, Download, Building2 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { Skeleton, SkeletonCard } from '../components/EmptyState';
 import { useDataFetch } from '../hooks/useDataFetch';

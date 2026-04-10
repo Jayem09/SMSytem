@@ -27,9 +27,9 @@ export default function Backups() {
     try {
       const res = await api.get('/api/backups');
       setBackups(res.data.backups || res.data || []);
-      setLoading(false);
     } catch (err) {
       console.error('Failed to fetch backups', err);
+    } finally {
       setLoading(false);
     }
   }, []);

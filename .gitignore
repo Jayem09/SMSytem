@@ -75,3 +75,17 @@ package.json
 
 # Sisyphus (planning artifacts)
 .sisyphus/*.pem
+
+# GitNexus (auto-generated index)
+.gitnexus/
+
+# Claude Code (auto-generated skills & hooks)
+.claude/
+CLAUDE.md
+
+# OpenCode (local dev config)
+.opencode/
+
+# Superpowers (planning artifacts)
+docs/superpowers/plans/
+docs/superpowers/specs/

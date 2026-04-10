@@ -57,11 +57,6 @@ export default function RFIDField({ value, onChange, disabled }: RFIDFieldProps)
     setInputValue('');
   };
 
-  const cancelScan = () => {
-    setIsScanning(false);
-    setBuffer('');
-  };
-
   // Handle manual input - only accept numbers, require Enter to confirm
   const handleManualInput = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {

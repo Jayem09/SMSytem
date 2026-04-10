@@ -65,13 +65,6 @@ export default function Transfers() {
   
   const { showToast } = useToast();
 
-  const showConfirm = (title: string, message: string, onConfirm: () => void) => {
-    
-    if (window.confirm(`${title}: ${message}`)) {
-      onConfirm();
-    }
-  };
-
   const isSuperAdmin = user?.role?.toLowerCase() === 'super_admin';
   const myBranchId = user?.branch_id ? Number(user.branch_id) : null;
   const focusBranchId = isSuperAdmin ? (branchFilter === 'ALL' ? null : Number(branchFilter)) : myBranchId;

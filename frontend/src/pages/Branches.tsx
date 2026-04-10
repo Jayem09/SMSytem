@@ -1,5 +1,5 @@
 import { useState, useEffect, type ReactNode } from 'react';
-import { Search, Plus, Building2, MapPin, Phone, Edit, Activity, Mail } from 'lucide-react';
+import { Search, Plus, Building2, Activity, Mail } from 'lucide-react';
 import api from '../api/axios';
 import DataTable from '../components/DataTable';
 import Modal from '../components/Modal';
@@ -249,7 +249,7 @@ export default function Branches() {
             </button>
             <button
               type="button"
-              onClick={() => { handleSubmit({ preventDefault: () => {} } as any); }}
+              onClick={() => { handleSubmit({ preventDefault: () => {} } as React.FormEvent); }}
               className="px-4 py-2 text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors font-medium shadow-sm"
             >
               {editingBranch ? 'Update Branch' : 'Create Branch'}
