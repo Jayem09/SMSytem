@@ -286,6 +286,35 @@ func (h *TransferHandler) UpdateStatus(c *gin.Context) {
 		return
 	}
 
+	// Validate status transition path
+	validTransitions := map[string][]string{
+		models.TransferStatusPending:   {models.TransferStatusApproved, models.TransferStatusRejected, models.TransferStatusCancelled},
+		models.TransferStatusApproved:  {models.TransferStatusInTransit, models.TransferStatusCancelled},
+		models.TransferStatusInTransit: {models.TransferStatusCompleted},
+		models.TransferStatusCompleted: {},
+		models.TransferStatusRejected:  {},
+		models.TransferStatusCancelled: {},
+	}
+
+	allowedNext, exists := validTransitions[oldStatus]
+	if !exists {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Unknown current status: " + oldStatus})
+		return
+	}
+
+	isValidTransition := false
+	for _, allowed := range allowedNext {
+		if allowed == newStatus {
+			isValidTransition = true
+			break
+		}
+	}
+	if !isValidTransition {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Cannot change status from '%s' to '%s'", oldStatus, newStatus)})
+		return
+	}
+
+	// Permission checks (super_admin bypasses all)
 	if userRole != "super_admin" {
 		if newStatus == models.TransferStatusApproved || newStatus == models.TransferStatusInTransit || newStatus == models.TransferStatusRejected {
 			if userBranchID != transfer.SourceBranchID {
@@ -296,6 +325,12 @@ func (h *TransferHandler) UpdateStatus(c *gin.Context) {
 		if newStatus == models.TransferStatusCompleted {
 			if userBranchID != transfer.DestinationBranchID {
 				c.JSON(http.StatusForbidden, gin.H{"error": "Only the destination branch can receive transfers"})
+				return
+			}
+		}
+		if newStatus == models.TransferStatusCancelled {
+			if userBranchID != transfer.SourceBranchID && userID != transfer.RequestedByUserID {
+				c.JSON(http.StatusForbidden, gin.H{"error": "Only the source branch or the requester can cancel transfers"})
 				return
 			}
 		}
@@ -394,7 +429,7 @@ func (h *TransferHandler) UpdateStatus(c *gin.Context) {
 			}
 		} else if oldStatus == models.TransferStatusInTransit && newStatus == models.TransferStatusCompleted {
 
-			for _, item := range transfer.Items {
+			for i, item := range transfer.Items {
 
 				var destWarehouse models.Warehouse
 				if err := tx.Where("branch_id = ?", transfer.DestinationBranchID).First(&destWarehouse).Error; err != nil {
@@ -417,10 +452,14 @@ func (h *TransferHandler) UpdateStatus(c *gin.Context) {
 					return err
 				}
 
+				// Add stock back to global product.stock (was deducted on ship, now available again at destination)
 				var product models.Product
 				if err := tx.First(&product, item.ProductID).Error; err == nil {
 					tx.Model(&product).Update("stock", product.Stock+item.Quantity)
 				}
+
+				// Set received_quantity on the transfer item
+				tx.Model(&transfer.Items[i]).Update("received_quantity", item.Quantity)
 
 				movement := models.StockMovement{
 					ProductID:   item.ProductID,
@@ -446,34 +485,42 @@ func (h *TransferHandler) UpdateStatus(c *gin.Context) {
 
 	h.LogService.Record(userID, "UPDATE", "StockTransfer", strconv.Itoa(int(transfer.ID)), fmt.Sprintf("Status changed to %s", newStatus), c.ClientIP())
 
-	// Send email notification
-	// Notify source branch when their transfer status changes
+	// Send email notifications (async, never blocks the response)
 	if h.EmailService != nil {
 		var sourceBranch, destBranch models.Branch
 		database.DB.First(&sourceBranch, transfer.SourceBranchID)
 		database.DB.First(&destBranch, transfer.DestinationBranchID)
 
-		// Notify source branch about status change
+		// Notify source branch about all status changes
 		if sourceBranch.Email != "" {
-			go h.EmailService.SendTransferNotification(
-				sourceBranch.Email,
-				sourceBranch.Name,
-				transfer.ReferenceNumber,
-				newStatus,
-				sourceBranch.Name,
-				destBranch.Name,
-			)
+			go func() {
+				if err := h.EmailService.SendTransferNotification(
+					sourceBranch.Email,
+					sourceBranch.Name,
+					transfer.ReferenceNumber,
+					newStatus,
+					sourceBranch.Name,
+					destBranch.Name,
+				); err != nil {
+					log.Printf("[TRANSFER] Email to source branch %s failed: %v", sourceBranch.Name, err)
+				}
+			}()
 		}
-		// Also notify destination when transfer is in transit (they need to receive)
-		if newStatus == "in_transit" && destBranch.Email != "" {
-			go h.EmailService.SendTransferNotification(
-				destBranch.Email,
-				destBranch.Name,
-				transfer.ReferenceNumber,
-				newStatus,
-				sourceBranch.Name,
-				destBranch.Name,
-			)
+
+		// Notify destination branch when items are shipped (in_transit) or received (completed)
+		if destBranch.Email != "" && (newStatus == models.TransferStatusInTransit || newStatus == models.TransferStatusCompleted) {
+			go func() {
+				if err := h.EmailService.SendTransferNotification(
+					destBranch.Email,
+					destBranch.Name,
+					transfer.ReferenceNumber,
+					newStatus,
+					sourceBranch.Name,
+					destBranch.Name,
+				); err != nil {
+					log.Printf("[TRANSFER] Email to destination branch %s failed: %v", destBranch.Name, err)
+				}
+			}()
 		}
 	}
 

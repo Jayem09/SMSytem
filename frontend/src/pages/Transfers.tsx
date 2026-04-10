@@ -93,17 +93,17 @@ export default function Transfers() {
       ]);
 
       if (results[0].status === 'fulfilled') {
-        const res = (results[0] as PromiseFulfilledResult<{ data: { transfers?: unknown[] } }>).value;
+        const res = (results[0] as PromiseFulfilledResult<{ data: { transfers?: Transfer[] } }>).value;
         setTransfers(res.data.transfers || []);
       }
 
       if (results[1].status === 'fulfilled') {
-        const branchesRes = (results[1] as PromiseFulfilledResult<{ data: { branches?: unknown[] } }>).value;
+        const branchesRes = (results[1] as PromiseFulfilledResult<{ data: { branches?: Branch[] } }>).value;
         setBranches(branchesRes.data.branches || []);
       }
 
       if (results[2].status === 'fulfilled') {
-        const productsRes = (results[2] as PromiseFulfilledResult<{ data: { products?: unknown[] } }>).value;
+        const productsRes = (results[2] as PromiseFulfilledResult<{ data: { products?: Product[] } }>).value;
         setProducts(productsRes.data.products || []);
       }
 
