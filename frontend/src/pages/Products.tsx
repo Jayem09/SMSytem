@@ -5,6 +5,7 @@ import DataTable from '../components/DataTable';
 import Modal from '../components/Modal';
 import FormField from '../components/FormField';
 import { useAuth } from '../hooks/useAuth';
+import { useDataFetch } from '../hooks/useDataFetch';
 
 interface Category { id: number; name: string; }
 interface Brand { id: number; name: string; }
@@ -87,46 +88,49 @@ export default function Products() {
 
   const [isImporting, setIsImporting] = useState(false);
 
-  const fetchProducts = useCallback(async () => {
-    try {
+  const { data: productsData, isLoading: productsLoading, refetch: refetchProducts } = useDataFetch({
+    queryKey: ['products', search, filterCategory, filterBrand],
+    queryFn: () => {
       const params: Record<string, string> = { all: '1' };
       if (search) params.search = search;
       if (filterCategory) params.category_id = filterCategory;
       if (filterBrand) params.brand_id = filterBrand;
-      
-      const res = await api.get('/api/products', { params });
-      setProducts(res.data.products || []);
-    } catch {
-      setError('Failed to load products');
-    } finally {
+      return api.get('/api/products', { params });
+    },
+  });
+
+  const { data: metaData } = useDataFetch({
+    queryKey: ['products', 'meta'],
+    queryFn: () => Promise.all([
+      api.get('/api/categories'),
+      api.get('/api/brands'),
+    ]).then(([catRes, brandRes]) => ({
+      data: { categories: catRes.data.categories, brands: brandRes.data.brands },
+      status: catRes.status,
+      statusText: catRes.statusText,
+      headers: {},
+    })),
+  });
+
+  useEffect(() => {
+    if (productsData) {
+      const data = productsData as { products?: Product[] };
+      setProducts(data.products || []);
       setLoading(false);
     }
-  }, [search, filterCategory, filterBrand]);
+  }, [productsData]);
 
-  const fetchMeta = useCallback(async () => {
-    try {
-      const [catRes, brandRes] = await Promise.all([
-        api.get('/api/categories'),
-        api.get('/api/brands'),
-      ]);
-      setCategories(catRes.data.categories || []);
-      setBrands(brandRes.data.brands || []);
-    } catch {
-      setError('Failed to load metadata');
+  useEffect(() => {
+    if (metaData) {
+      const data = metaData as { categories?: Category[]; brands?: Brand[] };
+      setCategories(data.categories || []);
+      setBrands(data.brands || []);
     }
-  }, []);
+  }, [metaData]);
 
-  useEffect(() => { 
-    fetchProducts(); 
-    fetchMeta(); 
-  }, [fetchProducts, fetchMeta]);
-
-  
-  
-  useEffect(() => { 
-    const t = setTimeout(fetchProducts, 300); 
-    return () => clearTimeout(t); 
-  }, [fetchProducts]);
+  const fetchProducts = useCallback(() => {
+    refetchProducts();
+  }, [refetchProducts]);
 
   const openCreate = () => {
     setEditing(null);
