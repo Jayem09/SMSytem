@@ -66,7 +66,6 @@ class TauriApi {
     console.debug('fetchRequest:', method, fullUrl);
     const response = await fetch(fullUrl, options);
     console.debug('Fetch called:', method, fullUrl, 'status:', response.status);
-    if (!response.ok) {
     let responseData: unknown;
     try {
       responseData = await response.json();
