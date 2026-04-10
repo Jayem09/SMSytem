@@ -1,4 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from './lib/queryClient';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import ToastContainer from './components/Toast';
@@ -82,6 +84,7 @@ function App() {
 
     return (
       <ErrorBoundary>
+        <QueryClientProvider client={queryClient}>
         <BrowserRouter>
         <AuthProvider>
           <ToastProvider>
@@ -125,8 +128,9 @@ function App() {
             </MaintenanceGuard>
           </ToastProvider>
         </AuthProvider>
-      </BrowserRouter>
-    </ErrorBoundary>
+        </BrowserRouter>
+        </QueryClientProvider>
+      </ErrorBoundary>
   );
 }
 
