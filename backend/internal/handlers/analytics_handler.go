@@ -149,7 +149,7 @@ func (h *AnalyticsHandler) processQuery(question string, branchID uint, mode str
 			log.Printf("AI error: %v", err)
 			return &QueryResult{
 				Query:  question,
-				Answer: "Sorry, AI is taking too long. Try again.",
+				Answer: "AI error: " + err.Error(),
 			}
 		}
 

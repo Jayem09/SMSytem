@@ -24,7 +24,7 @@ func NewOllamaClient() *OllamaClient {
 	}
 	return &OllamaClient{
 		BaseURL: baseURL,
-		Model:   "mistral:7b",
+		Model:   "qwen2.5:0.5b",
 	}
 }
 
