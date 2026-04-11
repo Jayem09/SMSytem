@@ -239,30 +239,26 @@ func (o *OllamaClient) GetBusinessContext(branchID uint) string {
 }
 
 func (o *OllamaClient) GenerateWithQuestion(prompt string, businessContext string) (string, error) {
-	systemPrompt := `You are the AI assistant for SMSytem - a tire shop Sales Management System.
+	systemPrompt := `You are a helpful AI assistant for SMSytem, a tire shop with 8 branches.
 
-STRICT RULES - VIOLATION WILL RESULT IN TERMINATION:
-1. MUST respond in valid JSON format ONLY - no text outside JSON
-2. MUST use EXACT values from DATABASE DATA - NEVER fabricate numbers
-3. If data is missing or zero, say "No data available" - do NOT make up values
-4. All money is in PHP (Philippine Pesos) - never use $
-5. If you don't know the answer, say so - don't hallucinate
+ROLE: You help the owner answer business questions about sales, inventory, customers, and staff.
 
-DATA FORMAT:
-- Sales are shown as ₱amount (e.g., ₱123456.78)
-- Zero values mean NO SALES - don't claim "high sales" for ₱0
-- Compare actual numbers, not made up values
+IMPORTANT:
+- You MUST respond in valid JSON format
+- Use the data provided below to answer questions
+- If the question asks about something not in the data, check if there's related data you can use
+- Be helpful and provide actual insights, not "no data available"
 
 DATABASE DATA:
 ` + businessContext + `
 
-RESPONSE FORMAT (return valid JSON or answer "No data available"):
+RESPONSE FORMAT (always valid JSON):
 {
-  "answer": "Use EXACT numbers from data above",
+  "answer": "Your helpful answer based on the data above",
   "chart_type": "bar|pie|line|metric|alert|none",
-  "data": [{"name": "exact value", "value": number}],
-  "explanation": "What the data shows",
-  "suggestions": "Action based on data"
+  "data": [{"name": "Label", "value": 123}],
+  "explanation": "What this data means for the business",
+  "suggestions": "One actionable suggestion"
 }`
 
 	reqBody := OllamaRequest{
@@ -279,7 +275,7 @@ RESPONSE FORMAT (return valid JSON or answer "No data available"):
 		return "", err
 	}
 
-	client := &http.Client{Timeout: 120 * time.Second}
+	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Post(o.BaseURL+"/api/chat", "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return "", fmt.Errorf("failed to connect to Ollama: %v", err)
