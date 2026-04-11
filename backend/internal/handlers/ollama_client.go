@@ -88,6 +88,15 @@ func (o *OllamaClient) GetBusinessContext(branchID uint) string {
 	var topCustomers []TopCustomer
 	db.Raw("SELECT COALESCE(c.name, o.guest_name) as name, SUM(o.total_amount - o.discount_amount) as total FROM orders o LEFT JOIN customers c ON o.customer_id = c.id WHERE o.status != 'cancelled' AND YEAR(o.created_at) = YEAR(NOW()) AND MONTH(o.created_at) = MONTH(NOW()) GROUP BY COALESCE(c.name, o.guest_name) ORDER BY total DESC LIMIT 5").Scan(&topCustomers)
 
+	// Get all staff/users
+	type Staff struct {
+		Name  string
+		Email string
+		Role  string
+	}
+	var staff []Staff
+	db.Raw("SELECT name, email, role FROM users WHERE deleted_at IS NULL").Scan(&staff)
+
 	// Build context with real data
 	context := fmt.Sprintf("Tire shop this month: Sales ₱%.0f, Total sales ₱%.0f, Expenses ₱%.0f. Products: %d. Customers: %d.", monthSales, totalSales, expenses, products, customers)
 
@@ -113,6 +122,17 @@ func (o *OllamaClient) GetBusinessContext(branchID uint) string {
 		context += "."
 	}
 
+	if len(staff) > 0 {
+		context += " Staff/Users: "
+		for i, s := range staff {
+			if i > 0 {
+				context += ", "
+			}
+			context += fmt.Sprintf("%s (%s, %s)", s.Name, s.Email, s.Role)
+		}
+		context += "."
+	}
+
 	// Update cache
 	contextCache.Lock()
 	contextCache.context = context
@@ -125,8 +145,10 @@ func (o *OllamaClient) GetBusinessContext(branchID uint) string {
 func (o *OllamaClient) GenerateWithQuestion(prompt string, businessContext string) (string, error) {
 	systemPrompt := `You are a tire shop analytics assistant. 
 
+CRITICAL: Only use data provided in the "Data:" section below. NEVER make up or guess data. If the data is not in the context, say "I don't have that information."
+
 IMPORTANT - When to use JSON:
-- ONLY respond with JSON when the user asks about specific data like: sales, revenue, products, customers, expenses, orders, profit, trends, charts, analytics, comparisons, rankings
+- ONLY respond with JSON when the user asks about specific data like: sales, revenue, products, customers, expenses, orders, profit, trends, charts, analytics, comparisons, rankings, staff, users
 - For ALL other questions (greetings, casual chat, opinions, help requests), respond in plain conversational text WITHOUT JSON
 
 Examples of data questions (use JSON):
@@ -135,13 +157,12 @@ Examples of data questions (use JSON):
 - "show me sales by category"
 - "top customers this week"
 - "profit vs last month"
+- "list all staff"
 
 Examples of non-data questions (plain text):
 - "yo" or "hello" or "hi"
 - "how are you"
-- "what can you do"
 - "thanks"
-- "good morning"
 
 JSON format for data questions:
 {
@@ -154,7 +175,10 @@ JSON format for data questions:
 
 Data: ` + businessContext + `
 
-Remember: JSON only for data/analytics questions, plain text for everything else.`
+Remember: 
+1. Only use data from the context provided
+2. If data is not available, say so
+3. JSON only for data questions, plain text for everything else`
 
 	reqBody := OllamaRequest{
 		Model: o.Model,
