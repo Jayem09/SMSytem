@@ -60,21 +60,58 @@ func (o *OllamaClient) GetBusinessContext(branchID uint) string {
 	}
 	contextCache.RUnlock()
 
-	// FAST - only run 5 essential queries
 	db := database.DB
 
 	var totalSales, monthSales, expenses float64
 	var products, customers int
 
-	// Just 5 queries instead of 19 - WAY faster
+	// Essential queries
 	db.Raw("SELECT COALESCE(SUM(total_amount - discount_amount), 0) FROM orders WHERE status != 'cancelled'").Scan(&totalSales)
 	db.Raw("SELECT COALESCE(SUM(total_amount - discount_amount), 0) FROM orders WHERE YEAR(created_at) = YEAR(NOW()) AND MONTH(created_at) = MONTH(NOW()) AND status != 'cancelled'").Scan(&monthSales)
 	db.Raw("SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE YEAR(expense_date) = YEAR(NOW()) AND MONTH(expense_date) = MONTH(NOW())").Scan(&expenses)
 	db.Raw("SELECT COUNT(*) FROM products WHERE deleted_at IS NULL").Scan(&products)
 	db.Raw("SELECT COUNT(*) FROM customers").Scan(&customers)
 
-	// Build simple context string
-	context := fmt.Sprintf("Tire shop sales: ₱%.0f this month, ₱%.0f total. Expenses: ₱%.0f. Products: %d. Customers: %d.", monthSales, totalSales, expenses, products, customers)
+	// Get top products
+	type TopProduct struct {
+		Name  string
+		Total float64
+	}
+	var topProducts []TopProduct
+	db.Raw("SELECT p.name as name, SUM(oi.subtotal) as total FROM order_items oi JOIN orders o ON oi.order_id = o.id JOIN products p ON oi.product_id = p.id WHERE o.status != 'cancelled' AND YEAR(o.created_at) = YEAR(NOW()) AND MONTH(o.created_at) = MONTH(NOW()) GROUP BY p.id, p.name ORDER BY total DESC LIMIT 5").Scan(&topProducts)
+
+	// Get recent customers
+	type TopCustomer struct {
+		Name  string
+		Total float64
+	}
+	var topCustomers []TopCustomer
+	db.Raw("SELECT COALESCE(c.name, o.guest_name) as name, SUM(o.total_amount - o.discount_amount) as total FROM orders o LEFT JOIN customers c ON o.customer_id = c.id WHERE o.status != 'cancelled' AND YEAR(o.created_at) = YEAR(NOW()) AND MONTH(o.created_at) = MONTH(NOW()) GROUP BY COALESCE(c.name, o.guest_name) ORDER BY total DESC LIMIT 5").Scan(&topCustomers)
+
+	// Build context with real data
+	context := fmt.Sprintf("Tire shop this month: Sales ₱%.0f, Total sales ₱%.0f, Expenses ₱%.0f. Products: %d. Customers: %d.", monthSales, totalSales, expenses, products, customers)
+
+	if len(topProducts) > 0 {
+		context += " Top products: "
+		for i, p := range topProducts {
+			if i > 0 {
+				context += ", "
+			}
+			context += fmt.Sprintf("%s ₱%.0f", p.Name, p.Total)
+		}
+		context += "."
+	}
+
+	if len(topCustomers) > 0 {
+		context += " Top customers: "
+		for i, c := range topCustomers {
+			if i > 0 {
+				context += ", "
+			}
+			context += fmt.Sprintf("%s ₱%.0f", c.Name, c.Total)
+		}
+		context += "."
+	}
 
 	// Update cache
 	contextCache.Lock()
@@ -86,9 +123,29 @@ func (o *OllamaClient) GetBusinessContext(branchID uint) string {
 }
 
 func (o *OllamaClient) GenerateWithQuestion(prompt string, businessContext string) (string, error) {
-	systemPrompt := `You are a helpful assistant for a tire shop. Reply in English only. Keep it short.
+	systemPrompt := `You are a tire shop analytics assistant. 
+
+For questions about sales, products, customers, expenses, or any data that can be visualized, you MUST respond with ONLY a JSON object in this exact format (no other text before or after):
+
+{
+  "chart_type": "bar|line|pie|metric",
+  "title": "Short descriptive title",
+  "labels": ["label1", "label2", "label3", ...],
+  "values": [number1, number2, number3, ...],
+  "summary": "One sentence summary of the data"
+}
+
+Chart type rules:
+- bar: comparing categories (e.g., monthly sales, top products, sales by category)
+- line: trends over time (e.g., daily sales, weekly revenue)
+- pie: parts of a whole (e.g., sales by category, payment method breakdown)
+- metric: single important number (e.g., total revenue, order count, profit)
+
+For simple greetings or non-data questions, respond in plain conversational text.
+
 Data: ` + businessContext + `
-Respond in JSON: {"answer":"your answer","chart_type":"none","explanation":"","suggestions":""}`
+
+Remember: JSON ONLY for data questions, plain text for everything else.`
 
 	reqBody := OllamaRequest{
 		Model: o.Model,

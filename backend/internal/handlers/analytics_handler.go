@@ -153,23 +153,33 @@ func (h *AnalyticsHandler) processQuery(question string, branchID uint, mode str
 			}
 		}
 
-		// Try to parse as JSON
-		var aiResp AIResponse
-		if json.Valid([]byte(resp)) {
-			if err := json.Unmarshal([]byte(resp), &aiResp); err == nil {
-				return &QueryResult{
-					Query:       question,
-					Answer:      aiResp.Answer,
-					Data:        aiResp.Data,
-					ChartType:   aiResp.ChartType,
-					Explanation: aiResp.Explanation,
-					Suggestions: aiResp.Suggestions,
+		// Try to parse as JSON chart response
+		var chartResp struct {
+			ChartType string    `json:"chart_type"`
+			Title     string    `json:"title"`
+			Labels    []string  `json:"labels"`
+			Values    []float64 `json:"values"`
+			Summary   string    `json:"summary"`
+		}
+
+		if json.Unmarshal([]byte(resp), &chartResp) == nil && chartResp.ChartType != "" {
+			// Convert to chart data format
+			chartData := make([]map[string]interface{}, len(chartResp.Labels))
+			for i, label := range chartResp.Labels {
+				chartData[i] = map[string]interface{}{
+					"name":  label,
+					"value": chartResp.Values[i],
 				}
+			}
+			return &QueryResult{
+				Query:     question,
+				Answer:    chartResp.Summary,
+				Data:      chartData,
+				ChartType: chartResp.ChartType,
 			}
 		}
 
-		// JSON parse failed - return raw response as answer (no retry to speed up)
-		log.Printf("AI JSON parse failed, returning raw: %s", resp[:min(100, len(resp))])
+		// Not JSON - return as plain text
 		return &QueryResult{
 			Query:  question,
 			Answer: resp,
