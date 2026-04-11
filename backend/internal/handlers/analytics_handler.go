@@ -137,8 +137,8 @@ func (h *AnalyticsHandler) processQuery(question string, branchID uint, mode str
 
 	answer := h.fallbackQuery(question)
 
-	// If mode is "ai" and Fast mode didn't find a match, try Ollama
-	if mode == "ai" && answer == "Sorry, I couldn't understand that question. Try asking about revenue, sales, inventory, or customers." {
+	// If mode is "ai" and Fast mode didn't find a match (returned default fallback), try Ollama
+	if mode == "ai" && strings.Contains(answer, "I couldn't understand that") {
 		ollama := NewOllamaClient()
 		ollamaAnswer, err := ollama.Generate(question)
 		if err != nil {
