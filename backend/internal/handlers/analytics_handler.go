@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -12,6 +13,15 @@ import (
 )
 
 type AnalyticsHandler struct{}
+
+// AIResponse represents structured JSON response from Ollama
+type AIResponse struct {
+	Answer      string      `json:"answer"`
+	ChartType   string      `json:"chart_type"`
+	Data        interface{} `json:"data"`
+	Explanation string      `json:"explanation"`
+	Suggestions string      `json:"suggestions"`
+}
 
 func NewAnalyticsHandler() *AnalyticsHandler {
 	return &AnalyticsHandler{}
@@ -141,12 +151,27 @@ func (h *AnalyticsHandler) processQuery(question string, branchID uint, mode str
 	if mode == "ai" && strings.Contains(answer, "I couldn't understand that") {
 		ollama := NewOllamaClient()
 		ctx := ollama.GetBusinessContext(branchID)
-		ollamaAnswer, err := ollama.GenerateWithQuestion(question, ctx)
-		if err != nil {
-			log.Printf("Ollama error: %v", err)
-		} else {
-			answer = ollamaAnswer
+		resp, err := ollama.GenerateWithQuestion(question, ctx)
+
+		// Try to parse as JSON
+		var aiResp AIResponse
+		if json.Valid([]byte(resp)) {
+			if err := json.Unmarshal([]byte(resp), &aiResp); err == nil {
+				// Valid JSON response - return structured data
+				return &QueryResult{
+					Query:     question,
+					Answer:    aiResp.Answer,
+					Data:      aiResp.Data,
+					ChartType: aiResp.ChartType,
+				}
+			}
 		}
+
+		// Fallback: if JSON parsing fails, use raw response as answer
+		if err != nil {
+			log.Printf("AI JSON parse error: %v", err)
+		}
+		answer = resp
 	}
 
 	return &QueryResult{
