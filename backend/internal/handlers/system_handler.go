@@ -198,8 +198,9 @@ func getCPUUsage() float64 {
 }
 
 func getMemoryUsage() float64 {
-	// free -b: total used free shared buff/cache available
-	cmd := exec.Command("sh", "-c", "free -b | grep Mem | awk '{print ($3/$2) * 100}'")
+	// free -m: total used free shared buff/cache available
+	// Calculate: (used / total) * 100
+	cmd := exec.Command("sh", "-c", "free -m | grep Mem | awk '{if ($2 > 0) print ($3/$2) * 100; else print 0}'")
 	out, err := cmd.CombinedOutput()
 	if err == nil && len(out) > 0 {
 		trimmed := strings.TrimSpace(string(out))
@@ -212,11 +213,12 @@ func getMemoryUsage() float64 {
 }
 
 func getMemoryTotal() float64 {
+	// free -m returns total in MB
 	cmd := exec.Command("sh", "-c", "free -m | grep Mem | awk '{print $2}'")
 	out, _ := cmd.Output()
 	if len(out) > 0 {
 		total, _ := strconv.ParseFloat(strings.TrimSpace(string(out)), 64)
-		return total
+		return total / 1024 // Convert MB to GB
 	}
 	return 0
 }
