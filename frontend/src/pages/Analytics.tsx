@@ -52,13 +52,14 @@ export default function Analytics() {
 
 try {
         const modeParam = aiMode ? 'ai' : 'fast';
-        const res = await api.get<{answer?: string; data?: unknown; chart_type?: string; explanation?: string; suggestions?: string}>(`/api/analytics?q=${encodeURIComponent(q)}&mode=${modeParam}`);
-        // Be defensive in case the backend shape changes slightly
-        const answer = res?.data?.answer ?? '';
-        const data = res?.data?.data ?? null;
-        const chartType = res?.data?.chart_type ?? '';
-        const explanation = res?.data?.explanation ?? '';
-        const suggestions = res?.data?.suggestions ?? '';
+        const res = await api.get(`/api/analytics?q=${encodeURIComponent(q)}&mode=${modeParam}`);
+        // Type the response
+        const response = res?.data as {answer?: string; data?: unknown; chart_type?: string; explanation?: string; suggestions?: string} | undefined;
+        const answer = response?.answer ?? '';
+        const data = response?.data ?? null;
+        const chartType = response?.chart_type ?? '';
+        const explanation = response?.explanation ?? '';
+        const suggestions = response?.suggestions ?? '';
         setHistory(prev => prev.map(h => 
           h.id === questionId 
             ? { ...h, answer, data, chartType, explanation, suggestions }
