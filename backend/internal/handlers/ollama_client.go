@@ -60,6 +60,12 @@ func (o *OllamaClient) GetBusinessContext(branchID uint) string {
 		CustomerName string
 		TotalSales   float64
 	}
+	type staffInfo struct {
+		Name     string
+		Email    string
+		Role     string
+		BranchID uint
+	}
 
 	var todaysSales, monthSales, lastMonthSales, totalSales salesSum
 	var todaysOrders, monthOrders, totalOrders orderCount
@@ -69,6 +75,7 @@ func (o *OllamaClient) GetBusinessContext(branchID uint) string {
 	var topProducts []topProduct
 	var topCustomers []topCustomer
 	var expensesThisMonth, expensesLastMonth salesSum
+	var staff []staffInfo
 
 	db.Raw("SELECT COALESCE(SUM(total_amount - discount_amount), 0) as total FROM orders WHERE DATE(created_at) = CURDATE() AND status != 'cancelled'").Scan(&todaysSales)
 	db.Raw("SELECT COALESCE(SUM(total_amount - discount_amount), 0) as total FROM orders WHERE YEAR(created_at) = YEAR(NOW()) AND MONTH(created_at) = MONTH(NOW()) AND status != 'cancelled'").Scan(&monthSales)
@@ -90,6 +97,8 @@ func (o *OllamaClient) GetBusinessContext(branchID uint) string {
 	db.Raw("SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE YEAR(expense_date) = YEAR(NOW()) AND MONTH(expense_date) = MONTH(NOW())").Scan(&expensesThisMonth)
 	db.Raw("SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE YEAR(expense_date) = YEAR(DATE_SUB(NOW(), INTERVAL 1 MONTH)) AND MONTH(expense_date) = MONTH(DATE_SUB(NOW(), INTERVAL 1 MONTH))").Scan(&expensesLastMonth)
 
+	db.Raw("SELECT name, email, role, branch_id FROM users WHERE deleted_at IS NULL").Scan(&staff)
+
 	context := fmt.Sprintf(`SALES: Today=₱%.2f, ThisMonth=₱%.2f, LastMonth=₱%.2f, Total=₱%.2f`, todaysSales.Total, monthSales.Total, lastMonthSales.Total, totalSales.Total)
 	context += fmt.Sprintf(`\nORDERS: Today=%d, ThisMonth=%d, Total=%d`, todaysOrders.Count, monthOrders.Count, totalOrders.Count)
 	context += fmt.Sprintf(`\nEXPENSES: ThisMonth=₱%.2f, LastMonth=₱%.2f`, expensesThisMonth.Total, expensesLastMonth.Total)
@@ -107,6 +116,17 @@ func (o *OllamaClient) GetBusinessContext(branchID uint) string {
 		context += "\nTOP CUSTOMERS THIS MONTH:"
 		for _, c := range topCustomers {
 			context += fmt.Sprintf("\n- %s: ₱%.2f", c.CustomerName, c.TotalSales)
+		}
+	}
+
+	if len(staff) > 0 {
+		context += "\n\nSTAFF (ALL BRANCHES):"
+		for _, s := range staff {
+			email := s.Email
+			if email == "" {
+				email = "no email"
+			}
+			context += fmt.Sprintf("\n- %s | %s | BranchID:%d", s.Name, email, s.BranchID)
 		}
 	}
 
