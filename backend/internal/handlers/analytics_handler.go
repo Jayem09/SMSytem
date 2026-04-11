@@ -140,6 +140,38 @@ func (h *AnalyticsHandler) processQuery(question string, branchID uint, mode str
 	question = strings.ToLower(question)
 	patterns := h.getQueryPatterns()
 
+	// In "ai" mode, ALWAYS use Ollama - skip regex matching
+	if mode == "ai" {
+		ollama := NewOllamaClient()
+		ctx := ollama.GetBusinessContext(branchID)
+		resp, err := ollama.GenerateWithQuestion(question, ctx)
+
+		// Try to parse as JSON
+		var aiResp AIResponse
+		if json.Valid([]byte(resp)) {
+			if err := json.Unmarshal([]byte(resp), &aiResp); err == nil {
+				return &QueryResult{
+					Query:       question,
+					Answer:      aiResp.Answer,
+					Data:        aiResp.Data,
+					ChartType:   aiResp.ChartType,
+					Explanation: aiResp.Explanation,
+					Suggestions: aiResp.Suggestions,
+				}
+			}
+		}
+
+		// Fallback: if JSON parsing fails, use raw response as answer
+		if err != nil {
+			log.Printf("AI JSON parse error: %v", err)
+		}
+		return &QueryResult{
+			Query:  question,
+			Answer: resp,
+		}
+	}
+
+	// Fast mode: use regex patterns
 	for _, pattern := range patterns {
 		matches := pattern.Regex.FindStringSubmatch(question)
 		if len(matches) > 1 {
