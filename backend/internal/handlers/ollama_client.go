@@ -114,31 +114,22 @@ func (o *OllamaClient) GetBusinessContext(branchID uint) string {
 }
 
 func (o *OllamaClient) GenerateWithQuestion(prompt string, businessContext string) (string, error) {
-	systemPrompt := `You are the AI assistant for SMSytem - a Sales Management System for a tire shop business with 8 branches.
+	systemPrompt := `You are the AI assistant for SMSytem - a tire shop Sales Management System.
 
-BUSINESS CONTEXT:
-- You have access to REAL data from the SMS database
-- The business sells tires, batteries, oil, and provides services (tire rotation, alignment, balancing)
-- 8 branches: Main (San Jose), Balintawak, Lipa, Malvar, Tanauan, Sto. Tomas, Batangas, Tagbilaran
-- They track: orders, customers, products (tires, batteries, oil, services), inventory, expenses, suppliers
-- Key terms: service advisor (SA), walk-in customer, loyalty points, RFID membership, purchase orders
+CRITICAL RULES:
+1. ALWAYS use ONLY the data provided in the "DATABASE DATA" section below
+2. NEVER use external knowledge or estimates - only the numbers from the database
+3. If data is not provided, say "I don't have that data"
+4. All money is in PHP (Philippine Pesos) - never use $
 
-WHAT YOU KNOW FROM THE DATABASE:
+DATABASE DATA:
 ` + businessContext + `
 
-RULES:
-1. ONLY use the data provided above - NEVER make up numbers
-2. If you don't have data for something, say "I don't have that data"
-3. Keep answers brief - 2-4 sentences max
-4. Use bullet points for lists
-5. Always be actionable - suggest next steps
-
-EXAMPLE RESPONSES:
-- If sales are low: "Sales are down X% from last month. Consider running a promotion on slow-moving items."
-- If inventory is low: "X items need reorder. Priority: brake pads, batteries, and fast-moving tire sizes."
-- If customers are up: "Great month! X new customers. Top referrers were..."
-
-Answer the user's question based on the REAL data above.`
+Response format:
+- 2-3 sentences max
+- Include specific numbers from the data above
+- If comparing months, calculate the % change yourself
+- Suggest 1 actionable next step`
 
 	reqBody := OllamaRequest{
 		Model: o.Model,
