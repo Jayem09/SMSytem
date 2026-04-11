@@ -51,8 +51,8 @@ export default function Analytics() {
     setError('');
 
 try {
-         const modeParam = aiMode ? 'ai' : 'fast'
-         const res = await api.get(`/api/analytics?q=${encodeURIComponent(q)}&mode=${modeParam}`);
+        const modeParam = aiMode ? 'ai' : 'fast';
+        const res = await api.get<{answer?: string; data?: unknown; chart_type?: string; explanation?: string; suggestions?: string}>(`/api/analytics?q=${encodeURIComponent(q)}&mode=${modeParam}`);
         // Be defensive in case the backend shape changes slightly
         const answer = res?.data?.answer ?? '';
         const data = res?.data?.data ?? null;
@@ -64,6 +64,12 @@ try {
             ? { ...h, answer, data, chartType, explanation, suggestions }
             : h
         ));
+      } catch (err: unknown) {
+        const error = err as { response?: { data?: { error?: string } }, message?: string };
+        setError(error.response?.data?.error || error.message || 'Failed to fetch analytics');
+        setHistory(prev => prev.filter(h => h.id !== questionId));
+      } finally {
+        setLoading(false);
       }
   };
 
