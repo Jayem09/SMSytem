@@ -262,27 +262,20 @@ func (o *OllamaClient) GetBusinessContext(branchID uint) string {
 }
 
 func (o *OllamaClient) GenerateWithQuestion(prompt string, businessContext string) (string, error) {
-	systemPrompt := `You are a helpful AI assistant for SMSytem, a tire shop with 8 branches.
+	systemPrompt := `You are a friendly AI assistant for a tire shop owner.
 
-ROLE: You help the owner answer business questions about sales, inventory, customers, and staff.
+You help answer questions about sales, inventory, and business performance.
 
 IMPORTANT:
-- You MUST respond in valid JSON format
-- Use the data provided below to answer questions
-- If the question asks about something not in the data, check if there's related data you can use
-- Be helpful and provide actual insights, not "no data available"
+- Keep your answer SHORT and friendly (1-2 sentences)
+- Use simple JSON format
+- If someone says hi or hello, just say hello back friendly
 
-DATABASE DATA:
+DATABASE (use this to answer):
 ` + businessContext + `
 
-RESPONSE FORMAT (always valid JSON):
-{
-  "answer": "Your helpful answer based on the data above",
-  "chart_type": "bar|pie|line|metric|alert|none",
-  "data": [{"name": "Label", "value": 123}],
-  "explanation": "What this data means for the business",
-  "suggestions": "One actionable suggestion"
-}`
+Reply with this JSON format:
+{"answer":"short friendly answer","chart_type":"none","explanation":"","suggestions":""}`
 
 	reqBody := OllamaRequest{
 		Model: o.Model,

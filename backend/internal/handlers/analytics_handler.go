@@ -160,26 +160,11 @@ func (h *AnalyticsHandler) processQuery(question string, branchID uint, mode str
 			}
 		}
 
-		// JSON parse failed - retry
-		log.Printf("AI JSON parse failed, response: %s", resp[:min(200, len(resp))])
-		retryResp, _ := ollama.GenerateWithQuestion(question+" Respond in VALID JSON only.", ctx)
-		if json.Valid([]byte(retryResp)) {
-			if err := json.Unmarshal([]byte(retryResp), &aiResp); err == nil {
-				return &QueryResult{
-					Query:       question,
-					Answer:      aiResp.Answer,
-					Data:        aiResp.Data,
-					ChartType:   aiResp.ChartType,
-					Explanation: aiResp.Explanation,
-					Suggestions: aiResp.Suggestions,
-				}
-			}
-		}
-
-		// Still failed - return retry response as text or error
+		// JSON parse failed - return raw response as answer (no retry to speed up)
+		log.Printf("AI JSON parse failed, returning raw: %s", resp[:min(100, len(resp))])
 		return &QueryResult{
 			Query:  question,
-			Answer: "AI unavailable. Please try again.",
+			Answer: resp,
 		}
 	}
 
