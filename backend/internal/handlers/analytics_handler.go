@@ -143,7 +143,15 @@ func (h *AnalyticsHandler) processQuery(question string, branchID uint, mode str
 	if mode == "ai" {
 		ollama := NewOllamaClient()
 		ctx := ollama.GetBusinessContext(branchID)
-		resp, _ := ollama.GenerateWithQuestion(question, ctx)
+		resp, err := ollama.GenerateWithQuestion(question, ctx)
+
+		if err != nil {
+			log.Printf("AI error: %v", err)
+			return &QueryResult{
+				Query:  question,
+				Answer: "Sorry, AI is taking too long. Try again.",
+			}
+		}
 
 		// Try to parse as JSON
 		var aiResp AIResponse
