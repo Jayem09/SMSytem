@@ -54,7 +54,7 @@ type ToolCall struct {
 	Function ToolCallFunction `json:"function"`
 }
 
-type GroqRequest struct {
+type AIRequest struct {
 	Model       string    `json:"model"`
 	Messages    []Message `json:"messages"`
 	Tools       []Tool    `json:"tools,omitempty"`
@@ -71,7 +71,7 @@ type Message struct {
 	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
 }
 
-type GroqResponse struct {
+type AIResponse struct {
 	Choices []struct {
 		Message Message `json:"message"`
 	} `json:"choices"`
@@ -165,7 +165,7 @@ Format EXACTLY like this:
   "values": [5000, 3000],
   "summary": "Here is the chart you requested."
 }
-4. If the user asks for a simple LIST or a general question, DO NOT output JSON. Write the answer naturally in plain English based ONLY on the SQL data.`, branchIDStr, branchIDStr, branchIDStr)
+4. If the user asks for a simple LIST or a general question, DO NOT output JSON. Write the answer naturally in plain English based ONLY on the SQL data.`, branchConstraint)
 
 	messages := []Message{
 		{Role: "system", Content: systemPrompt},
@@ -192,13 +192,13 @@ Format EXACTLY like this:
 		},
 	}
 
-	apiKey := os.Getenv("GROQ_API_KEY")
+	apiKey := os.Getenv("GEMINI_API_KEY")
 
 	// Multi-turn loop
 	maxTurns := 3
 	for turn := 0; turn < maxTurns; turn++ {
-		reqBody := GroqRequest{
-			Model:       "llama-3.1-8b-instant",
+		reqBody := AIRequest{
+			Model:       "gemini-1.5-flash",
 			Messages:    messages,
 			Tools:       tools,
 			ToolChoice:  "auto",
@@ -212,7 +212,8 @@ Format EXACTLY like this:
 		}
 
 		client := &http.Client{Timeout: 15 * time.Second}
-		req, err := http.NewRequest("POST", "https://api.groq.com/openai/v1/chat/completions", bytes.NewBuffer(jsonData))
+		// Using Gemini's OpenAI-compatible endpoint
+		req, err := http.NewRequest("POST", "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", bytes.NewBuffer(jsonData))
 		if err != nil {
 			return "", err
 		}
@@ -221,26 +222,26 @@ Format EXACTLY like this:
 
 		resp, err := client.Do(req)
 		if err != nil {
-			return "", fmt.Errorf("failed to connect to Groq: %v", err)
+			return "", fmt.Errorf("failed to connect to Gemini: %v", err)
 		}
 
 		if resp.StatusCode != http.StatusOK {
 			resp.Body.Close()
-			return "", fmt.Errorf("Groq returned status %d", resp.StatusCode)
+			return "", fmt.Errorf("Gemini returned status %d", resp.StatusCode)
 		}
 
-		var groqResp GroqResponse
-		if err := json.NewDecoder(resp.Body).Decode(&groqResp); err != nil {
+		var aiResp AIResponse
+		if err := json.NewDecoder(resp.Body).Decode(&aiResp); err != nil {
 			resp.Body.Close()
 			return "", err
 		}
 		resp.Body.Close()
 
-		if len(groqResp.Choices) == 0 {
+		if len(aiResp.Choices) == 0 {
 			return "", fmt.Errorf("no response from AI")
 		}
 
-		responseMessage := groqResp.Choices[0].Message
+		responseMessage := aiResp.Choices[0].Message
 		messages = append(messages, responseMessage)
 
 		// Check if AI wants to use a tool
