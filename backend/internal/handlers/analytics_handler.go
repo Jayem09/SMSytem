@@ -160,7 +160,10 @@ func (h *AnalyticsHandler) processQuery(question string, branchID uint, mode str
 		resp = strings.TrimSuffix(resp, "```")
 		resp = strings.TrimSpace(resp)
 
-		// Try to parse as JSON chart response
+		// Try to parse as JSON chart response using regex for robustness
+		jsonRegex := regexp.MustCompile(`(?s)\{.*\}`)
+		jsonStr := jsonRegex.FindString(resp)
+		
 		var chartResp struct {
 			ChartType string    `json:"chart_type"`
 			Title     string    `json:"title"`
@@ -168,8 +171,8 @@ func (h *AnalyticsHandler) processQuery(question string, branchID uint, mode str
 			Values    []float64 `json:"values"`
 			Summary   string    `json:"summary"`
 		}
-
-		if json.Unmarshal([]byte(resp), &chartResp) == nil && chartResp.ChartType != "" {
+		
+		if jsonStr != "" && json.Unmarshal([]byte(jsonStr), &chartResp) == nil && chartResp.ChartType != "" {
 			// Convert to chart data format
 			chartData := make([]map[string]interface{}, len(chartResp.Labels))
 			for i, label := range chartResp.Labels {

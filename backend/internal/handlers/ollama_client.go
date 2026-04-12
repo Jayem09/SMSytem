@@ -179,7 +179,7 @@ FORMATTING RULES:
 - To find products out of stock: SELECT name, stock FROM products WHERE stock = 0
 - To find branch pending transfers: SELECT count(*) FROM stock_transfers WHERE status = 'pending'
 2. If the tool returns empty data '[]' or 0, YOU MUST NOT INVENT DATA. Simply report: 'The database returned no records.' Do not use placeholder names like 'John Doe'.
-3. If the user asks for a CHART, you MUST output EXACTLY ONLY the JSON format block below. Do this EVEN IF the values are 0! ABSOLUTELY DO NOT include conversational preamble like "Here is the chart". Just output the raw JSON object! 
+3. If the user asks for a CHART, you MUST output EXACTLY ONLY ONE JSON format block below. Combine data into a single chart if multiple items are requested. ABSOLUTELY DO NOT include conversational preamble like "Here is the chart". Just output the raw JSON object! 
 Format EXACTLY like this:
 {
   "chart_type": "bar",
