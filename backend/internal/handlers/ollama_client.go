@@ -198,7 +198,7 @@ Format EXACTLY like this:
 	maxTurns := 3
 	for turn := 0; turn < maxTurns; turn++ {
 		reqBody := GeminiRequest{
-			Model:       "gemini-1.5-flash-latest",
+			Model:       "gemini-1.5-flash",
 			Messages:    messages,
 			Tools:       tools,
 			ToolChoice:  "auto",
@@ -212,12 +212,12 @@ Format EXACTLY like this:
 		}
 
 		client := &http.Client{Timeout: 15 * time.Second}
-		// Using Gemini's OpenAI-compatible endpoint with the /v1/ versioning segment
-		req, err := http.NewRequest("POST", "https://generativelanguage.googleapis.com/v1beta/openai/v1/chat/completions", bytes.NewBuffer(jsonData))
+		// Using Gemini's OpenAI-compatible endpoint with API key as query parameter for maximum stability
+		apiURL := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions?key=%s", apiKey)
+		req, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(jsonData))
 		if err != nil {
 			return "", err
 		}
-		req.Header.Set("Authorization", "Bearer "+apiKey)
 		req.Header.Set("Content-Type", "application/json")
 
 		resp, err := client.Do(req)
