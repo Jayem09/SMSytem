@@ -524,20 +524,20 @@ export default function Transfers() {
                 const isDest = Number(actionBranch) === Number(selectedTransfer.destination_branch_id);
                 return (
                   <>
-                    {/* Approve/Reject — DESTINATION branch approves, super_admin can also approve */}
-                    {(isSuperAdmin || isDest) && selectedTransfer.status === 'pending' && (
+                    {/* Approve/Reject/Ship — SOURCE branch (has stock) */}
+                    {(isSuperAdmin || isSource) && selectedTransfer.status === 'pending' && (
                       <>
                         <button onClick={() => handleUpdateStatus(selectedTransfer.id, 'rejected')} className="px-4 py-3 bg-red-50 text-red-600 font-black text-xs rounded-xl uppercase tracking-widest flex items-center gap-2 hover:bg-red-100 transition-colors cursor-pointer"><XCircle className="w-4 h-4"/> REJECT</button>
                         <button onClick={() => handleUpdateStatus(selectedTransfer.id, 'approved')} className="px-4 py-3 bg-blue-50 text-blue-700 font-black text-xs rounded-xl uppercase tracking-widest flex items-center gap-2 hover:bg-blue-100 transition-colors cursor-pointer"><CheckCircle className="w-4 h-4"/> APPROVE</button>
                       </>
                     )}
 
-                    {/* Ship — source branch only */}
+                    {/* Ship — source branch only after approved */}
                     {isSource && selectedTransfer.status === 'approved' && (
                       <button onClick={() => handleUpdateStatus(selectedTransfer.id, 'in_transit')} className="px-6 py-3 bg-purple-600 text-white font-black text-xs rounded-xl uppercase tracking-widest flex items-center gap-2 hover:bg-purple-500 transition-colors shadow-xl shadow-purple-200 cursor-pointer"><Truck className="w-4 h-4"/> SHIP INVENTORY</button>
                     )}
 
-                    {/* Confirm Receipt — destination branch only */}
+                    {/* Confirm Receipt — DESTINATION branch only */}
                     {isDest && selectedTransfer.status === 'in_transit' && (
                       <button onClick={() => handleUpdateStatus(selectedTransfer.id, 'completed')} className="px-6 py-3 bg-green-600 text-white font-black text-xs rounded-xl uppercase tracking-widest flex items-center gap-2 hover:bg-green-500 transition-colors shadow-xl shadow-green-200 cursor-pointer"><Inbox className="w-4 h-4"/> CONFIRM RECEIPT</button>
                     )}

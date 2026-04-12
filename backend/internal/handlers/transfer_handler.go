@@ -328,10 +328,10 @@ func (h *TransferHandler) UpdateStatus(c *gin.Context) {
 
 	// Permission checks (super_admin bypasses all)
 	if userRole != "super_admin" {
-		// APPROVE: Only destination branch can approve (they're receiving stock)
+		// APPROVE: Only SOURCE branch can approve (they have the stock to send)
 		if newStatus == models.TransferStatusApproved {
-			if userBranchID != transfer.DestinationBranchID {
-				c.JSON(http.StatusForbidden, gin.H{"error": "Only the destination branch can approve transfers"})
+			if userBranchID != transfer.SourceBranchID {
+				c.JSON(http.StatusForbidden, gin.H{"error": "Only the source branch (sender) can approve transfers"})
 				return
 			}
 		}
@@ -349,14 +349,14 @@ func (h *TransferHandler) UpdateStatus(c *gin.Context) {
 				return
 			}
 		}
-		// RECEIVE (completed): Only destination branch can receive
+		// RECEIVE (completed): Only DESTINATION branch can receive
 		if newStatus == models.TransferStatusCompleted {
 			if userBranchID != transfer.DestinationBranchID {
 				c.JSON(http.StatusForbidden, gin.H{"error": "Only the destination branch can receive transfers"})
 				return
 			}
 		}
-		// CANCEL: Source branch or the requester can cancel
+		// CANCEL: SOURCE branch or the requester can cancel
 		if newStatus == models.TransferStatusCancelled {
 			if userBranchID != transfer.SourceBranchID && userID != transfer.RequestedByUserID {
 				c.JSON(http.StatusForbidden, gin.H{"error": "Only the source branch or the requester can cancel transfers"})
