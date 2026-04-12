@@ -153,6 +153,13 @@ func (h *AnalyticsHandler) processQuery(question string, branchID uint, mode str
 			}
 		}
 
+		// Strip markdown fences before parsing (llama3.2:1b often adds them)
+		resp = strings.TrimSpace(resp)
+		resp = strings.TrimPrefix(resp, "```json")
+		resp = strings.TrimPrefix(resp, "```")
+		resp = strings.TrimSuffix(resp, "```")
+		resp = strings.TrimSpace(resp)
+
 		// Try to parse as JSON chart response
 		var chartResp struct {
 			ChartType string    `json:"chart_type"`
@@ -166,9 +173,13 @@ func (h *AnalyticsHandler) processQuery(question string, branchID uint, mode str
 			// Convert to chart data format
 			chartData := make([]map[string]interface{}, len(chartResp.Labels))
 			for i, label := range chartResp.Labels {
+				value := 0.0
+				if i < len(chartResp.Values) {
+					value = chartResp.Values[i]
+				}
 				chartData[i] = map[string]interface{}{
 					"name":  label,
-					"value": chartResp.Values[i],
+					"value": value,
 				}
 			}
 			return &QueryResult{

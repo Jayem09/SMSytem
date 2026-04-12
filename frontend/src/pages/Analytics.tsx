@@ -43,42 +43,42 @@ export default function Analytics() {
 
   const sendQuery = async (q: string) => {
     if (!q.trim() || loading) return;
-    
+
     const questionId = Date.now();
     setHistory(prev => [...prev, { id: questionId, type: 'question', query: q, answer: '', data: null, chartType: '' }]);
     setQuestion('');
     setLoading(true);
     setError('');
 
-try {
-        const modeParam = aiMode ? 'ai' : 'fast';
-        const res = await api.get(`/api/analytics?q=${encodeURIComponent(q)}&mode=${modeParam}`);
-        // Type the response
-        const response = res?.data as {answer?: string; data?: Record<string, unknown>; chart_type?: string; explanation?: string; suggestions?: string} | undefined;
-        const answer = response?.answer ?? '';
-        const data = response?.data ?? null;
-        const chartType = response?.chart_type ?? '';
-        const explanation = response?.explanation ?? '';
-        const suggestions = response?.suggestions ?? '';
-        setHistory(prev => prev.map(h => 
-          h.id === questionId 
-            ? { ...h, answer, data, chartType, explanation, suggestions }
-            : h
-        ));
-      } catch (err: unknown) {
-        const errObj = err as { response?: { data?: { error?: string } }; message?: string; cause?: string };
-        const errMsg = errObj.response?.data?.error || errObj.message || errObj.cause || 'Failed to fetch analytics';
-        console.error('Analytics error:', errMsg);
-        setError(errMsg);
-        // Keep the question in history so user sees what failed
-        setHistory(prev => prev.map(h => 
-          h.id === questionId 
-            ? { ...h, answer: 'Error: ' + errMsg }
-            : h
-        ));
-      } finally {
-        setLoading(false);
-      }
+    try {
+      const modeParam = aiMode ? 'ai' : 'fast';
+      const res = await api.get(`/api/analytics?q=${encodeURIComponent(q)}&mode=${modeParam}`);
+      // Type the response
+      const response = res?.data as { answer?: string; data?: Record<string, unknown>; chart_type?: string; explanation?: string; suggestions?: string } | undefined;
+      const answer = response?.answer ?? '';
+      const data = response?.data ?? null;
+      const chartType = response?.chart_type ?? '';
+      const explanation = response?.explanation ?? '';
+      const suggestions = response?.suggestions ?? '';
+      setHistory(prev => prev.map(h =>
+        h.id === questionId
+          ? { ...h, answer, data, chartType, explanation, suggestions }
+          : h
+      ));
+    } catch (err: unknown) {
+      const errObj = err as { response?: { data?: { error?: string } }; message?: string; cause?: string };
+      const errMsg = errObj.response?.data?.error || errObj.message || errObj.cause || 'Failed to fetch analytics';
+      console.error('Analytics error:', errMsg);
+      setError(errMsg);
+      // Keep the question in history so user sees what failed
+      setHistory(prev => prev.map(h =>
+        h.id === questionId
+          ? { ...h, answer: 'Error: ' + errMsg }
+          : h
+      ));
+    } finally {
+      setLoading(false);
+    }
   };
 
   const formatCurrency = (val: number) => {
@@ -134,7 +134,7 @@ try {
 
     if ((chartType === 'bar' || chartType === 'pie') && Array.isArray(data)) {
       const chartData = (data as ChartDataItem[]).map((item) => ({
-        name: item.product_name || item.advisor_name || item.customer_name || item.label || item.category_name || item.brand_name || 'Other',
+        name: item.product_name || item.advisor_name || item.customer_name || (item as any).name || item.label || item.category_name || item.brand_name || 'Other',
         value: item.total_sales || item.total || item.value || item.total_qty || 0
       })).filter((d) => Number(d.value) > 0);
 
@@ -169,7 +169,7 @@ try {
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData.slice(0, 10)} layout="vertical">
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis type="number" tickFormatter={(v) => `₱${(v/1000).toFixed(0)}k`} />
+              <XAxis type="number" tickFormatter={(v) => `₱${(v / 1000).toFixed(0)}k`} />
               <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 11 }} />
               <Tooltip formatter={(value) => formatCurrency(Number(value))} />
               <Bar dataKey="value" fill="#6366f1" radius={[0, 4, 4, 0]} />
@@ -192,7 +192,7 @@ try {
             <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name" />
-              <YAxis tickFormatter={(v) => `₱${(v/1000).toFixed(0)}k`} />
+              <YAxis tickFormatter={(v) => `₱${(v / 1000).toFixed(0)}k`} />
               <Tooltip formatter={(value) => formatCurrency(Number(value))} />
               <Line type="monotone" dataKey="value" stroke="#6366f1" strokeWidth={2} dot={{ fill: '#6366f1' }} />
             </LineChart>
@@ -238,11 +238,10 @@ try {
           </div>
           <button
             onClick={() => setAiMode(!aiMode)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              aiMode 
-                ? 'bg-purple-100 text-purple-700 border border-purple-300' 
-                : 'bg-gray-100 text-gray-600 border border-gray-200'
-            }`}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${aiMode
+              ? 'bg-purple-100 text-purple-700 border border-purple-300'
+              : 'bg-gray-100 text-gray-600 border border-gray-200'
+              }`}
           >
             <Zap className={`w-4 h-4 ${aiMode ? 'fill-purple-500' : ''}`} />
             {aiMode ? 'AI Mode' : 'Fast Mode'}
@@ -260,7 +259,7 @@ try {
             <p className="text-gray-500 mb-6 max-w-md mx-auto">
               I can answer questions about your sales, inventory, customers, and more.
             </p>
-            
+
             <div className="flex flex-wrap gap-2 justify-center max-w-2xl mx-auto">
               {QUICK_QUERIES.map((q, i) => (
                 <button
@@ -296,7 +295,7 @@ try {
                   <pre className={`whitespace-pre-wrap text-sm text-gray-700 font-sans ${item.chartType ? 'mt-4 pt-4 border-t border-gray-100' : ''}`}>
                     {item.answer}
                   </pre>
-                  
+
                   {/* AI Explanation */}
                   {item.explanation && (
                     <div className="mt-4 pt-4 border-t border-gray-100">
@@ -307,7 +306,7 @@ try {
                       <p className="text-sm text-gray-600 leading-relaxed">{item.explanation}</p>
                     </div>
                   )}
-                  
+
                   {/* AI Suggestions */}
                   {item.suggestions && (
                     <div className="mt-3 pt-3 border-t border-gray-100">
@@ -330,7 +329,7 @@ try {
               <Loader2 className="w-4 h-4 text-gray-500 animate-spin" />
             </div>
             <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-              <p className="text-gray-500">Analyzing your data...</p>
+              <p className="text-gray-500">Thinking...</p>
             </div>
           </div>
         )}
@@ -365,7 +364,7 @@ try {
             Ask
           </button>
         </form>
-        
+
         <div className="mt-3 flex flex-wrap gap-2">
           <span className="text-xs text-gray-400">Try:</span>
           {['revenue', 'orders', 'profit', 'expenses'].map((topic) => (

@@ -22,16 +22,27 @@ func NewOllamaClient() *OllamaClient {
 	if baseURL == "" {
 		baseURL = "http://localhost:11434"
 	}
+	model := os.Getenv("OLLAMA_MODEL")
+	if model == "" {
+		model = "llama3.2:1b"
+	}
 	return &OllamaClient{
 		BaseURL: baseURL,
-		Model:   "llama3.2:1b",
+		Model:   model,
 	}
 }
 
+type OllamaOptions struct {
+	NumPredict  int     `json:"num_predict,omitempty"`
+	NumCtx      int     `json:"num_ctx,omitempty"`
+	Temperature float64 `json:"temperature,omitempty"`
+}
+
 type OllamaRequest struct {
-	Model    string    `json:"model"`
-	Messages []Message `json:"messages"`
-	Stream   bool      `json:"stream"`
+	Model    string         `json:"model"`
+	Messages []Message      `json:"messages"`
+	Stream   bool           `json:"stream"`
+	Options  *OllamaOptions `json:"options,omitempty"`
 }
 
 type Message struct {
@@ -45,18 +56,26 @@ type OllamaResponse struct {
 }
 
 // Cached context - refresh every 5 minutes
-var contextCache struct {
-	sync.RWMutex
+type ContextCacheEntry struct {
 	context   string
 	timestamp time.Time
+}
+
+var contextCache = struct {
+	sync.RWMutex
+	entries map[uint]ContextCacheEntry
+}{
+	entries: make(map[uint]ContextCacheEntry),
 }
 
 func (o *OllamaClient) GetBusinessContext(branchID uint) string {
 	// Check cache first (5 min expiry)
 	contextCache.RLock()
-	if time.Since(contextCache.timestamp) < 5*time.Minute && contextCache.context != "" {
+	// Default to zero time and empty string if doesn't exist
+	entry := contextCache.entries[branchID]
+	if time.Since(entry.timestamp) < 5*time.Minute && entry.context != "" {
 		defer contextCache.RUnlock()
-		return contextCache.context
+		return entry.context
 	}
 	contextCache.RUnlock()
 
@@ -135,8 +154,10 @@ func (o *OllamaClient) GetBusinessContext(branchID uint) string {
 
 	// Update cache
 	contextCache.Lock()
-	contextCache.context = context
-	contextCache.timestamp = time.Now()
+	contextCache.entries[branchID] = ContextCacheEntry{
+		context:   context,
+		timestamp: time.Now(),
+	}
 	contextCache.Unlock()
 
 	return context
@@ -187,6 +208,11 @@ Remember:
 			{Role: "user", Content: prompt},
 		},
 		Stream: false,
+		Options: &OllamaOptions{
+			NumPredict:  200,  // Hard cutoff max generated tokens to prevent running on infinitely
+			NumCtx:      1024, // Bind context window tight to save memory + Eval time
+			Temperature: 0.1,  // Low temp speeds up argmax sampling and reduces wild guessing
+		},
 	}
 
 	jsonData, err := json.Marshal(reqBody)

@@ -200,7 +200,7 @@ export function generateDeliveryReceiptHTML(order: ReceiptOrder, _tin?: string, 
         }
       </style>
     </head>
-    <body onload="window.print()">
+    <body>
       <div class="date-field">${dateStr}</div>
       <div class="reg-name">${customerName}</div>
       <div class="address">${custAddress}</div>
@@ -214,7 +214,9 @@ export function generateDeliveryReceiptHTML(order: ReceiptOrder, _tin?: string, 
 export async function printDeliveryReceipt(order: ReceiptOrder, tin?: string, businessAddress?: string, withholdingTaxRate?: number) {
   const htmlContent = generateDeliveryReceiptHTML(order, tin, businessAddress, withholdingTaxRate);
 
-  // Use the #print-area for consistent printing
+  // Inject into #print-area and call window.print().
+  // Works for both browser dev and Tauri — WKWebView honours @media print
+  // (#root hidden, #print-area shown) the same as a regular browser.
   let container = document.getElementById('print-area');
   if (!container) {
     container = document.createElement('div');
@@ -223,22 +225,16 @@ export async function printDeliveryReceipt(order: ReceiptOrder, tin?: string, bu
   }
 
   const headContent = htmlContent.match(/<head[^>]*>([\s\S]*)<\/head>/)?.[1] || '';
-  const bodyInner = htmlContent.match(/<body[^>]*>([\s\S]*)<\/body>/)?.[1] || htmlContent;
+  const bodyInner   = htmlContent.match(/<body[^>]*>([\s\S]*)<\/body>/)?.[1] || htmlContent;
 
-  container.innerHTML = `
-    ${headContent}
-    ${bodyInner}
-  `;
+  container.innerHTML = `${headContent}${bodyInner}`;
 
-  // Use Tauri print API if available, fallback to window.print
-  try {
-    const { print } = await import('@tauri-apps/api/webview');
-    await print();
-  } catch {
-    window.print();
-  }
-  
+  // Small delay so DOM is fully painted before the print dialog opens
+  await new Promise<void>((resolve) => setTimeout(resolve, 150));
+
+  window.print();
+
   setTimeout(() => {
     if (container) container.innerHTML = '';
-  }, 2000);
+  }, 3000);
 }

@@ -214,7 +214,11 @@ export function generateReceiptHTML(order: ReceiptOrder, tin?: string, businessA
 export async function printReceipt(order: ReceiptOrder, tin?: string, businessAddress?: string, withholdingTaxRate?: number) {
   const htmlContent = generateReceiptHTML(order, tin, businessAddress, withholdingTaxRate);
 
-  // Use the #print-area from index.css for high-reliability, glitch-free printing
+  // Inject the receipt into #print-area and trigger window.print().
+  // This works for BOTH browser dev AND Tauri (WKWebView honours @media print
+  // the same as a normal browser — #root is hidden, #print-area is shown).
+  // The old webview.print() call was the cause of the alignment bug because it
+  // printed the entire app window instead of just the receipt area.
   let container = document.getElementById('print-area');
   if (!container) {
     container = document.createElement('div');
@@ -222,26 +226,18 @@ export async function printReceipt(order: ReceiptOrder, tin?: string, businessAd
     document.body.appendChild(container);
   }
 
-  // Extract content and styles
   const headContent = htmlContent.match(/<head[^>]*>([\s\S]*)<\/head>/)?.[1] || '';
-  const bodyInner = htmlContent.match(/<body[^>]*>([\s\S]*)<\/body>/)?.[1] || htmlContent;
+  const bodyInner   = htmlContent.match(/<body[^>]*>([\s\S]*)<\/body>/)?.[1] || htmlContent;
 
-  container.innerHTML = `
-    ${headContent}
-    ${bodyInner}
-  `;
+  container.innerHTML = `${headContent}${bodyInner}`;
 
-  // Use Tauri print API if available, fallback to window.print
-  try {
-    const { print } = await import('@tauri-apps/api/webview');
-    await print();
-  } catch {
-    // Fallback to window.print for browser dev
-    window.print();
-  }
-  
-  // DELAYED CLEANUP: Wait for print dialog to finish
+  // Small delay so the DOM is fully painted before the print dialog opens
+  await new Promise<void>((resolve) => setTimeout(resolve, 150));
+
+  window.print();
+
+  // Cleanup after print dialog is dismissed
   setTimeout(() => {
     if (container) container.innerHTML = '';
-  }, 2000);
+  }, 3000);
 }
