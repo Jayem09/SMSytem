@@ -67,6 +67,7 @@ type NativeContent struct {
 
 type NativePart struct {
 	Text             string              `json:"text,omitempty"`
+	ThoughtSignature string              `json:"thoughtSignature,omitempty"`
 	FunctionCall     *NativeFunctionCall `json:"functionCall,omitempty"`
 	FunctionResponse *NativeFunctionResp `json:"functionResponse,omitempty"`
 }
