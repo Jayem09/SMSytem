@@ -114,7 +114,7 @@ func executeSecureSQL(query string) (string, error) {
 	fmt.Printf("==============================\n\n")
 
 	if len(results) == 0 {
-		return "[]", nil
+		return fmt.Sprintf("[] (Notice: 0 rows found for query: %s)", query), nil
 	}
 
 	bytes, err := json.Marshal(results)
