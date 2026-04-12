@@ -37,6 +37,8 @@ type purchaseOrderInput struct {
 
 func (h *PurchaseOrderHandler) List(c *gin.Context) {
 	branchID, _ := GetUintFromContext(c, "branchID")
+	userRole, _ := c.Get("userRole")
+	roleStr, _ := userRole.(string)
 
 	query := database.DB.
 		Preload("Supplier").
@@ -44,7 +46,8 @@ func (h *PurchaseOrderHandler) List(c *gin.Context) {
 		Preload("Items.Product").
 		Order("created_at DESC")
 
-	if branchID > 0 {
+	// Only super_admin sees all POs, others see only their branch's
+	if roleStr != "super_admin" {
 		query = query.Where("branch_id = ?", branchID)
 	}
 

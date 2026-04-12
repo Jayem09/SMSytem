@@ -30,7 +30,7 @@ export default function Suppliers() {
   const [error, setError] = useState('');
   const { showToast } = useToast();
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const isSuperAdmin = user?.role === 'super_admin';
 
   // Form fields
   const [name, setName] = useState('');
@@ -164,7 +164,7 @@ export default function Suppliers() {
     { key: 'contact_person', label: 'Contact Person' },
     { key: 'phone', label: 'Phone' },
     { key: 'email', label: 'Email' },
-    ...(isAdmin ? [{
+    ...(isSuperAdmin ? [{
       key: 'branches',
       label: 'Branches',
       render: (item: Supplier) => (
@@ -194,7 +194,7 @@ export default function Suppliers() {
         data={suppliers}
         loading={loading}
         onEdit={openEdit}
-        onDelete={isAdmin ? handleDelete : undefined}
+        onDelete={isSuperAdmin ? handleDelete : undefined}
       />
 
       {/* Create/Edit Modal */}

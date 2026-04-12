@@ -64,8 +64,18 @@ func (h *ExpenseHandler) Create(c *gin.Context) {
 
 func (h *ExpenseHandler) List(c *gin.Context) {
 	branchID, _ := c.Get("branchID")
+	userRole, _ := c.Get("userRole")
+	roleStr, _ := userRole.(string)
+
 	var expenses []models.Expense
-	if err := database.DB.Where("branch_id = ?", branchID).Preload("User").Preload("Product").Order("expense_date desc").Find(&expenses).Error; err != nil {
+	query := database.DB.Preload("User").Preload("Product").Order("expense_date desc")
+
+	// Only super_admin sees all expenses, others see only their branch's
+	if roleStr != "super_admin" {
+		query = query.Where("branch_id = ?", branchID)
+	}
+
+	if err := query.Find(&expenses).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch expenses"})
 		return
 	}

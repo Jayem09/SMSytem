@@ -35,13 +35,13 @@ func (h *SupplierHandler) List(c *gin.Context) {
 	roleStr, _ := userRole.(string)
 
 	var suppliers []models.Supplier
-	// Admin/super_admin sees all suppliers, branch users see only linked ones
-	if roleStr == "super_admin" || roleStr == "admin" || branchID == 0 {
+	// Only super_admin sees all suppliers, others see only their branch's linked ones
+	if roleStr == "super_admin" {
 		if err := database.DB.Order("name ASC").Find(&suppliers).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch suppliers"})
 			return
 		}
-	} else {
+	} else if branchID > 0 {
 		if err := database.DB.
 			Joins("INNER JOIN branch_suppliers bs ON bs.supplier_id = suppliers.id AND bs.branch_id = ?", branchID).
 			Order("name ASC").
@@ -49,6 +49,9 @@ func (h *SupplierHandler) List(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch suppliers"})
 			return
 		}
+	} else {
+		// No branch assigned, return empty
+		suppliers = []models.Supplier{}
 	}
 	c.JSON(http.StatusOK, gin.H{"suppliers": suppliers})
 }
