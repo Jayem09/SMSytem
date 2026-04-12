@@ -90,10 +90,10 @@ func executeSecureSQL(query string) (string, error) {
 		return "", fmt.Errorf("security policy violation: multiple statements detected")
 	}
 
-	blockedKeywords := []string{"DROP", "DELETE", "UPDATE", "INSERT", "ALTER", "TRUNCATE", "REPLACE", "GRANT", "CREATE"}
+	blockedKeywords := []string{" DROP ", " DELETE ", " UPDATE ", " INSERT ", " ALTER ", " TRUNCATE ", " REPLACE ", " GRANT ", " CREATE "}
 	for _, kw := range blockedKeywords {
-		if strings.Contains(upperQuery, kw) {
-			return "", fmt.Errorf("security policy violation: query contains forbidden keyword '%s'", kw)
+		if strings.Contains(" "+upperQuery+" ", kw) { // Add padding to check complete words safely
+			return "", fmt.Errorf("security policy violation: query contains forbidden keyword '%s'", strings.TrimSpace(kw))
 		}
 	}
 
@@ -134,21 +134,21 @@ EXACT Database Schema:
 - expenses: id, amount, category, expense_date, branch_id
 - stock_transfers: id, source_branch_id, destination_branch_id, status
 
-IMPORTANT INSTRUCTIONS:
-1. ALWAYS use the 'query_database_securely' tool first. Do not hallucinate columns. Use ONLY the EXACT columns provided above. Examples:
+FORMATTING RULES:
+1. ALWAYS use the 'query_database_securely' tool first. Do not guess or hallucinate. Use ONLY the EXACT columns provided above. Examples:
 - To find products out of stock: SELECT name, stock FROM products WHERE stock = 0
 - To find branch users: SELECT name, role FROM users WHERE branch_id = %s
-- To find branch pending transfers: SELECT count(*) FROM stock_transfers WHERE destination_branch_id = %s AND status = 'pending'
-2. If the user asks for a CHART, you MUST output EXACTLY ONLY the JSON format block below. ABSOLUTELY DO NOT include conversational preamble like "Here is the chart". Just output the raw JSON object! 
+2. If the tool returns empty data '[]' or 0, YOU MUST NOT INVENT DATA. Simply report: 'The database returned no records.' Do not use placeholder names like 'John Doe'.
+3. If the user asks for a CHART, you MUST output EXACTLY ONLY the JSON format block below. Do this EVEN IF the values are 0! ABSOLUTELY DO NOT include conversational preamble like "Here is the chart". Just output the raw JSON object! 
 Format EXACTLY like this:
 {
   "chart_type": "bar",
   "title": "Top Selling Products",
-  "labels": ["Product A", "Product B"],
+  "labels": ["Real Product Name 1", "Real Product Name 2"],
   "values": [5000, 3000],
-  "summary": "Here are the top products you requested."
+  "summary": "Here is the chart you requested."
 }
-3. If the user asks for a simple LIST or a general question, DO NOT output JSON. Write the answer naturally in plain English using the data you fetched.`, branchIDStr, branchIDStr, branchIDStr, branchIDStr)
+4. If the user asks for a simple LIST or a general question, DO NOT output JSON. Write the answer naturally in plain English based ONLY on the SQL data.`, branchIDStr, branchIDStr, branchIDStr)
 
 	messages := []Message{
 		{Role: "system", Content: systemPrompt},
