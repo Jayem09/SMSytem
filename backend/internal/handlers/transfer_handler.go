@@ -328,18 +328,35 @@ func (h *TransferHandler) UpdateStatus(c *gin.Context) {
 
 	// Permission checks (super_admin bypasses all)
 	if userRole != "super_admin" {
-		if newStatus == models.TransferStatusApproved || newStatus == models.TransferStatusInTransit || newStatus == models.TransferStatusRejected {
-			if userBranchID != transfer.SourceBranchID {
-				c.JSON(http.StatusForbidden, gin.H{"error": "Only the source branch can approve/ship/reject transfers"})
+		// APPROVE: Only destination branch can approve (they're receiving stock)
+		if newStatus == models.TransferStatusApproved {
+			if userBranchID != transfer.DestinationBranchID {
+				c.JSON(http.StatusForbidden, gin.H{"error": "Only the destination branch can approve transfers"})
 				return
 			}
 		}
+		// SHIP (in_transit): Only source branch can ship
+		if newStatus == models.TransferStatusInTransit {
+			if userBranchID != transfer.SourceBranchID {
+				c.JSON(http.StatusForbidden, gin.H{"error": "Only the source branch can ship transfers"})
+				return
+			}
+		}
+		// REJECT: Either source or destination branch can reject
+		if newStatus == models.TransferStatusRejected {
+			if userBranchID != transfer.SourceBranchID && userBranchID != transfer.DestinationBranchID {
+				c.JSON(http.StatusForbidden, gin.H{"error": "Only source or destination branch can reject transfers"})
+				return
+			}
+		}
+		// RECEIVE (completed): Only destination branch can receive
 		if newStatus == models.TransferStatusCompleted {
 			if userBranchID != transfer.DestinationBranchID {
 				c.JSON(http.StatusForbidden, gin.H{"error": "Only the destination branch can receive transfers"})
 				return
 			}
 		}
+		// CANCEL: Source branch or the requester can cancel
 		if newStatus == models.TransferStatusCancelled {
 			if userBranchID != transfer.SourceBranchID && userID != transfer.RequestedByUserID {
 				c.JSON(http.StatusForbidden, gin.H{"error": "Only the source branch or the requester can cancel transfers"})
