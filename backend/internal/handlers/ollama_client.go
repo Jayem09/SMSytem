@@ -79,13 +79,18 @@ type GroqResponse struct {
 
 func executeSecureSQL(query string) (string, error) {
 	query = strings.TrimSpace(query)
+	query = strings.TrimSuffix(query, ";")
 	upperQuery := strings.ToUpper(query)
 
 	if !strings.HasPrefix(upperQuery, "SELECT") {
 		return "", fmt.Errorf("security policy violation: only SELECT statements are allowed")
 	}
 
-	blockedKeywords := []string{";", "DROP", "DELETE", "UPDATE", "INSERT", "ALTER", "TRUNCATE", "REPLACE", "GRANT", "CREATE"}
+	if strings.Contains(upperQuery, ";") {
+		return "", fmt.Errorf("security policy violation: multiple statements detected")
+	}
+
+	blockedKeywords := []string{"DROP", "DELETE", "UPDATE", "INSERT", "ALTER", "TRUNCATE", "REPLACE", "GRANT", "CREATE"}
 	for _, kw := range blockedKeywords {
 		if strings.Contains(upperQuery, kw) {
 			return "", fmt.Errorf("security policy violation: query contains forbidden keyword '%s'", kw)
@@ -134,7 +139,7 @@ IMPORTANT INSTRUCTIONS:
 - To find products out of stock: SELECT name, stock FROM products WHERE stock = 0
 - To find branch users: SELECT name, role FROM users WHERE branch_id = %s
 - To find branch pending transfers: SELECT count(*) FROM stock_transfers WHERE destination_branch_id = %s AND status = 'pending'
-2. If the user asks for metrics, charts, or data lists, you MUST output EXACTLY ONLY the JSON format block. ABSOLUTELY DO NOT include conversational preamble like "Here is the chart". Just output the raw JSON object! 
+2. If the user asks for a CHART, you MUST output EXACTLY ONLY the JSON format block below. ABSOLUTELY DO NOT include conversational preamble like "Here is the chart". Just output the raw JSON object! 
 Format EXACTLY like this:
 {
   "chart_type": "bar",
@@ -142,7 +147,8 @@ Format EXACTLY like this:
   "labels": ["Product A", "Product B"],
   "values": [5000, 3000],
   "summary": "Here are the top products you requested."
-}`, branchIDStr, branchIDStr, branchIDStr, branchIDStr)
+}
+3. If the user asks for a simple LIST or a general question, DO NOT output JSON. Write the answer naturally in plain English using the data you fetched.`, branchIDStr, branchIDStr, branchIDStr, branchIDStr)
 
 	messages := []Message{
 		{Role: "system", Content: systemPrompt},
