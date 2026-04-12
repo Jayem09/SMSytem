@@ -485,7 +485,6 @@ export default function POS() {
                     ref={rfidInputRef}
                     type="text"
                     autoFocus
-                    readOnly
                     placeholder="Tap RFID card or type ID..."
                     className="w-full px-4 py-3 border-2 border-indigo-500 rounded-lg text-sm font-medium bg-white"
                     onChange={(e) => handleRfidInputChange(e.target.value)}
