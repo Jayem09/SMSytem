@@ -77,6 +77,7 @@ func main() {
 		Search:        handlers.NewSearchHandler(),
 		System:        handlers.NewSystemHandler(backupService),
 		Analytics:     handlers.NewAnalyticsHandler(),
+		Promo:         handlers.NewPromoHandler(emailService),
 		Email:         emailService,
 	}
 

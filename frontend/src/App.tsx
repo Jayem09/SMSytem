@@ -28,6 +28,7 @@ import DailyReport from './pages/DailyReport';
 import Branches from './pages/Branches';
 import Transfers from './pages/Transfers';
 import Analytics from './pages/Analytics';
+import PromoEmail from './pages/PromoEmail';
 import Monitoring from './pages/Monitoring';
 import Backups from './pages/Backups';
 import MaintenanceGuard from './components/MaintenanceGuard';
@@ -121,6 +122,7 @@ function App() {
                 <Route path="/settings" element={<ProtectedRoute requiredRole="admin"><SettingsPage /></ProtectedRoute>} />
                 <Route path="/monitoring" element={<ProtectedRoute requiredRole="admin"><Monitoring /></ProtectedRoute>} />
                 <Route path="/backups" element={<ProtectedRoute requiredRole="admin"><Backups /></ProtectedRoute>} />
+                <Route path="/promo-email" element={<ProtectedRoute requiredRole="admin"><PromoEmail /></ProtectedRoute>} />
               </Route>
 
               <Route path="*" element={<Navigate to="/dashboard" replace />} />

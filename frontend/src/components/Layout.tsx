@@ -20,6 +20,7 @@ const navItems = [
   { to: '/customers', label: 'Customers', roles: ['super_admin', 'admin', 'cashier'] },
   { to: '/crm', label: 'CRM Analysis', roles: ['super_admin', 'admin'] },
   { to: '/daily-report', label: 'Daily Summary', roles: ['super_admin', 'admin'] },
+  { to: '/promo-email', label: 'Promo Emails', roles: ['super_admin', 'admin'] },
   { to: '/expenses', label: 'Expenses', roles: ['super_admin', 'admin', 'purchasing', 'purchaser'] },
   { to: '/staff', label: 'Staff & Roles', roles: ['super_admin', 'admin'] },
   { to: '/branches', label: 'Branches', roles: ['super_admin'] },

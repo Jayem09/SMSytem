@@ -35,6 +35,7 @@ type Handlers struct {
 	Search        *handlers.SearchHandler
 	System        *handlers.SystemHandler
 	Analytics     *handlers.AnalyticsHandler
+	Promo         *handlers.PromoHandler
 	Email         *services.EmailService
 }
 
@@ -45,6 +46,14 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 			"status":  "ok",
 			"message": "SMSystem API is running",
 		})
+	})
+
+	router.GET("/api/debug-promo-test", func(c *gin.Context) {
+		c.JSON(200, gin.H{"message": "promo route works from debug"})
+	})
+
+	router.POST("/api/promo/send", func(c *gin.Context) {
+		c.JSON(200, gin.H{"message": "unprotected promo route works"})
 	})
 
 	router.GET("/api/status", h.System.GetStatus)
@@ -135,6 +144,12 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 
 			transfers.PUT("/:id/status", h.Transfer.UpdateStatus)
 		}
+
+		// Direct route for promo
+		protected.POST("/promo/send", h.Promo.SendPromoEmail)
+		protected.GET("/promo/test", func(c *gin.Context) {
+			c.JSON(200, gin.H{"message": "promo route works"})
+		})
 
 		purchaseOrders := protected.Group("/purchase-orders")
 		{
