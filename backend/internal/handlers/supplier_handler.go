@@ -31,18 +31,21 @@ type supplierInput struct {
 
 func (h *SupplierHandler) List(c *gin.Context) {
 	branchID, _ := GetUintFromContext(c, "branchID")
+	userRole, _ := c.Get("userRole")
+	roleStr, _ := userRole.(string)
 
 	var suppliers []models.Supplier
-	if branchID > 0 {
-		if err := database.DB.
-			Joins("INNER JOIN branch_suppliers bs ON bs.supplier_id = suppliers.id AND bs.branch_id = ?", branchID).
-			Order("name ASC").
-			Find(&suppliers).Error; err != nil {
+	// Admin/super_admin sees all suppliers, branch users see only linked ones
+	if roleStr == "super_admin" || roleStr == "admin" || branchID == 0 {
+		if err := database.DB.Order("name ASC").Find(&suppliers).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch suppliers"})
 			return
 		}
 	} else {
-		if err := database.DB.Order("name ASC").Find(&suppliers).Error; err != nil {
+		if err := database.DB.
+			Joins("INNER JOIN branch_suppliers bs ON bs.supplier_id = suppliers.id AND bs.branch_id = ?", branchID).
+			Order("name ASC").
+			Find(&suppliers).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch suppliers"})
 			return
 		}
