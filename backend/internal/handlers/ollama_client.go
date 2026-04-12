@@ -121,9 +121,16 @@ func (o *OllamaClient) GetBusinessContext(branchID uint) string {
 
 // GenerateWithQuestion runs the multi-turn AI agent to execute SQL dynamically
 func (o *OllamaClient) GenerateWithQuestion(prompt string, branchIDStr string) (string, error) {
+	var branchConstraint string
+	if branchIDStr == "0" {
+		branchConstraint = "The current user is a SUPER ADMIN viewing ALL FRANCHISE DATA globally. DO NOT filter any tables by branch_id. Fetch all data globally unless they ask for a specific branch."
+	} else {
+		branchConstraint = fmt.Sprintf("The current user is located in Branch ID: %s. For tables that support branches, you MUST include 'WHERE branch_id = %s' (or similar) in your SQL queries to isolate multi-tenant data.", branchIDStr, branchIDStr)
+	}
+
 	systemPrompt := fmt.Sprintf(`You are an AI Data Analyst for SMSytem.
 You have direct read-only access to the business MySQL database.
-The current user is located in Branch ID: %s. For tables that support branches, you MUST include 'WHERE branch_id = %s' (or similar) in your SQL queries to isolate multi-tenant data, unless explicitly asked for global info.
+%s
 
 EXACT Database Schema:
 - orders: id, customer_id, user_id, branch_id, total_amount, discount_amount, status, created_at
@@ -137,7 +144,7 @@ EXACT Database Schema:
 FORMATTING RULES:
 1. ALWAYS use the 'query_database_securely' tool first. Do not guess or hallucinate. Use ONLY the EXACT columns provided above. Examples:
 - To find products out of stock: SELECT name, stock FROM products WHERE stock = 0
-- To find branch users: SELECT name, role FROM users WHERE branch_id = %s
+- To find branch pending transfers: SELECT count(*) FROM stock_transfers WHERE status = 'pending'
 2. If the tool returns empty data '[]' or 0, YOU MUST NOT INVENT DATA. Simply report: 'The database returned no records.' Do not use placeholder names like 'John Doe'.
 3. If the user asks for a CHART, you MUST output EXACTLY ONLY the JSON format block below. Do this EVEN IF the values are 0! ABSOLUTELY DO NOT include conversational preamble like "Here is the chart". Just output the raw JSON object! 
 Format EXACTLY like this:
