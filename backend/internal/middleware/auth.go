@@ -91,6 +91,11 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 		}
 		role = strings.ToLower(role)
 
+		// super_admin always gets branchID=0 to see all data
+		if role == "super_admin" {
+			branchID = 0
+		}
+
 		userEmail, _ := getStringClaim(claims, "email")
 
 		c.Set("userID", userID)
