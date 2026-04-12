@@ -107,6 +107,11 @@ func main() {
 
 	routes.Setup(router, cfg, h)
 
+	// Debug route added in main.go directly
+	router.GET("/api/directtest", func(c *gin.Context) {
+		c.JSON(200, gin.H{"message": "direct test works"})
+	})
+
 	addr := fmt.Sprintf(":%s", cfg.ServerPort)
 	srv := &http.Server{
 		Addr:    addr,
