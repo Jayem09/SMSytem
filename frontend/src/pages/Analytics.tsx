@@ -232,8 +232,8 @@ export default function Analytics() {
               <Sparkles className="w-5 h-5 text-indigo-600" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900">AI Analytics</h1>
-              <p className="text-sm text-gray-500">Ask questions in plain English</p>
+              <h1 className="text-xl font-bold text-gray-900">Tyra Insights</h1>
+              <p className="text-sm text-gray-500">Business Intelligence powered by Tyra</p>
             </div>
           </div>
           <button
@@ -250,14 +250,22 @@ export default function Analytics() {
       </div>
 
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        {/* AI Disclaimer Header */}
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-center gap-3 opacity-90">
+          <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0" />
+          <p className="text-xs text-amber-800 font-medium">
+            Tyra is an AI and can sometimes make mistakes. Always verify critical business data before making financial decisions.
+          </p>
+        </div>
+
         {history.length === 0 && (
           <div className="text-center py-12">
             <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-4">
               <Bot className="w-8 h-8 text-indigo-500" />
             </div>
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">Ask me anything!</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">Ask Tyra anything!</h2>
             <p className="text-gray-500 mb-6 max-w-md mx-auto">
-              I can answer questions about your sales, inventory, customers, and more.
+              I can analyze your sales, inventory, and business performance in seconds.
             </p>
 
             <div className="flex flex-wrap gap-2 justify-center max-w-2xl mx-auto">
@@ -323,16 +331,21 @@ export default function Analytics() {
           </div>
         ))}
 
-        {loading && (
           <div className="flex gap-3">
-            <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-              <Loader2 className="w-4 h-4 text-gray-500 animate-spin" />
+            <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0 animate-pulse ring-2 ring-indigo-400 ring-offset-2">
+              <Sparkles className="w-4 h-4 text-indigo-600" />
             </div>
             <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-              <p className="text-gray-500">Thinking...</p>
+              <div className="flex items-center gap-3">
+                <div className="flex gap-1">
+                  <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                  <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                  <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce"></span>
+                </div>
+                <p className="text-sm font-medium text-indigo-600">Tyra is analyzing your data...</p>
+              </div>
             </div>
           </div>
-        )}
 
         {error && (
           <div className="flex gap-3">

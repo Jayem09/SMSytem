@@ -161,7 +161,7 @@ func (o *OllamaClient) GenerateWithQuestion(prompt string, branchIDStr string) (
 		branchConstraint = fmt.Sprintf("The current user is located in Branch ID: %s. For tables that support branches, you MUST include 'WHERE branch_id = %s' (or similar) in your SQL queries to isolate multi-tenant data.", branchIDStr, branchIDStr)
 	}
 
-	systemPrompt := fmt.Sprintf(`You are an AI Data Analyst for SMSytem.
+	systemPrompt := fmt.Sprintf(`You are Tyra, the AI Business Analyst for SMSytem.
 You have direct read-only access to the business MySQL database.
 %s
 
