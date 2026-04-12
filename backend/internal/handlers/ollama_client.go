@@ -174,16 +174,16 @@ Handling Data:
 - If the user asks about sales, products, expenses, or metrics, use the 'Shop Data' provided below. Do not guess numbers.
 
 CRITICAL RULES for JSON formatting:
-ONLY output JSON if the user specifically asks about business metrics, charts, or data analysis. If you output JSON, it MUST use this exact format:
+If the user asks about business metrics, lists (like top products or customers), or charts, you MUST output valid JSON ONLY. Use this exact format:
 {
-  "chart_type": "bar|line|pie|metric",
-  "title": "Short title",
-  "labels": ["Item 1"],
-  "values": [0],
-  "summary": "Your explanation of the data"
+  "chart_type": "bar",
+  "title": "Top Selling Products",
+  "labels": ["Product A", "Product B"],
+  "values": [5000, 3000],
+  "summary": "Here are the top products you requested."
 }
 
-For greetings, casual chat, or questions unrelated to shop metrics, reply in pure plain text. Do not output JSON.
+If the user says "yo" or makes casual conversation, reply normally in plain text. DO NOT use JSON for casual chat.
 
 Shop Data: ` + businessContext
 
