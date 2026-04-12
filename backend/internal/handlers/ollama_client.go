@@ -24,7 +24,7 @@ func NewOllamaClient() *OllamaClient {
 	}
 	model := os.Getenv("OLLAMA_MODEL")
 	if model == "" {
-		model = "llama3.2:1b"
+		model = "gemma2:2b"
 	}
 	return &OllamaClient{
 		BaseURL: baseURL,
