@@ -32,17 +32,11 @@ func NewOllamaClient() *OllamaClient {
 	}
 }
 
-type OllamaOptions struct {
-	NumPredict  int     `json:"num_predict,omitempty"`
-	NumCtx      int     `json:"num_ctx,omitempty"`
-	Temperature float64 `json:"temperature,omitempty"`
-}
-
-type OllamaRequest struct {
-	Model    string         `json:"model"`
-	Messages []Message      `json:"messages"`
-	Stream   bool           `json:"stream"`
-	Options  *OllamaOptions `json:"options,omitempty"`
+type GroqRequest struct {
+	Model       string    `json:"model"`
+	Messages    []Message `json:"messages"`
+	Temperature float64   `json:"temperature"`
+	MaxTokens   int       `json:"max_tokens"`
 }
 
 type Message struct {
@@ -50,9 +44,10 @@ type Message struct {
 	Content string `json:"content"`
 }
 
-type OllamaResponse struct {
-	Message Message `json:"message"`
-	Done    bool    `json:"done"`
+type GroqResponse struct {
+	Choices []struct {
+		Message Message `json:"message"`
+	} `json:"choices"`
 }
 
 // Cached context - refresh every 5 minutes
@@ -187,18 +182,14 @@ If the user says "yo" or makes casual conversation, reply normally in plain text
 
 Shop Data: ` + businessContext
 
-	reqBody := OllamaRequest{
-		Model: o.Model,
+	reqBody := GroqRequest{
+		Model: "llama-3.1-8b-instant",
 		Messages: []Message{
 			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: prompt},
 		},
-		Stream: false,
-		Options: &OllamaOptions{
-			NumPredict:  200,  // Hard cutoff max generated tokens to prevent running on infinitely
-			NumCtx:      1024, // Bind context window tight to save memory + Eval time
-			Temperature: 0.1,  // Low temp speeds up argmax sampling and reduces wild guessing
-		},
+		Temperature: 0.1,
+		MaxTokens:   300,
 	}
 
 	jsonData, err := json.Marshal(reqBody)
@@ -206,21 +197,33 @@ Shop Data: ` + businessContext
 		return "", err
 	}
 
-	client := &http.Client{Timeout: 120 * time.Second}
-	resp, err := client.Post(o.BaseURL+"/api/chat", "application/json", bytes.NewBuffer(jsonData))
+	client := &http.Client{Timeout: 10 * time.Second}
+	req, err := http.NewRequest("POST", "https://api.groq.com/openai/v1/chat/completions", bytes.NewBuffer(jsonData))
 	if err != nil {
-		return "", fmt.Errorf("failed to connect to Ollama: %v", err)
+		return "", err
+	}
+	apiKey := os.Getenv("GROQ_API_KEY")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to connect to Groq: %v", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("Ollama returned status %d", resp.StatusCode)
+		return "", fmt.Errorf("Groq returned status %d", resp.StatusCode)
 	}
 
-	var ollamaResp OllamaResponse
-	if err := json.NewDecoder(resp.Body).Decode(&ollamaResp); err != nil {
+	var groqResp GroqResponse
+	if err := json.NewDecoder(resp.Body).Decode(&groqResp); err != nil {
 		return "", err
 	}
 
-	return ollamaResp.Message.Content, nil
+	if len(groqResp.Choices) > 0 {
+		return groqResp.Choices[0].Message.Content, nil
+	}
+
+	return "", fmt.Errorf("no response from AI")
 }
