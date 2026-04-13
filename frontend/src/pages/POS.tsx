@@ -515,8 +515,18 @@ export default function POS() {
                   </button>
                 </div>
               ) : rfidError ? (
-                <div className="bg-red-50 rounded-lg p-3 border border-red-200">
+                <div className="bg-red-50 rounded-lg p-3 border border-red-200 space-y-2">
                   <p className="text-sm text-red-600">RFID card not recognized</p>
+                  <button
+                    onClick={() => {
+                      setRfidError(false);
+                      setIsRfidScanning(true);
+                      setRfidBuffer('');
+                    }}
+                    className="w-full py-2 bg-red-100 text-red-700 text-sm font-medium rounded-lg hover:bg-red-200 transition-colors"
+                  >
+                    Retry Scan
+                  </button>
                 </div>
               ) : (
                 <div className="space-y-2">

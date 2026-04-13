@@ -42,9 +42,10 @@ export default function Staff() {
   const fetchUsers = async () => {
     try {
       const res = await api.get('/api/users');
-      setUsers(res.data.users);
+      setUsers(res.data.users || []);
     } catch (error) {
       console.error('Failed to fetch users:', error);
+      setUsers([]);
     } finally {
       setLoading(false);
     }
@@ -229,9 +230,9 @@ export default function Staff() {
     }
   ];
 
-  const filteredUsers = users.filter((u) => 
-    u.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    u.email.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredUsers = (users || []).filter((u) => 
+    u.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    u.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (

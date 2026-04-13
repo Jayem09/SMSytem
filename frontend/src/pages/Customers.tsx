@@ -50,6 +50,8 @@ export default function Customers() {
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [rfidCardId, setRfidCardId] = useState('');
+  const [rfidChecking, setRfidChecking] = useState(false);
+  const [rfidDuplicateError, setRfidDuplicateError] = useState('');
 
   const fetchCustomers = useCallback(async () => {
     try {
@@ -87,10 +89,42 @@ export default function Customers() {
     }
   };
 
+  const checkRfidDuplicate = async (rfid: string): Promise<boolean> => {
+    if (!rfid || rfid.length < 8) {
+      setRfidDuplicateError('');
+      return false;
+    }
+    setRfidChecking(true);
+    setRfidDuplicateError('');
+    try {
+      const res = await api.get(`/api/customers/rfid/${rfid}`);
+      const data = res.data as { customer?: Customer };
+      if (data?.customer) {
+        if (editing && data.customer.id === editing.id) {
+          setRfidDuplicateError('');
+          setRfidChecking(false);
+          return false;
+        } else {
+          setRfidDuplicateError(`Card already registered to ${data.customer.name}`);
+          setRfidChecking(false);
+          return true;
+        }
+      }
+      setRfidChecking(false);
+      return false;
+    } catch {
+      setRfidDuplicateError('');
+      setRfidChecking(false);
+      return false;
+    }
+  };
+
   const openCreate = () => {
     setEditing(null);
     setName(''); setEmail(''); setPhone(''); setAddress(''); setRfidCardId('');
     setError('');
+    setRfidChecking(false);
+    setRfidDuplicateError('');
     setModalOpen(true);
   };
 
@@ -99,12 +133,21 @@ export default function Customers() {
     setName(c.name); setEmail(c.email); setPhone(c.phone); setAddress(c.address);
     setRfidCardId(c.rfid_card_id || '');
     setError('');
+    setRfidChecking(false);
+    setRfidDuplicateError('');
     setModalOpen(true);
   };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
+    if (rfidCardId && rfidCardId.length >= 8) {
+      const isDuplicate = await checkRfidDuplicate(rfidCardId);
+      if (isDuplicate) {
+        setError('RFID card is already in use by another customer');
+        return;
+      }
+    }
     const payload = { name, email, phone, address, rfid_card_id: rfidCardId };
     try {
       if (editing) {
@@ -236,7 +279,15 @@ export default function Customers() {
             <FormField label="Email Address" type="email" value={email} onChange={setEmail} placeholder="juan@example.com" icon={<Mail className="w-4 h-4" />} />
             <FormField label="Phone Number" value={phone} onChange={setPhone} placeholder="09XX XXX XXXX" icon={<Phone className="w-4 h-4" />} />
             <FormField label="Home Address" type="textarea" value={address} onChange={setAddress} placeholder="Street, City, Province" icon={<MapPin className="w-4 h-4" />} />
-            <RFIDField value={rfidCardId} onChange={setRfidCardId} />
+            <div>
+              <RFIDField value={rfidCardId} onChange={(val) => { setRfidCardId(val); checkRfidDuplicate(val); }} />
+              {rfidChecking && (
+                <p className="text-xs text-gray-400 ml-1 -mt-2">Checking card...</p>
+              )}
+              {rfidDuplicateError && (
+                <p className="text-xs text-red-500 ml-1 -mt-2">{rfidDuplicateError}</p>
+              )}
+            </div>
           </div>
           <button type="submit" className="w-full mt-8 py-4 text-sm font-black text-white bg-gray-900 hover:bg-gray-800 rounded-2xl transition-all shadow-lg hover:shadow-xl active:scale-95 cursor-pointer uppercase tracking-widest">
             {editing ? 'Update Profile' : 'Save Customer'}
