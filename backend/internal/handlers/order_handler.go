@@ -205,6 +205,34 @@ func (h *OrderHandler) Create(c *gin.Context) {
 			return fmt.Errorf("failed to create order: %v", err)
 		}
 
+		// Auto-create customer for walk-in guests
+		if order.CustomerID == nil && input.GuestName != "" && input.GuestPhone != "" {
+			// Check if customer with this phone already exists
+			var existingCustomer models.Customer
+			switch err := tx.Where("phone = ?", input.GuestPhone).First(&existingCustomer).Error; err {
+			case nil:
+				// Use existing customer
+				order.CustomerID = &existingCustomer.ID
+				if err := tx.Save(&order).Error; err != nil {
+					fmt.Printf("Warning: failed to link order to existing customer: %v\n", err)
+				}
+			case gorm.ErrRecordNotFound:
+				// Create new customer
+				newCustomer := models.Customer{
+					Name:  input.GuestName,
+					Phone: input.GuestPhone,
+				}
+				if err := tx.Create(&newCustomer).Error; err == nil {
+					order.CustomerID = &newCustomer.ID
+					if err := tx.Save(&order).Error; err != nil {
+						fmt.Printf("Warning: failed to link order to customer: %v\n", err)
+					}
+				}
+			default:
+				fmt.Printf("Warning: error checking for existing customer: %v\n", err)
+			}
+		}
+
 		if orderStatus == "completed" {
 			for _, item := range orderItems {
 				var product models.Product

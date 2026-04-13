@@ -5,7 +5,8 @@ import Modal from '../components/Modal';
 import FormField from '../components/FormField';
 import RFIDField from '../components/RFIDField';
 import { useAuth } from '../hooks/useAuth';
-import { History, Edit2, Trash2, User, Phone, Mail, MapPin, ShoppingBag, CheckCircle, XCircle, Clock, CreditCard } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
+import { History, Edit2, Trash2, User, Phone, Mail, MapPin, ShoppingBag, CheckCircle, XCircle, Clock, CreditCard, Users, CreditCardIcon } from 'lucide-react';
 
 interface Order {
   id: number;
@@ -25,6 +26,8 @@ interface Customer {
   loyaltyPoints?: number;
 }
 
+type CustomerFilter = 'all' | 'loyalty' | 'walkin';
+
 const getTier = (points: number) => {
   if (points >= 200) return { name: 'Gold', bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-300' };
   if (points >= 50) return { name: 'Silver', bg: 'bg-gray-100', text: 'text-gray-600', border: 'border-gray-300' };
@@ -33,10 +36,12 @@ const getTier = (points: number) => {
 
 export default function Customers() {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'purchasing' || user?.role === 'purchaser';
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState<CustomerFilter>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -70,6 +75,12 @@ export default function Customers() {
       setLoading(false);
     }
   }, [search]);
+
+  const filteredCustomers = customers.filter(c => {
+    if (filter === 'loyalty') return c.rfid_card_id && c.rfid_card_id.length >= 8;
+    if (filter === 'walkin') return !c.rfid_card_id || c.rfid_card_id.length < 8;
+    return true;
+  });
 
   useEffect(() => { fetchCustomers(); }, [fetchCustomers]);
   useEffect(() => { const t = setTimeout(fetchCustomers, 300); return () => clearTimeout(t); }, [fetchCustomers]);
@@ -141,6 +152,13 @@ export default function Customers() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
+    
+    // Client-side validation - only name is required
+    if (!name.trim()) {
+      setError('Full Name is required');
+      return;
+    }
+    
     if (rfidCardId && rfidCardId.length >= 8) {
       const isDuplicate = await checkRfidDuplicate(rfidCardId);
       if (isDuplicate) {
@@ -152,8 +170,10 @@ export default function Customers() {
     try {
       if (editing) {
         await api.put(`/api/customers/${editing.id}`, payload);
+        showToast('Customer updated successfully', 'success');
       } else {
         await api.post('/api/customers', payload);
+        showToast('Customer created successfully', 'success');
       }
       setModalOpen(false);
       fetchCustomers();
@@ -188,12 +208,49 @@ export default function Customers() {
         </button>
       </div>
 
+      {/* Filter Tabs */}
+      <div className="flex gap-2 mb-6">
+        <button
+          onClick={() => setFilter('all')}
+          className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${
+            filter === 'all' 
+              ? 'bg-gray-900 text-white' 
+              : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+          }`}
+        >
+          <Users className="w-4 h-4 inline mr-2" />
+          All Customers
+        </button>
+        <button
+          onClick={() => setFilter('loyalty')}
+          className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${
+            filter === 'loyalty' 
+              ? 'bg-indigo-600 text-white' 
+              : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+          }`}
+        >
+          <CreditCardIcon className="w-4 h-4 inline mr-2" />
+          With Loyalty Card
+        </button>
+        <button
+          onClick={() => setFilter('walkin')}
+          className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${
+            filter === 'walkin' 
+              ? 'bg-amber-500 text-white' 
+              : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+          }`}
+        >
+          <User className="w-4 h-4 inline mr-2" />
+          Walk-in
+        </button>
+      </div>
+
       {error && !modalOpen && <p className="text-red-600 text-sm mb-4">{error}</p>}
 
       <DataTable
         columns={[
           {
-            key: 'name', label: 'Name', render: (c) => (
+            key: 'name', label: 'Name', render: (c: Customer) => (
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-gray-50 rounded-lg text-gray-400 group-hover:text-gray-900 transition-colors">
                   <User className="w-4 h-4" />
@@ -237,7 +294,7 @@ export default function Customers() {
             }
           },
         ]}
-        data={customers}
+        data={filteredCustomers}
         loading={loading}
         searchValue={search}
         onSearchChange={setSearch}
@@ -279,7 +336,8 @@ export default function Customers() {
             <FormField label="Email Address" type="email" value={email} onChange={setEmail} placeholder="juan@example.com" icon={<Mail className="w-4 h-4" />} />
             <FormField label="Phone Number" value={phone} onChange={setPhone} placeholder="09XX XXX XXXX" icon={<Phone className="w-4 h-4" />} />
             <FormField label="Home Address" type="textarea" value={address} onChange={setAddress} placeholder="Street, City, Province" icon={<MapPin className="w-4 h-4" />} />
-            <div>
+            <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+              <p className="text-xs text-indigo-600 mb-3 font-medium">Scan or tap the customer's RFID loyalty card (optional)</p>
               <RFIDField value={rfidCardId} onChange={(val) => { setRfidCardId(val); checkRfidDuplicate(val); }} />
               {rfidChecking && (
                 <p className="text-xs text-gray-400 ml-1 -mt-2">Checking card...</p>

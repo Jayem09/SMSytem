@@ -147,6 +147,10 @@ export default function POS() {
         setRfidCustomer(data.customer);
         setCustomerId(data.customer.id.toString());
         setRfidError(false);
+        // Auto-fill business address from customer's registered address
+        if (data.customer.address) {
+          setBusinessAddress(data.customer.address);
+        }
         showToast(`Welcome back, ${data.customer.name}!`, 'success');
       } else {
         setRfidError(true);
@@ -168,6 +172,7 @@ export default function POS() {
     setRfidBuffer('');
     setSelectedReward(null);
     setRfidError(false);
+    setBusinessAddress('');
   };
 
   const finalTotal = Math.max(0, posSubtotal - parseFloat(discount || '0'));
@@ -505,14 +510,25 @@ export default function POS() {
                   )}
                 </div>
               ) : rfidCustomer ? (
-                <div className="flex items-center justify-between bg-white rounded-lg p-3 border border-emerald-200">
-                  <div>
-                    <p className="text-sm font-bold text-gray-900">{rfidCustomer.name}</p>
-                    <p className="text-xs text-gray-500">{rfidCustomer.loyalty_points?.toFixed(0) || 0} points</p>
+                <div className="bg-white rounded-lg p-3 border border-emerald-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-bold text-gray-900">{rfidCustomer.name}</p>
+                      <p className="text-xs text-gray-500">{rfidCustomer.loyalty_points?.toFixed(0) || 0} points</p>
+                    </div>
+                    <button onClick={clearRfidCustomer} className="text-gray-400 hover:text-red-500">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
-                  <button onClick={clearRfidCustomer} className="text-gray-400 hover:text-red-500">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  {rfidCustomer.email && (
+                    <p className="text-xs text-gray-500">{rfidCustomer.email}</p>
+                  )}
+                  {rfidCustomer.phone && (
+                    <p className="text-xs text-gray-500">{rfidCustomer.phone}</p>
+                  )}
+                  {rfidCustomer.address && (
+                    <p className="text-xs text-gray-500 truncate" title={rfidCustomer.address}>{rfidCustomer.address}</p>
+                  )}
                 </div>
               ) : rfidError ? (
                 <div className="bg-red-50 rounded-lg p-3 border border-red-200 space-y-2">
@@ -590,6 +606,10 @@ export default function POS() {
                       const data = res.data as { customer?: Customer };
                       if (data?.customer) {
                         setRfidCustomer(data.customer);
+                        // Auto-fill business address from customer's registered address
+                        if (data.customer.address) {
+                          setBusinessAddress(data.customer.address);
+                        }
                       }
                     } catch {
                       // ignore
