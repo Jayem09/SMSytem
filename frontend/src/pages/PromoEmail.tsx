@@ -44,6 +44,7 @@ export default function PromoEmail() {
   // Selection state
   const [recipientType, setRecipientType] = useState<'customers' | 'suppliers'>('customers');
   const [selectedRecipients, setSelectedRecipients] = useState<Recipient[]>([]);
+  const [search, setSearch] = useState('');
   const [result, setResult] = useState<{ success: number; failed: number; failed_emails: string[] } | null>(null);
 
   useEffect(() => {
@@ -104,6 +105,28 @@ export default function PromoEmail() {
   };
 
   const columns = [
+    { 
+      key: 'select', 
+      label: '', 
+      render: (item: any) => {
+        const isSelected = selectedRecipients.some(r => r.email === item.email);
+        return (
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => {
+              if (isSelected) {
+                setSelectedRecipients(selectedRecipients.filter(r => r.email !== item.email));
+              } else {
+                setSelectedRecipients([...selectedRecipients, { email: item.email, name: item.name }]);
+              }
+            }}
+            className="w-4 h-4 rounded border-white/10 bg-white/5 text-white focus:ring-slate-900 transition-all cursor-pointer"
+          />
+        );
+      },
+      className: "w-12 text-center"
+    },
     { key: 'name', label: 'NAME', sortable: true },
     { key: 'email', label: 'EMAIL', sortable: true },
   ];
@@ -353,11 +376,8 @@ export default function PromoEmail() {
                     <DataTable
                       columns={columns}
                       data={recipientType === 'customers' ? customers : suppliers}
-                      selectable
-                      onSelectionChange={(rows) => {
-                        setSelectedRecipients(rows.map((r: any) => ({ email: r.email, name: r.name })));
-                      }}
-                      searchable={true}
+                      searchValue={search}
+                      onSearchChange={setSearch}
                       pageSize={10}
                     />
                  </div>
