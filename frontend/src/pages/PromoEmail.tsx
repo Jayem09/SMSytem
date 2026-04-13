@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import api from '../api/axios';
-import { Mail, Send, Users, Truck, CheckCircle, XCircle, Loader2, Calendar, Tag, MessageSquare, Layout, Eye, Settings, Briefcase } from 'lucide-react';
+import DataTable from '../components/DataTable';
+import { Mail, Send, Users, Truck, CheckCircle, XCircle, Loader2, Search } from 'lucide-react';
 
 interface Customer {
   id: number;
@@ -20,9 +21,9 @@ interface Recipient {
 }
 
 const TEMPLATES = [
-  { id: 'buy4get1', name: 'BUY X GET Y FREE', defaultDiscount: 'Buy 4 Get 1 Free', accent: '#d97706' },
-  { id: 'discount', name: 'DISCOUNT SALE', defaultDiscount: '20% OFF', accent: '#4f46e5' },
-  { id: 'seasonal', name: 'SEASONAL PROMO', defaultDiscount: 'Special Offer', accent: '#059669' },
+  { id: 'buy4get1', name: 'Buy X Get Y Free', defaultDiscount: 'Buy 4 Get 1 Free' },
+  { id: 'discount', name: 'Discount Sale', defaultDiscount: '20% OFF' },
+  { id: 'seasonal', name: 'Seasonal Promo', defaultDiscount: 'Special Offer' },
 ];
 
 export default function PromoEmail() {
@@ -32,8 +33,6 @@ export default function PromoEmail() {
   const [sending, setSending] = useState(false);
 
   // Form state
-  const [campaignTitle, setCampaignTitle] = useState('');
-  const [subjectLine, setSubjectLine] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState(TEMPLATES[0].id);
   const [promoCode, setPromoCode] = useState('');
   const [discount, setDiscount] = useState(TEMPLATES[0].defaultDiscount);
@@ -44,7 +43,7 @@ export default function PromoEmail() {
   const [recipientType, setRecipientType] = useState<'customers' | 'suppliers'>('customers');
   const [selectedRecipients, setSelectedRecipients] = useState<Recipient[]>([]);
   const [selectAll, setSelectAll] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [search, setSearch] = useState('');
 
   // Result state
   const [result, setResult] = useState<{ success: number; failed: number; failed_emails: string[] } | null>(null);
@@ -72,21 +71,21 @@ export default function PromoEmail() {
     }
   };
 
-  const currentRecipients = useMemo(() => {
+  const currentRecipientsList = useMemo(() => {
     const list = recipientType === 'customers' ? customers : suppliers;
-    if (!searchQuery) return list;
+    if (!search) return list;
     return list.filter(r => 
-      r.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      r.email.toLowerCase().includes(searchQuery.toLowerCase())
+      r.name.toLowerCase().includes(search.toLowerCase()) || 
+      r.email.toLowerCase().includes(search.toLowerCase())
     );
-  }, [recipientType, customers, suppliers, searchQuery]);
+  }, [recipientType, customers, suppliers, search]);
 
   const handleSelectAll = () => {
     if (selectAll) {
       setSelectedRecipients([]);
     } else {
       setSelectedRecipients(
-        currentRecipients.map((r) => ({
+        currentRecipientsList.map((r) => ({
           email: r.email,
           name: r.name,
         }))
@@ -132,7 +131,6 @@ export default function PromoEmail() {
       const res = await api.post('/api/promo/send', {
         recipients: selectedRecipients,
         template: selectedTemplate,
-        subject: subjectLine,
         promo_code: promoCode,
         discount,
         valid_until: validUntil,
@@ -152,226 +150,254 @@ export default function PromoEmail() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gray-950">
-        <Loader2 className="w-12 h-12 animate-spin text-gray-700" />
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#030712] text-gray-100 p-8 font-sans">
+    <div className="p-6 max-w-6xl mx-auto">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-16 px-4">
-        <div>
-          <h1 className="text-4xl font-black tracking-[0.1em] text-white mb-2" style={{ letterSpacing: '0.15em' }}>PROMO</h1>
-          <p className="text-gray-500 font-bold uppercase tracking-[0.3em] text-[10px]">Premium Marketing Suite</p>
-        </div>
-
-        {result && (
-          <div className={`px-6 py-3 rounded-full border backdrop-blur-xl animate-in fade-in slide-in-from-right-4 ${
-            result.failed === 0 
-            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
-            : 'bg-amber-500/10 border-amber-500/20 text-amber-400'
-          }`}>
-            <div className="flex items-center gap-3">
-              <CheckCircle className="w-4 h-4" />
-              <div className="text-[10px] font-black uppercase tracking-widest">
-                Sent {result.success} campaigns
-              </div>
-            </div>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-indigo-100 rounded-lg">
+            <Mail className="w-5 h-5 text-indigo-600" />
           </div>
-        )}
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">Promo Emails</h1>
+            <p className="text-sm text-gray-500">Send promotional emails to customers & suppliers</p>
+          </div>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-10 items-start max-w-7xl mx-auto">
-        
-        {/* Column 1: Configuration (4 cols) */}
-        <div className="xl:col-span-4 space-y-8">
-          <div className="bg-white/[0.03] backdrop-blur-2xl rounded-2xl p-8 border border-white/5">
-            <h3 className="text-[10px] font-black tracking-[0.3em] text-gray-500 uppercase mb-8">Campaign Setup</h3>
-            
-            <div className="space-y-8">
-              <div>
-                <label className="block text-[8px] font-black text-gray-600 uppercase tracking-widest mb-3">Internal Identifier</label>
-                <input
-                  type="text"
-                  value={campaignTitle}
-                  onChange={(e) => setCampaignTitle(e.target.value)}
-                  placeholder="Reference"
-                  className="w-full bg-black/40 border-b border-white/10 rounded-none px-0 py-3 focus:border-white outline-none transition-all placeholder:text-gray-700 font-medium text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[8px] font-black text-gray-600 uppercase tracking-widest mb-3">Subject Line</label>
-                <input
-                  type="text"
-                  value={subjectLine}
-                  onChange={(e) => setSubjectLine(e.target.value)}
-                  placeholder="Inbox Title"
-                  className="w-full bg-black/40 border-b border-white/10 rounded-none px-0 py-3 focus:border-white outline-none transition-all placeholder:text-gray-700 font-medium text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[8px] font-black text-gray-600 uppercase tracking-widest mb-4">Template Selection</label>
-                <div className="space-y-2">
-                  {TEMPLATES.map((t) => (
-                    <button
-                      key={t.id}
-                      onClick={() => handleTemplateChange(t.id)}
-                      className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all ${
-                        selectedTemplate === t.id 
-                        ? 'bg-white/5 border-white/20' 
-                        : 'bg-transparent border-white/5 opacity-40 hover:opacity-80'
-                      }`}
-                    >
-                      <span className="text-[10px] font-bold tracking-widest">{t.name}</span>
-                      <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: t.accent }}></div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
+      {/* Result Alert */}
+      {result && (
+        <div className={`mb-6 p-4 rounded-lg flex items-center gap-3 ${
+          result.failed === 0
+            ? 'bg-green-100 text-green-800'
+            : 'bg-yellow-100 text-yellow-800'
+        }`}>
+          {result.failed === 0 ? (
+            <CheckCircle className="w-5 h-5" />
+          ) : (
+            <XCircle className="w-5 h-5" />
+          )}
+          <div>
+            <p className="font-medium">Sent {result.success} emails successfully</p>
+            {result.failed > 0 && (
+              <p className="text-sm">Failed: {result.failed}</p>
+            )}
           </div>
         </div>
+      )}
 
-        {/* Column 2: Content (4 cols) */}
-        <div className="xl:col-span-4 space-y-8">
-          <div className="bg-white/[0.03] backdrop-blur-2xl rounded-2xl p-8 border border-white/5">
-            <h3 className="text-[10px] font-black tracking-[0.3em] text-gray-500 uppercase mb-8">Offer Details</h3>
-
-            <div className="space-y-8">
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-[8px] font-black text-gray-600 uppercase tracking-widest mb-3">Code</label>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Left Column - Settings */}
+        <div className="space-y-6">
+          {/* Template Selection */}
+          <div className="bg-white rounded-xl border shadow-sm">
+            <div className="px-4 py-3 border-b">
+              <h3 className="font-semibold text-gray-900">Email Template</h3>
+            </div>
+            <div className="p-4 space-y-2">
+              {TEMPLATES.map((template) => (
+                <label
+                  key={template.id}
+                  className={`flex items-center p-3 rounded-lg border cursor-pointer transition-all ${
+                    selectedTemplate === template.id
+                      ? 'border-indigo-500 bg-indigo-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
                   <input
-                    type="text"
-                    value={promoCode}
-                    onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
-                    placeholder="CODE"
-                    className="w-full bg-black/40 border-b border-white/10 rounded-none px-0 py-3 focus:border-white outline-none transition-all font-mono font-bold text-center tracking-[0.2em] text-sm"
+                    type="radio"
+                    name="template"
+                    value={template.id}
+                    checked={selectedTemplate === template.id}
+                    onChange={() => handleTemplateChange(template.id)}
+                    className="sr-only"
                   />
-                </div>
-                <div>
-                  <label className="block text-[8px] font-black text-gray-600 uppercase tracking-widest mb-3">Value</label>
-                  <input
-                    type="text"
-                    value={discount}
-                    onChange={(e) => setDiscount(e.target.value)}
-                    placeholder="20% OFF"
-                    className="w-full bg-black/40 border-b border-white/10 rounded-none px-0 py-3 focus:border-white outline-none transition-all font-bold text-sm"
-                  />
-                </div>
-              </div>
+                  <span className={selectedTemplate === template.id ? 'text-indigo-700 font-medium' : 'text-gray-700'}>
+                    {template.name}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
 
+          {/* Promo Details */}
+          <div className="bg-white rounded-xl border shadow-sm">
+            <div className="px-4 py-3 border-b">
+              <h3 className="font-semibold text-gray-900">Promo Details</h3>
+            </div>
+            <div className="p-4 space-y-4">
               <div>
-                <label className="block text-[8px] font-black text-gray-600 uppercase tracking-widest mb-3">Expiration</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Promo Code *
+                </label>
+                <input
+                  type="text"
+                  value={promoCode}
+                  onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                  placeholder="e.g. BUY4GET1"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Offer / Discount
+                </label>
+                <input
+                  type="text"
+                  value={discount}
+                  onChange={(e) => setDiscount(e.target.value)}
+                  placeholder="e.g. Buy 4 Get 1 Free"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Valid Until
+                </label>
                 <input
                   type="date"
                   value={validUntil}
                   onChange={(e) => setValidUntil(e.target.value)}
-                  className="w-full bg-black/40 border-b border-white/10 rounded-none px-0 py-3 focus:border-white outline-none transition-all text-sm font-medium"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
               </div>
-
               <div>
-                <label className="block text-[8px] font-black text-gray-600 uppercase tracking-widest mb-3">More Information</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Extra Details
+                </label>
                 <textarea
                   value={details}
                   onChange={(e) => setDetails(e.target.value)}
-                  placeholder="Terms or personal notes..."
-                  rows={4}
-                  className="w-full bg-black/20 border border-white/5 rounded-xl px-4 py-4 focus:border-white/20 outline-none transition-all resize-none text-xs leading-relaxed"
+                  placeholder="e.g. Valid on all Michelin & Goodyear tires"
+                  rows={2}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
                 />
               </div>
             </div>
           </div>
-          
-          <div className="px-8 flex items-center gap-2 opacity-30">
-             <Eye className="w-3 h-3" />
-             <span className="text-[8px] font-black tracking-widest uppercase">Live Preview Active</span>
-          </div>
         </div>
 
-        {/* Column 3: Audience (4 cols) */}
-        <div className="xl:col-span-4 space-y-8">
-          <div className="bg-white/[0.03] backdrop-blur-2xl rounded-2xl p-8 border border-white/5 flex flex-col h-[540px]">
-            <div className="flex items-center justify-between mb-8">
-              <h3 className="text-[10px] font-black tracking-[0.3em] text-gray-500 uppercase">Audience</h3>
-              <span className="text-[8px] font-black tracking-widest text-white px-2 py-0.5 bg-white/10 rounded-full">{selectedRecipients.length}</span>
+        {/* Right Column - Recipients */}
+        <div className="space-y-6">
+          {/* Recipient Selection */}
+          <div className="bg-white rounded-xl border shadow-sm">
+            <div className="px-4 py-3 border-b flex items-center justify-between">
+              <h3 className="font-semibold text-gray-900">Recipients</h3>
+              <span className="text-sm text-gray-500">
+                {selectedRecipients.length} selected
+              </span>
             </div>
 
-            <div className="flex p-1 bg-black/40 rounded-xl mb-6 ring-1 ring-white/5">
-              <button
-                onClick={() => { setRecipientType('customers'); setSelectAll(false); setSelectedRecipients([]); }}
-                className={`flex-1 flex items-center justify-center py-2.5 rounded-lg text-[9px] font-black tracking-widest transition-all ${recipientType === 'customers' ? 'bg-white/10 text-white' : 'text-gray-600 hover:text-gray-400'}`}
-              >
-                CUSTOMERS
-              </button>
-              <button
-                onClick={() => { setRecipientType('suppliers'); setSelectAll(false); setSelectedRecipients([]); }}
-                className={`flex-1 flex items-center justify-center py-2.5 rounded-lg text-[9px] font-black tracking-widest transition-all ${recipientType === 'suppliers' ? 'bg-white/10 text-white' : 'text-gray-600 hover:text-gray-400'}`}
-              >
-                SUPPLIERS
-              </button>
+            {/* Type Tabs */}
+            <div className="p-4 border-b">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { setRecipientType('customers'); setSelectAll(false); setSelectedRecipients([]); }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    recipientType === 'customers'
+                      ? 'bg-indigo-100 text-indigo-700'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  <Users className="w-4 h-4" />
+                  Customers ({customers.length})
+                </button>
+                <button
+                  onClick={() => { setRecipientType('suppliers'); setSelectAll(false); setSelectedRecipients([]); }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    recipientType === 'suppliers'
+                      ? 'bg-indigo-100 text-indigo-700'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  <Truck className="w-4 h-4" />
+                  Suppliers ({suppliers.length})
+                </button>
+              </div>
             </div>
 
-            <div className="space-y-4 mb-6">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search..."
-                className="w-full bg-transparent border-b border-white/10 px-0 py-2 focus:border-white outline-none text-[10px] placeholder:text-gray-700"
-              />
+            {/* Search & Select All */}
+            <div className="p-4 space-y-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search by name or email..."
+                  className="w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
               <button 
                 onClick={handleSelectAll}
-                className="w-full text-[8px] font-black tracking-[0.2em] uppercase text-gray-600 hover:text-white transition-colors"
+                className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
               >
-                {selectAll ? 'Deselect all' : `Select all (${currentRecipients.length})`}
+                {selectAll ? 'Clear Selection' : `Select All (${currentRecipientsList.length})`}
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-              {currentRecipients.map((r) => {
-                const isSelected = selectedRecipients.some((rec) => rec.email === r.email);
-                return (
-                  <div
-                    key={r.id}
-                    onClick={() => handleToggleRecipient(r)}
-                    className={`group flex items-center gap-4 p-3 rounded-xl border cursor-pointer transition-all ${isSelected ? 'bg-white/5 border-white/10' : 'bg-transparent border-transparent hover:bg-white/5'}`}
-                  >
-                    <div className={`w-3.5 h-3.5 rounded-sm border transition-all ${isSelected ? 'bg-white border-white' : 'border-white/10'}`}>
-                      {isSelected && <CheckCircle className="w-2.5 h-2.5 text-black mx-auto mt-0.5" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[10px] font-bold text-white truncate uppercase tracking-tight">{r.name}</p>
-                      <p className="text-[8px] text-gray-600 truncate">{r.email}</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="mt-8 pt-4 border-t border-white/5">
-              <button
-                onClick={handleSend}
-                disabled={sending || selectedRecipients.length === 0 || !promoCode.trim()}
-                className={`w-full flex items-center justify-center gap-4 py-5 rounded-2xl font-black text-[10px] tracking-[0.3em] transition-all ${
-                  sending || selectedRecipients.length === 0 || !promoCode.trim()
-                  ? 'bg-gray-900 text-gray-700 cursor-not-allowed'
-                  : 'bg-white text-black hover:opacity-90 active:scale-95'
-                }`}
-              >
-                {sending ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  'APPROVE CAMPAIGN'
-                )}
-              </button>
+            {/* Recipient List */}
+            <div className="px-4 pb-4 max-h-80 overflow-y-auto space-y-1">
+              {currentRecipientsList.length === 0 ? (
+                <p className="py-4 text-center text-gray-500">No {recipientType} with email found</p>
+              ) : (
+                currentRecipientsList.map((r) => {
+                  const isSelected = selectedRecipients.some((rec) => rec.email === r.email);
+                  return (
+                    <label
+                      key={r.id}
+                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleToggleRecipient(r)}
+                        className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{r.name}</p>
+                        <p className="text-xs text-gray-500 truncate">{r.email}</p>
+                      </div>
+                    </label>
+                  );
+                })
+              )}
             </div>
           </div>
+
+          {/* Send Button */}
+          <button
+            onClick={handleSend}
+            disabled={sending || selectedRecipients.length === 0 || !promoCode.trim()}
+            className={`w-full flex items-center justify-center gap-2 py-3 rounded-lg font-semibold transition-all ${
+              sending || selectedRecipients.length === 0 || !promoCode.trim()
+                ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                : 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-sm hover:shadow-md active:scale-95'
+            }`}
+          >
+            {sending ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Sending...
+              </>
+            ) : (
+              <>
+              <Send className="w-5 h-5" />
+              Send to {selectedRecipients.length} recipient{selectedRecipients.length !== 1 ? 's' : ''}
+            </>
+          )}
+          </button>
+
+          {/* Info */}
+          <p className="text-xs text-gray-400 text-center">
+            Powered by Brevo • Free 300 emails/day
+          </p>
         </div>
       </div>
     </div>

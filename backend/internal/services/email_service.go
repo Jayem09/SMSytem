@@ -303,7 +303,7 @@ func (e *EmailService) SendPromoEmail(toEmail, toName, promoCode, subjectLine, d
 	}
 
 	// Note: Logo should be on a stable public URL
-	logoURL := "https://smstyredepot.com/logo2.png" 
+	logoURL := "https://smstyredepot.com/logo.png"
 
 	html := fmt.Sprintf(`<!DOCTYPE html>
 <html>
@@ -341,10 +341,22 @@ func (e *EmailService) SendPromoEmail(toEmail, toName, promoCode, subjectLine, d
                 <p style="margin:0 0 16px;font-size:13px;font-weight:700;color:#1e293b;text-transform:uppercase;letter-spacing:0.15em;">Our Favorites</p>
                 <table width="100%%" cellpadding="0" cellspacing="0" style="table-layout: fixed;">
                     <tr>
+<td width="33%%" align="center" style="padding:6px;">
+                            <div style="background-color:#fcfcfc; border:1px solid #f1f5f9; border-radius:12px; padding:16px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                                <img src="https://smstyredepot.com/api/products/566/image" style="width:100%%; height:140px; object-fit:contain; display:block; border-radius:4px;">
+                                <p style="margin:16px 0 0;font-size:10px;font-weight:700;color:#1e293b;text-transform:uppercase;letter-spacing:0.1em;">Performance</p>
+                            </div>
+                        </td>
                         <td width="33%%" align="center" style="padding:6px;">
                             <div style="background-color:#fcfcfc; border:1px solid #f1f5f9; border-radius:12px; padding:16px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
-                                <img src="https://images.pexels.com/photos/195633/pexels-photo-195633.jpeg?auto=compress&cs=tinysrgb&w=300" style="width:100%%; height:140px; object-fit:contain; display:block; border-radius:4px;">
-                                <p style="margin:16px 0 0;font-size:10px;font-weight:700;color:#1e293b;text-transform:uppercase;letter-spacing:0.1em;">Performance</p>
+                                <img src="https://smstyredepot.com/api/products/703/image" style="width:100%%; height:140px; object-fit:contain; display:block; border-radius:4px;">
+                                <p style="margin:16px 0 0;font-size:10px;font-weight:700;color:#1e293b;text-transform:uppercase;letter-spacing:0.1em;">Rugged</p>
+                            </div>
+                        </td>
+                        <td width="33%%" align="center" style="padding:6px;">
+                            <div style="background-color:#fcfcfc; border:1px solid #f1f5f9; border-radius:12px; padding:16px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                                <img src="https://smstyredepot.com/api/products/721/image" style="width:100%%; height:140px; object-fit:contain; display:block; border-radius:4px;">
+                                <p style="margin:16px 0 0;font-size:10px;font-weight:700;color:#1e293b;text-transform:uppercase;letter-spacing:0.1em;">All-Season</p>
                             </div>
                         </td>
                         <td width="33%%" align="center" style="padding:6px;">
@@ -460,4 +472,3 @@ func (e *EmailService) detailsSection(details string) string {
             </td>
           </tr>`, details)
 }
-
