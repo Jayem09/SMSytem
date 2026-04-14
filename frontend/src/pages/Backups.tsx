@@ -88,37 +88,37 @@ export default function Backups() {
 
   const handleDownloadBackup = async (id: number, filename: string) => {
     console.log('handleDownload called:', id, filename);
-    try {
-      const token = localStorage.getItem('token');
-      console.log('Fetching:', `${API_BASE}/api/backups/${id}/download`);
-      const response = await fetch(`${API_BASE}/api/backups/${id}/download`, {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-      });
-      
-      console.log('Download response status:', response.status, response.statusText);
-      console.log('Content-Type:', response.headers.get('content-type'));
-      console.log('Content-Length:', response.headers.get('content-length'));
-      if (!response.ok) throw new Error('Download failed');
-      
-      const blob = await response.blob();
-      console.log('Blob size:', blob.size, 'Blob type:', blob.type);
-      
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      link.style.display = 'none';
-      document.body.appendChild(link);
-      console.log('Triggering click on link');
-      link.click();
-      console.log('Link clicked, removing from DOM');
-      link.remove();
-      window.URL.revokeObjectURL(url);
-      console.log('Download complete, URL revoked');
-      showToast('Download started', 'success');
-    } catch (err) {
-      console.error('Download error:', err);
-      showToast('Download failed', 'error');
+    const token = localStorage.getItem('token');
+    const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+    
+    if (isTauri) {
+      // In Tauri, open download URL in a new window - Tauri will handle it
+      const downloadUrl = `${API_BASE}/api/backups/${id}/download`;
+      window.open(downloadUrl + (token ? `?token=${token}` : ''), '_blank');
+      showToast('Download started - check downloads folder', 'success');
+    } else {
+      // Browser - use fetch + blob
+      try {
+        const response = await fetch(`${API_BASE}/api/backups/${id}/download`, {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        });
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        setTimeout(() => link.click(), 100);
+        setTimeout(() => {
+          link.remove();
+          window.URL.revokeObjectURL(url);
+        }, 1000);
+        window.URL.revokeObjectURL(url);
+        showToast('Download started', 'success');
+      } catch (err) {
+        console.error('Download error:', err);
+        showToast('Download failed', 'error');
+      }
     }
   };
 
