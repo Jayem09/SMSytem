@@ -25,15 +25,17 @@ func RunMigrations(db *gorm.DB) error {
 	log.Println("Running database migrations...")
 
 	// Create indexes for stock_transfers if they don't exist
-	// MySQL doesn't support CREATE INDEX IF NOT EXISTS, so we check first with a raw query
-	var count int
-	db.Raw("SELECT COUNT(*) FROM information_schema.statistics WHERE table_name = 'stock_transfers' AND index_name = 'idx_stock_transfers_source_status' AND table_schema = DATABASE()").Scan(&count)
-	if count == 0 {
-		db.Exec("CREATE INDEX idx_stock_transfers_source_status ON stock_transfers(source_branch_id, status)")
+	// MySQL doesn't support CREATE INDEX IF NOT EXISTS, so we just try to create
+	// and ignore "Duplicate key name" errors
+	indexes := []string{
+		"idx_stock_transfers_source_status",
+		"idx_stock_transfers_dest_status",
 	}
-	db.Raw("SELECT COUNT(*) FROM information_schema.statistics WHERE table_name = 'stock_transfers' AND index_name = 'idx_stock_transfers_dest_status' AND table_schema = DATABASE()").Scan(&count)
-	if count == 0 {
-		db.Exec("CREATE INDEX idx_stock_transfers_dest_status ON stock_transfers(destination_branch_id, status)")
+	for _, idx := range indexes {
+		err := db.Exec("CREATE INDEX " + idx + " ON stock_transfers(source_branch_id, status)").Error
+		if err != nil && !strings.Contains(err.Error(), "Duplicate key name") {
+			return fmt.Errorf("failed to create index %s: %w", idx, err)
+		}
 	}
 
 	migrations, err := loadMigrations()
