@@ -58,23 +58,7 @@ export default function Backups() {
     setCreating(false);
   };
 
-  const handleRestoreBackup = async (id: number) => {
-    if (!confirm('Are you sure you want to restore this backup? This will overwrite current data.')) {
-      return;
-    }
-    setRestoring(id);
-    try {
-      await api.post(`/api/backups/${id}/restore`);
-      showToast('Backup restored successfully. Refreshing...', 'success');
-      fetchBackups();
-    } catch (err: unknown) {
-      const axiosError = err as { response?: { data?: { error?: string } } };
-      showToast(axiosError.response?.data?.error || 'Restore failed', 'error');
-    }
-    setRestoring(null);
-  };
-
-const handleDeleteBackup = async (id: number) => {
+  const handleDeleteBackup = async (id: number) => {
     if (!confirm('Delete this backup? This cannot be undone.')) {
       return;
     }
@@ -131,29 +115,6 @@ const handleDeleteBackup = async (id: number) => {
       window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Download error:', err);
-      showToast('Download failed', 'error');
-    }
-  };
-
-  const handleDownloadBackup = async (id: number, filename: string) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE}/api/backups/${id}/download`, {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-      });
-      
-      if (!response.ok) throw new Error('Download failed');
-      
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', filename);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
       showToast('Download failed', 'error');
     }
   };
