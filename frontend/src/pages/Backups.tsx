@@ -243,16 +243,22 @@ const handleDeleteBackup = async (id: number) => {
                   {backup.status === 'completed' && (
                     <>
                       <button
-                        onClick={() => handleDownloadBackup(backup.id, backup.filename)}
-                        className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                        onClick={() => {
+                          console.log('Download click');
+                          handleDownloadBackup(backup.id, backup.filename);
+                        }}
+                        className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
                         title="Download"
                       >
                         <Download className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => handleRestoreBackup(backup.id)}
+                        onClick={() => {
+                          console.log('Restore click');
+                          handleRestoreBackup(backup.id);
+                        }}
                         disabled={restoring === backup.id}
-                        className="p-2 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors disabled:opacity-50"
+                        className="p-2 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
                         title="Restore"
                       >
                         {restoring === backup.id ? (
@@ -264,12 +270,15 @@ const handleDeleteBackup = async (id: number) => {
                     </>
                   )}
                   <button
+                    onMouseDown={(e) => console.log('MouseDown delete')}
+                    onMouseUp={(e) => console.log('MouseUp delete')}
                     onClick={(e) => {
+                      console.log('onClick delete fired');
                       e.stopPropagation();
                       alert('Delete button click! id=' + backup.id);
                       handleDeleteBackup(backup.id);
                     }}
-                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
                     title="Delete"
                   >
                     <Trash2 className="w-4 h-4" />
