@@ -27,14 +27,17 @@ func RunMigrations(db *gorm.DB) error {
 	// Create indexes for stock_transfers if they don't exist
 	// MySQL doesn't support CREATE INDEX IF NOT EXISTS, so we just try to create
 	// and ignore "Duplicate key name" errors
-	indexes := []string{
-		"idx_stock_transfers_source_status",
-		"idx_stock_transfers_dest_status",
+	indexes := []struct {
+		name   string
+		column string
+	}{
+		{"idx_stock_transfers_source_status", "source_branch_id"},
+		{"idx_stock_transfers_dest_status", "destination_branch_id"},
 	}
 	for _, idx := range indexes {
-		err := db.Exec("CREATE INDEX " + idx + " ON stock_transfers(source_branch_id, status)").Error
+		err := db.Exec("CREATE INDEX " + idx.name + " ON stock_transfers(" + idx.column + ", status)").Error
 		if err != nil && !strings.Contains(err.Error(), "Duplicate key name") {
-			return fmt.Errorf("failed to create index %s: %w", idx, err)
+			return fmt.Errorf("failed to create index %s: %w", idx.name, err)
 		}
 	}
 
