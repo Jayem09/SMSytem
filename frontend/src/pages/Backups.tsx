@@ -59,11 +59,8 @@ export default function Backups() {
   };
 
 const handleDeleteBackup = async (id: number) => {
-    alert('Delete clicked: ' + id);
-    if (!confirm('Delete this backup? This cannot be undone.')) {
-      return;
-    }
-    console.log('Delete proceeding for id:', id);
+    console.log('handleDelete called:', id);
+    // Skip confirm for testing - just delete
     try {
       const res = await api.delete(`/api/backups/${id}`);
       console.log('Delete response:', res);
@@ -73,6 +70,50 @@ const handleDeleteBackup = async (id: number) => {
       console.error('Delete error:', err);
       const axiosError = err as { response?: { data?: { error?: string } } };
       showToast(axiosError.response?.data?.error || 'Delete failed', 'error');
+    }
+  };
+
+  const handleRestoreBackup = async (id: number) => {
+    console.log('handleRestore called:', id);
+    setRestoring(id);
+    try {
+      const res = await api.post(`/api/backups/${id}/restore`);
+      console.log('Restore response:', res);
+      showToast('Backup restored successfully', 'success');
+      fetchBackups();
+    } catch (err: unknown) {
+      console.error('Restore error:', err);
+      const axiosError = err as { response?: { data?: { error?: string } };
+      showToast(axiosError.response?.data?.error || 'Restore failed', 'error');
+    }
+    setRestoring(null);
+  };
+
+  const handleDownloadBackup = async (id: number, filename: string) => {
+    console.log('handleDownload called:', id, filename);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE}/api/backups/${id}/download`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
+      
+      console.log('Download response:', response.status);
+      if (!response.ok) throw new Error('Download failed');
+      
+      const blob = await response.blob();
+      console.log('Blob size:', blob.size);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      showToast('Download started', 'success');
+    } catch (err) {
+      console.error('Download error:', err);
+      showToast('Download failed', 'error');
     }
   };
 
