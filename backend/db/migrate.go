@@ -25,10 +25,14 @@ func RunMigrations(db *gorm.DB) error {
 	log.Println("Running database migrations...")
 
 	// Create indexes for stock_transfers if they don't exist
-	if !db.Migrator().HasIndex(&struct{ TableName string }{"stock_transfers"}, "idx_stock_transfers_source_status") {
+	// MySQL doesn't support CREATE INDEX IF NOT EXISTS, so we check first with a raw query
+	var count int
+	db.Raw("SELECT COUNT(*) FROM information_schema.statistics WHERE table_name = 'stock_transfers' AND index_name = 'idx_stock_transfers_source_status' AND table_schema = DATABASE()").Scan(&count)
+	if count == 0 {
 		db.Exec("CREATE INDEX idx_stock_transfers_source_status ON stock_transfers(source_branch_id, status)")
 	}
-	if !db.Migrator().HasIndex(&struct{ TableName string }{"stock_transfers"}, "idx_stock_transfers_dest_status") {
+	db.Raw("SELECT COUNT(*) FROM information_schema.statistics WHERE table_name = 'stock_transfers' AND index_name = 'idx_stock_transfers_dest_status' AND table_schema = DATABASE()").Scan(&count)
+	if count == 0 {
 		db.Exec("CREATE INDEX idx_stock_transfers_dest_status ON stock_transfers(destination_branch_id, status)")
 	}
 
