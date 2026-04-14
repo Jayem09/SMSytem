@@ -5,6 +5,8 @@ import { Upload, Download, Database, Clock, AlertTriangle, CheckCircle, RefreshC
 import api from '../api/axios';
 import { useToast } from '../context/ToastContext';
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://168.144.46.137:8080';
+
 interface Backup {
   id: number;
   filename: string;
@@ -88,10 +90,15 @@ export default function Backups() {
 
   const handleDownloadBackup = async (id: number, filename: string) => {
     try {
-      const res = await api.get(`/api/backups/${id}/download`, {
-        responseType: 'blob'
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE}/api/backups/${id}/download`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
-      const url = window.URL.createObjectURL(new Blob([res.data]));
+      
+      if (!response.ok) throw new Error('Download failed');
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', filename);
@@ -99,7 +106,7 @@ export default function Backups() {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-    } catch {
+    } catch (err) {
       showToast('Download failed', 'error');
     }
   };
