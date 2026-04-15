@@ -86,6 +86,9 @@ CLAUDE.md
 # OpenCode (local dev config)
 .opencode/
 
+# Git worktrees
+.worktrees/
+
 # Superpowers (planning artifacts)
 docs/superpowers/plans/
 docs/superpowers/specs/

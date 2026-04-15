@@ -78,33 +78,33 @@ function App() {
   // Auto-detect connection recovery while in offline mode - NO PAGE RELOAD NEEDED
   useEffect(() => {
     if (!offlineModeActive) return;
-    
+
     // Check immediately on mount
     const doCheck = async () => {
       const connected = await checkServerConnection();
       console.log('[App] Offline mode - connection check:', connected);
-      
+
       if (connected) {
         console.log('[App] Connection restored! Auto-transitioning to online...');
-        
+
         // Clear offline mode flags
         setOfflineMode(false);
         setUserOfflineMode(false);
         setConnectionStatus('online');
         setBackendOnline(true);
-        
+
         // Set flag for login page banner
         localStorage.setItem('restored_from_offline', 'true');
-        
+
         console.log('[App] Auto-restored to online mode');
       }
     };
-    
+
     doCheck();
-    
+
     // Then check every 5 seconds
     const checkInterval = setInterval(doCheck, 5000);
-    
+
     return () => clearInterval(checkInterval);
   }, [offlineModeActive]);
 
@@ -121,7 +121,7 @@ function App() {
         }
       }
     }, 5000);
-    
+
     return () => clearInterval(connectionCheckInterval);
   }, [connectionStatus, offlineModeActive]);
 
@@ -133,30 +133,30 @@ function App() {
   // If offline and user hasn't proceeded to offline mode yet
   if (connectionStatus === 'offline' && !offlineModeActive) {
     return (
-      <ServerOfflineScreen 
+      <ServerOfflineScreen
         onProceedOffline={() => {
           console.log('[App] Proceed offline clicked, starting...');
-          
+
           // Check for any existing cached data first
           const existingProducts = offlineStorage.getProducts();
           const existingCategories = offlineStorage.getCategories();
           const existingCustomers = offlineStorage.getCustomers();
-          
+
           console.log('[App] Existing cache:', { products: existingProducts.length, categories: existingCategories.length, customers: existingCustomers.length });
-          
+
           const hasCachedData = existingProducts.length > 0 || existingCategories.length > 0;
           console.log('[App] Has cached data:', hasCachedData);
-          
+
           // Set offline mode FIRST
           setOfflineMode(true);
           setUserOfflineMode(true); // User explicitly chose offline
           console.log('[App] setOfflineMode(true) called');
-          
+
           // Start reconnection checker (to auto-detect when internet is back)
           startReconnectChecker();
           setOfflineModeActive(true);
           setBackendOnline(true);
-          
+
           // Auto-login as offline user with cached profile
           const cachedProfile = localStorage.getItem('cached_user_profiles');
           if (cachedProfile) {
@@ -177,10 +177,10 @@ function App() {
               console.log('[App] Auto-logged in as offline user:', p.email);
             }
           }
-          
+
           // DON'T redirect - just let the app continue rendering
           console.log('[App] Offline mode ready, continuing to app...');
-        }} 
+        }}
       />
     );
   }
