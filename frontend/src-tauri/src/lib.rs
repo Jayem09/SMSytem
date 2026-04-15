@@ -1,10 +1,32 @@
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 #[derive(Serialize, Deserialize)]
 pub struct ApiResponse {
     pub data: serde_json::Value,
     pub status: u16,
     pub status_text: String,
+}
+
+#[tauri::command]
+async fn download_backup(url: String, filename: String, token: Option<String>) -> Result<String, String> {
+    let client = reqwest::Client::new();
+    let mut request = client.get(&url);
+    
+    if let Some(t) = token {
+        request = request.header("Authorization", format!("Bearer {}", t));
+    }
+    
+    let response = request.send().await.map_err(|e| e.to_string())?;
+    
+    let bytes = response.bytes().await.map_err(|e| e.to_string())?;
+    
+    let downloads_dir = dirs::download_dir().unwrap_or_else(|| PathBuf::from("."));
+    let path = downloads_dir.join(&filename);
+    
+    std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
+    
+    Ok(path.to_string_lossy().to_string())
 }
 
 #[tauri::command]
@@ -130,7 +152,7 @@ pub fn run() {
          
       Ok(())
     })
-    .invoke_handler(tauri::generate_handler![api_get, api_post, api_put, api_delete, api_patch])
+    .invoke_handler(tauri::generate_handler![download_backup, api_get, api_post, api_put, api_delete, api_patch])
     .plugin(tauri_plugin_shell::init())
     .plugin(tauri_plugin_http::init())
     .plugin(tauri_plugin_updater::Builder::new().build())

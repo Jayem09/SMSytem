@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import api from '../api/axios';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
-import { Send, Bot, AlertCircle, Loader2, Sparkles, Zap } from 'lucide-react';
+import { Send, Bot, AlertCircle, Sparkles, Zap } from 'lucide-react';
 
 const QUICK_QUERIES = [
   { label: 'Revenue this month', query: 'how much did we earn this month' },
@@ -92,6 +92,7 @@ export default function Analytics() {
     label?: string;
     category_name?: string;
     brand_name?: string;
+    name?: string;
     total_sales?: number;
     total?: number;
     value?: number;
@@ -134,7 +135,7 @@ export default function Analytics() {
 
     if ((chartType === 'bar' || chartType === 'pie') && Array.isArray(data)) {
       const chartData = (data as ChartDataItem[]).map((item) => ({
-        name: item.product_name || item.advisor_name || item.customer_name || (item as any).name || item.label || item.category_name || item.brand_name || 'Other',
+        name: item.product_name || item.advisor_name || item.customer_name || item.name || item.label || item.category_name || item.brand_name || 'Other',
         value: item.total_sales || item.total || item.value || item.total_qty || 0
       })).filter((d) => Number(d.value) > 0);
 

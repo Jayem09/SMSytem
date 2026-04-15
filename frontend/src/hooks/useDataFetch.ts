@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { ApiResponse } from '../types/api';
+import { getIsOfflineMode } from '../context/AuthContext';
 
 interface UseDataFetchOptions<T> {
   queryFn: () => Promise<ApiResponse<T>>;
@@ -24,6 +25,13 @@ export function useDataFetch<T>({
   const fetchData = useCallback(async () => {
     if (!enabled) return;
     
+    // Don't make API calls in offline mode - use cached data if available
+    if (getIsOfflineMode()) {
+      console.debug('[useDataFetch] Skipping API call - offline mode active');
+      setIsLoading(false);
+      return;
+    }
+    
     setIsLoading(true);
     setError(null);
     
@@ -31,6 +39,12 @@ export function useDataFetch<T>({
       const response = await queryFn();
       setData(response.data as T);
     } catch (err) {
+      // Check if we're now offline after the error
+      if (getIsOfflineMode()) {
+        console.debug('[useDataFetch] Offline after error, cancelling fetch');
+        setIsLoading(false);
+        return;
+      }
       setError(err);
     } finally {
       setIsLoading(false);

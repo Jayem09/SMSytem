@@ -7,6 +7,8 @@ import RFIDField from '../components/RFIDField';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../context/ToastContext';
 import { History, Edit2, Trash2, User, Phone, Mail, MapPin, ShoppingBag, CheckCircle, XCircle, Clock, CreditCard, Users, CreditCardIcon } from 'lucide-react';
+import { getIsOfflineMode } from '../context/AuthContext';
+import offlineStorage from '../services/offlineStorage';
 
 interface Order {
   id: number;
@@ -59,6 +61,15 @@ export default function Customers() {
   const [rfidDuplicateError, setRfidDuplicateError] = useState('');
 
   const fetchCustomers = useCallback(async () => {
+    // If offline, load from cache
+    if (getIsOfflineMode()) {
+      const cachedCustomers = offlineStorage.getCustomers();
+      console.log('[Customers] Loading from offline cache:', cachedCustomers.length);
+      setCustomers(cachedCustomers);
+      setLoading(false);
+      return;
+    }
+    
     try {
       const params: Record<string, string> = {};
       if (search) params.search = search;
@@ -159,6 +170,48 @@ export default function Customers() {
       return;
     }
     
+    // If offline, save to localStorage instead
+    if (getIsOfflineMode()) {
+      const customers = offlineStorage.getCustomers();
+      
+      if (editing) {
+        // Update existing customer
+        const idx = customers.findIndex(c => c.id === editing.id);
+        if (idx >= 0) {
+          customers[idx] = {
+            ...customers[idx],
+            name,
+            email,
+            phone,
+            address,
+            rfidCardId: rfidCardId || '',
+            synced: false, // Mark as unsynced
+          };
+        }
+        showToast('Customer updated (offline)', 'success');
+      } else {
+        // Create new customer with temporary ID
+        const newCustomer = {
+          id: Date.now(), // Temporary ID
+          name,
+          email,
+          phone,
+          address,
+          rfidCardId: rfidCardId || '',
+          loyaltyPoints: 0,
+          synced: false, // Mark as unsynced - will sync when back online
+        };
+        customers.push(newCustomer);
+        showToast('Customer created (offline - will sync when online)', 'success');
+      }
+      
+      offlineStorage.saveCustomers(customers);
+      setModalOpen(false);
+      fetchCustomers();
+      return;
+    }
+    
+    // Online mode - use API
     if (rfidCardId && rfidCardId.length >= 8) {
       const isDuplicate = await checkRfidDuplicate(rfidCardId);
       if (isDuplicate) {
@@ -185,6 +238,18 @@ export default function Customers() {
 
   const handleDelete = async (c: Customer) => {
     if (!confirm(`Delete customer "${c.name}"?`)) return;
+    
+    // If offline, delete from localStorage
+    if (getIsOfflineMode()) {
+      const customers = offlineStorage.getCustomers();
+      const filtered = customers.filter(customer => customer.id !== c.id);
+      offlineStorage.saveCustomers(filtered);
+      showToast('Customer deleted (offline)', 'success');
+      fetchCustomers();
+      return;
+    }
+    
+    // Online mode - use API
     try {
       await api.delete(`/api/customers/${c.id}`);
       fetchCustomers();

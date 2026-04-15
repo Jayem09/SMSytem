@@ -27,3 +27,4 @@ tauri-plugin-shell = "2"
 tauri-plugin-http = "2"
 tauri-plugin-updater = "2"
 reqwest = { version = "0.12", features = ["rustls-tls", "json"] }
+dirs = "6"

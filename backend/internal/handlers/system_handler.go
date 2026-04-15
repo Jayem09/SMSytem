@@ -101,24 +101,11 @@ func (h *SystemHandler) GetBackups(c *gin.Context) {
 }
 
 func (h *SystemHandler) CreateBackup(c *gin.Context) {
-	// Check if backup service is configured
-	if h.BackupService == nil || !h.BackupService.CheckBackupEnabled() {
-		// Fallback: create record without actual backup
-		backup := models.Backup{
-			Filename: "smsystem_backup_" + time.Now().Format("2006-01-02_15-04") + ".sql",
-			Size:     0,
-			Type:     "manual",
-			Status:   "completed",
-		}
-		if err := database.DB.Create(&backup).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create backup record"})
-			return
-		}
-		c.JSON(http.StatusCreated, gin.H{"message": "Backup record created (backup service not configured)", "backup": backup})
+	if h.BackupService == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Backup service is not configured"})
 		return
 	}
 
-	// Create actual backup
 	backup, err := h.BackupService.CreateBackup()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Backup failed: %v", err)})
@@ -129,47 +116,62 @@ func (h *SystemHandler) CreateBackup(c *gin.Context) {
 }
 
 func (h *SystemHandler) RestoreBackup(c *gin.Context) {
-	id := c.Param("id")
-	var backup models.Backup
-
-	if err := database.DB.First(&backup, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Backup not found"})
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid backup ID"})
+		return
+	}
+	if h.BackupService == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Backup service is not configured"})
 		return
 	}
 
-	// Note: Actual restore logic would require executing the SQL file
-	// This is just updating the status
-	backup.Status = "completed"
-	database.DB.Save(&backup)
+	if err := h.BackupService.RestoreBackup(uint(id)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Restore failed: %v", err)})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Backup restored successfully"})
 }
 
 func (h *SystemHandler) DeleteBackup(c *gin.Context) {
-	id := c.Param("id")
-	var backup models.Backup
-
-	if err := database.DB.First(&backup, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Backup not found"})
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid backup ID"})
+		return
+	}
+	if h.BackupService == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Backup service is not configured"})
 		return
 	}
 
-	database.DB.Delete(&backup)
+	if err := h.BackupService.DeleteBackup(uint(id)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Delete failed: %v", err)})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Backup deleted"})
 }
 
 func (h *SystemHandler) DownloadBackup(c *gin.Context) {
-	id := c.Param("id")
-	var backup models.Backup
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid backup ID"})
+		return
+	}
+	if h.BackupService == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Backup service is not configured"})
+		return
+	}
 
-	if err := database.DB.First(&backup, id).Error; err != nil {
+	backup, err := h.BackupService.GetBackup(uint(id))
+	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Backup not found"})
 		return
 	}
 
-	// In production, this would serve the actual file
-	c.JSON(http.StatusOK, gin.H{"filename": backup.Filename, "message": "Download endpoint"})
+	backupPath := h.BackupService.GetBackupPath() + "/" + backup.Filename
+	c.FileAttachment(backupPath, backup.Filename)
 }
 
 func getUptime() string {

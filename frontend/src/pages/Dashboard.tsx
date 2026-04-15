@@ -4,7 +4,7 @@ import { PieChart, Pie, Cell, BarChart, Bar, LineChart, Line, XAxis, YAxis, Cart
 import { TrendingUp, Package, Users, ShoppingCart, PhilippinePeso, MoreVertical, Download, Building2 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { Skeleton, SkeletonCard } from '../components/EmptyState';
-import { useDataFetch } from '../hooks/useDataFetch';
+import { useDashboardStats } from '../hooks/useQueries';
 
 interface OrderItem {
   product?: { name: string };
@@ -35,7 +35,6 @@ export default function Dashboard() {
   const { user } = useAuth();
   const isSuperAdmin = user?.role === 'super_admin';
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'purchasing' || user?.role === 'purchaser';
-  const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [timeRange, setTimeRange] = useState(30);
   const [branchFilter, setBranchFilter] = useState<string>('ALL');
@@ -75,13 +74,10 @@ export default function Dashboard() {
     }
   }, [isSuperAdmin]);
 
-  const { data: statsData } = useDataFetch({
-    queryKey: ['dashboard', 'stats', timeRange, branchFilter],
-    queryFn: () => {
-      const branchParam = isSuperAdmin && branchFilter !== 'ALL' ? `&branch_id=${branchFilter}` : '';
-      return api.get(`/api/dashboard?days=${timeRange}${branchParam}`);
-    },
-  });
+  const { data: statsData, isLoading: loading } = useDashboardStats(
+    timeRange,
+    isSuperAdmin ? branchFilter : undefined,
+  );
 
   useEffect(() => {
     if (statsData) {
@@ -96,7 +92,6 @@ export default function Dashboard() {
         category_profits: (data.category_profits as typeof prev.category_profits) || [],
         product_revenue: (data.product_revenue as typeof prev.product_revenue) || []
       }));
-      setLoading(false);
     }
   }, [statsData]);
 
@@ -544,4 +539,3 @@ export default function Dashboard() {
     </div>
   );
 }
-

@@ -4,8 +4,9 @@ import { Settings, Monitor, FileText, Upload, ChevronDown, LogOut } from 'lucide
 import { useState, useEffect } from 'react';
 import api from '../api/axios';
 import GlobalSearch from './GlobalSearch';
+import { getIsOfflineMode } from '../context/AuthContext';
 
-const navItems = [
+const allNavItems = [
   { to: '/dashboard', label: 'Dashboard', roles: ['super_admin', 'admin', 'cashier', 'purchasing', 'purchaser'] },
   { to: '/analytics', label: 'AI Analytics', roles: ['super_admin', 'admin', 'cashier', 'purchasing', 'purchaser'] },
   { to: '/pos', label: 'POS Checkout', roles: ['super_admin', 'admin', 'cashier'] },
@@ -26,6 +27,13 @@ const navItems = [
   { to: '/branches', label: 'Branches', roles: ['super_admin'] },
 ];
 
+// Offline mode: only show POS, Orders, and Customers
+const offlineNavItems = [
+  { to: '/pos', label: 'POS Checkout', roles: ['super_admin', 'admin', 'cashier'] },
+  { to: '/orders', label: 'Orders', roles: ['super_admin', 'admin', 'cashier'] },
+  { to: '/customers', label: 'Customers', roles: ['super_admin', 'admin', 'cashier'] },
+];
+
 export default function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -34,6 +42,11 @@ export default function Layout() {
 
   useEffect(() => {
     const fetchCounts = async () => {
+      // Skip API call if offline
+      if (getIsOfflineMode()) {
+        setPendingCounts(0);
+        return;
+      }
       try {
         const res = await api.get('/api/transfers/pending-counts');
         setPendingCounts(res.data.total_actionable || 0);
@@ -98,6 +111,12 @@ export default function Layout() {
         <div className="px-4 py-4 border-b border-gray-200 flex justify-between items-center">
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-bold text-gray-900">SMSystem</h1>
+            {getIsOfflineMode() && (
+              <span className="flex items-center gap-1 bg-red-500 text-white px-2 py-0.5 rounded text-xs">
+                <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                Offline
+              </span>
+            )}
           </div>
           {(user?.role === 'admin' || user?.role === 'super_admin') && (
             <Link to="/settings" className="text-gray-400 hover:text-gray-900 transition-colors" title="Settings">
@@ -107,7 +126,8 @@ export default function Layout() {
         </div>
 
         <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
-          {navItems
+          {/* Use offline nav items if offline, otherwise show all */}
+          {(getIsOfflineMode() ? offlineNavItems : allNavItems)
             .filter((item) => item.roles.includes(currentRole))
             .map((item) => (
               <NavLink
@@ -133,19 +153,19 @@ export default function Layout() {
          <div className="border-t border-gray-200 px-4 py-3">
            {/* User Profile - Clickable Dropdown */}
            <div className="relative">
-             <button
-               onClick={() => setUserMenuOpen(!userMenuOpen)}
-               className="w-full flex items-center gap-3 mb-2 hover:bg-gray-50 p-2 -m-2 rounded-lg transition-colors"
-             >
-               <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-sm font-bold">
-                 {user?.name?.charAt(0).toUpperCase() || 'U'}
-               </div>
-               <div className="flex-1 min-w-0 text-left">
-                 <p className="text-sm font-medium text-gray-900 truncate">{user?.name}</p>
-                 <p className="text-xs text-gray-400 capitalize">{user?.role}</p>
-               </div>
-               <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
-             </button>
+<button
+                onClick={() => setUserMenuOpen(!userMenuOpen)}
+                className="w-full flex items-center gap-3 mb-2 hover:bg-gray-50 p-2 -m-2 rounded-lg transition-colors"
+              >
+                <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-sm font-bold">
+                  {user?.email?.charAt(0).toUpperCase() || 'U'}
+                </div>
+                <div className="flex-1 min-w-0 text-left">
+                  <p className="text-sm font-medium text-gray-900 truncate">{user?.email || user?.name}</p>
+                  <p className="text-xs text-gray-400 capitalize">{user?.role}</p>
+                </div>
+                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
              
               {/* Dropdown Menu */}
               {userMenuOpen && (

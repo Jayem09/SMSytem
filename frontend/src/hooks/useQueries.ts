@@ -1,6 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { get, post, put, del } from '../api/axios';
 import type { QueryParams } from '../types/api';
+import { getIsOfflineMode } from '../context/AuthContext';
+import offlineStorage, { type LocalProduct } from '../services/offlineStorage';
 
 export function useProductsQuery(params?: QueryParams) {
   return useQuery({
@@ -159,21 +162,87 @@ export function useUpdateBrand() {
 }
 
 export function usePOSData() {
+  // React Query handles caching - try online first, fallback to cache on error
   return useQuery({
     queryKey: ['pos', 'data'],
     queryFn: async () => {
-      const [pRes, cRes, custRes] = await Promise.all([
-        get('/api/products?all=1'),
-        get('/api/categories'),
-        get('/api/customers'),
-      ]);
+      // Try online first
+      if (!getIsOfflineMode()) {
+        try {
+          const [pRes, cRes, custRes] = await Promise.all([
+            get('/api/products?all=1'),
+            get('/api/categories'),
+            get('/api/customers'),
+          ]);
+          
+          const rawProducts = (pRes.data as { products?: unknown[] }).products 
+            || (pRes.data as { data?: unknown[] }).data 
+            || [];
+          const categories = (cRes.data as { categories?: unknown[] }).categories || [];
+          const rawCustomers = (custRes.data as { customers?: unknown[] }).customers || [];
+          
+          // Transform products to match POS format
+          const products = (rawProducts as any[]).map((p: any) => ({
+            ...p,
+            branch_stock: p.branch_stock ?? p.stock ?? 0,
+            category: categories.find((c: any) => c.id === p.category_id) || null,
+          }));
+          
+          // Deduplicate and save customers
+          const uniqueCustomersMap = new Map();
+          (rawCustomers as any[]).forEach((c: any) => {
+            const phone = c.phone || '';
+            if (phone && !uniqueCustomersMap.has(phone)) {
+              uniqueCustomersMap.set(phone, {
+                ...c,
+                rfidCardId: c.rfid_card_id,
+                loyaltyPoints: c.loyalty_points ?? 0,
+                synced: true,
+              });
+            }
+          });
+          const uniqueCustomers = Array.from(uniqueCustomersMap.values());
+          
+          // Cache for offline
+          offlineStorage.saveProducts(products);
+          offlineStorage.saveCategories(categories);
+          offlineStorage.saveCustomers(uniqueCustomers);
+          
+          return {
+            products,
+            categories: categories as { id: number; name: string }[],
+            customers: uniqueCustomers,
+          };
+        } catch (err) {
+          console.warn('[usePOSData] API fetch failed, falling back to cache:', err);
+          // Fall through to cache below
+        }
+      }
+      
+      // OFFLINE or API failed - load from cached storage
+      const products = offlineStorage.getProducts();
+      const categories = offlineStorage.getCategories() as { id: number; name: string }[];
+      const customers = offlineStorage.getCustomers();
+      
+      const productsWithCategory = products.map((p: any) => ({
+        ...p,
+        category: categories.find((c: any) => c.id === p.category_id) || null,
+      }));
+      
       return {
-        products: (pRes.data as { products?: unknown[] }).products || [],
-        categories: (cRes.data as { categories?: unknown[] }).categories || [],
-        customers: (custRes.data as { customers?: unknown[] }).customers || [],
+        products: productsWithCategory,
+        categories,
+        customers,
       };
     },
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
   });
+}
+
+// Function to find customer by RFID card (works offline!)
+export function findCustomerByRfid(rfidCode: string) {
+  const customers = offlineStorage.getCustomers();
+  // Look for RFID match in cached customers
+  return customers.find((c: any) => c.rfid_card_id === rfidCode || c.rfidCardId === rfidCode);
 }

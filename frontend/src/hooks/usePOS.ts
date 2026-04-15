@@ -6,6 +6,8 @@ export interface POSProduct {
   price: number;
   branch_stock: number;
   is_service?: boolean;
+  is_reward?: boolean;
+  points_required?: number;
   category_id: number;
   category?: { name: string };
 }
@@ -17,7 +19,7 @@ export interface POSCartItem extends POSProduct {
 export interface POSState {
   products: POSProduct[];
   categories: { id: number; name: string }[];
-  customers: { id: number; name: string }[];
+  customers: { id: number; name: string; loyalty_points?: number }[];
   cart: POSCartItem[];
   search: string;
   selectedCategory: number | null;

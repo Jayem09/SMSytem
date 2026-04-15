@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
+import { invoke } from '@tauri-apps/api/core';
 import { Upload, Download, Database, Clock, AlertTriangle, CheckCircle, RefreshCw, Trash2, FileText } from 'lucide-react';
 import api from '../api/axios';
 import { useToast } from '../context/ToastContext';
@@ -92,10 +93,20 @@ export default function Backups() {
     const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
     
     if (isTauri) {
-      // In Tauri, open download URL in a new window - Tauri will handle it
-      const downloadUrl = `${API_BASE}/api/backups/${id}/download`;
-      window.open(downloadUrl + (token ? `?token=${token}` : ''), '_blank');
-      showToast('Download started - check downloads folder', 'success');
+      // In Tauri, use Rust command to download
+      try {
+        const downloadUrl = `${API_BASE}/api/backups/${id}/download`;
+        const savedPath = await invoke('download_backup', {
+          url: downloadUrl,
+          filename: filename,
+          token: token
+        });
+        console.log('Download saved to:', savedPath);
+        showToast(`Downloaded to: ${savedPath}`, 'success');
+      } catch (err) {
+        console.error('Tauri download error:', err);
+        showToast('Download failed', 'error');
+      }
     } else {
       // Browser - use fetch + blob
       try {

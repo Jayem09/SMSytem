@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import api from '../api/axios';
 import Modal from '../components/Modal';
 import { printReceipt } from '../components/Receipt';
@@ -7,6 +8,8 @@ import {
   Search, ShoppingCart, Trash2, Printer, CheckCircle, Package
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
+import { getIsOfflineMode } from '../context/AuthContext';
+import offlineStorage from '../services/offlineStorage';
 import { usePOS, type POSProduct } from '../hooks/usePOS';
 import { usePOSData } from '../hooks/useQueries';
 
@@ -58,6 +61,7 @@ interface Customer {
 }
 
 export default function POS() {
+  const queryClient = useQueryClient();
   const { state, dispatch, addToCart, removeFromCart, updateQuantity, clearCart, setSearch, setCategory, subtotal: posSubtotal, filteredProducts } = usePOS();
   const { products, categories, customers, cart, search, selectedCategory, loading, error } = state;
 
@@ -96,10 +100,21 @@ export default function POS() {
     if (posData) {
       dispatch({ type: 'SET_PRODUCTS', payload: posData.products as POSProduct[] });
       dispatch({ type: 'SET_CATEGORIES', payload: posData.categories as { id: number; name: string }[] });
-      dispatch({ type: 'SET_CUSTOMERS', payload: posData.customers as { id: number; name: string }[] });
+      
+      // Include loyalty_points in customer data
+      const customersWithPoints = (posData.customers as any[]).map((c: any) => ({
+        ...c,
+        loyalty_points: c.loyalty_points || 0,
+      }));
+      dispatch({ type: 'SET_CUSTOMERS', payload: customersWithPoints });
     }
     if (posError) {
-      dispatch({ type: 'SET_ERROR', payload: 'Failed to sync with inventory system. Please check your connection.' });
+      // If there's an error (API down), try to load from cached customers
+      const cachedCustomers = offlineStorage.getCustomers();
+      if (cachedCustomers.length > 0) {
+        dispatch({ type: 'SET_CUSTOMERS', payload: cachedCustomers as any[] });
+      }
+      // For products, rely on posData from usePOSData fallback
     }
   }, [posData, posLoading, posError, dispatch]);
 
@@ -138,6 +153,29 @@ export default function POS() {
   };
 
   const handleRfidScan = async (uid: string) => {
+    // OFFLINE MODE: Check cached customers for RFID match
+    if (getIsOfflineMode()) {
+      const customers = offlineStorage.getCustomers();
+      const customer = customers.find((c: any) => c.rfidCardId === uid || c.rfid_card_id === uid);
+      
+      if (customer) {
+        setRfidCustomer(customer);
+        setCustomerId(customer.id?.toString() || '');
+        setRfidError(false);
+        // Auto-fill business address from customer's registered address
+        if (customer.address) {
+          setBusinessAddress(customer.address);
+        }
+        showToast(`Welcome back, ${customer.name}!`, 'success');
+      } else {
+        setRfidError(true);
+        setRfidCustomer(null);
+        showToast('RFID card not recognized. Please select customer manually.', 'error');
+      }
+      return;
+    }
+    
+    // ONLINE MODE: API call
     try {
       console.log('RFID scanning:', uid);
       const res = await api.get(`/api/customers/rfid/${uid}`);
@@ -194,6 +232,144 @@ export default function POS() {
       showToast('Invalid RFID card. Please scan a registered card or select customer manually.', 'error');
       return;
     }
+    
+    // OFFLINE CHECKOUT: Save order locally
+    if (getIsOfflineMode()) {
+      // Get customer info if selected
+      let customerName = '';
+      let customerPhone = '';
+      if (customerId) {
+        const customers = offlineStorage.getCustomers();
+        const customer = customers.find((c: any) => c.id === parseInt(customerId));
+        if (customer) {
+          customerName = customer.name || '';
+          customerPhone = customer.phone || '';
+        }
+      }
+      
+      const offlineOrder = {
+        customerId: customerId ? parseInt(customerId) : null,
+        customerName: customerName,
+        customerPhone: customerPhone,
+        guestName: !customerId ? guestName : '',
+        guestPhone: !customerId ? guestPhone : '',
+        totalAmount: finalTotal,
+        discountAmount: parseFloat(discount),
+        status: status,
+        paymentMethod: paymentMethod,
+        receiptType: receiptType,
+        tin: tin,
+        businessAddress: businessAddress,
+        withholdingTaxRate: parseFloat(withholdingTaxRate) || 0,
+        serviceAdvisorName: serviceAdvisorName,
+        rewardId: selectedReward?.id || null,
+        rewardPoints: selectedReward?.points_required || 0,
+        items: JSON.stringify(cart.map(item => ({
+          product_id: item.id,
+          product_name: item.name,
+          quantity: item.quantity,
+          unit_price: item.price
+        }))),
+        createdAt: new Date().toISOString(),
+        synced: false
+      };
+      
+      offlineStorage.saveOrder(offlineOrder);
+      
+      // Deduct stock from cached products so POS reflects correct quantities
+      if (status === 'completed') {
+        const cachedProducts = offlineStorage.getProducts();
+        console.log('[POS] Before stock deduction:', cachedProducts.map(p => ({ id: p.id, name: p.name, stock: p.branch_stock })));
+        for (const cartItem of cart) {
+          const pIdx = cachedProducts.findIndex(p => p.id === cartItem.id);
+          console.log('[POS] Cart item:', cartItem.id, cartItem.name, 'pIdx:', pIdx);
+          if (pIdx >= 0 && !cachedProducts[pIdx].is_service) {
+            cachedProducts[pIdx].branch_stock = Math.max(0, (cachedProducts[pIdx].branch_stock || 0) - cartItem.quantity);
+            console.log('[POS] Deducted', cartItem.quantity, 'from product', cachedProducts[pIdx].name, 'new stock:', cachedProducts[pIdx].branch_stock);
+          }
+        }
+offlineStorage.saveProducts(cachedProducts);
+        console.log('[POS] Deducted stock from cached products for offline order');
+        
+        // Force POS to re-render with updated stock - invalidate AND manually dispatch
+        queryClient.invalidateQueries({ queryKey: ['pos', 'data'] });
+        
+        // Also manually update the state from localStorage to ensure UI updates immediately
+        const updatedProducts = offlineStorage.getProducts();
+        dispatch({ type: 'SET_PRODUCTS', payload: updatedProducts as POSProduct[] });
+      }
+      
+      // Also set lastOrder so print works
+      setLastOrder({
+        id: Date.now(),
+        customer_id: customerId ? parseInt(customerId) : null,
+        guest_name: !customerId ? guestName : '',
+        guest_phone: !customerId ? guestPhone : '',
+        total_amount: finalTotal,
+        discount_amount: parseFloat(discount),
+        payment_method: paymentMethod,
+        status: status,
+        created_at: new Date().toISOString(),
+        items: cart.map((item, idx) => ({
+          id: idx,
+          product_id: item.id,
+          quantity: item.quantity,
+          unit_price: item.price,
+          subtotal: item.price * item.quantity,
+          product: { name: item.name }
+        }))
+      } as unknown as Order);
+      setLastTin(tin);
+      setLastBusinessAddress(businessAddress);
+      setLastWithholdingTaxRate(parseFloat(withholdingTaxRate) || 0);
+      setLastReceiptType(receiptType);
+      // If using a reward, deduct points from customer's cached balance
+      if (selectedReward && customerId) {
+        const customers = offlineStorage.getCustomers();
+        const customerIdx = customers.findIndex((c: any) => c.id === parseInt(customerId));
+        if (customerIdx >= 0) {
+          const currentPoints = customers[customerIdx].loyaltyPoints || 0;
+          const newPoints = currentPoints - (selectedReward.points_required || 0);
+          customers[customerIdx].loyaltyPoints = Math.max(0, newPoints);
+          offlineStorage.saveCustomers(customers);
+          
+          // Save pending points adjustment for sync
+          offlineStorage.savePendingPointsAdjustment({
+            customerId: parseInt(customerId),
+            points: -(selectedReward.points_required || 0),
+            orderId: Date.now(),
+            timestamp: new Date().toISOString(),
+          });
+          
+          console.log('[POS] Deducted', selectedReward.points_required, 'points from customer', customerId);
+        }
+      } else if (status === 'completed' && customerId) {
+        // Earn points logic for offline mode (1 point per ₱200 spent)
+        const pointsEarned = finalTotal / 200.0;
+        if (pointsEarned > 0) {
+          const customers = offlineStorage.getCustomers();
+          const customerIdx = customers.findIndex((c: any) => c.id === parseInt(customerId));
+          if (customerIdx >= 0) {
+            const currentPoints = customers[customerIdx].loyalty_points || customers[customerIdx].loyaltyPoints || 0;
+            customers[customerIdx].loyalty_points = currentPoints + pointsEarned;
+            customers[customerIdx].loyaltyPoints = currentPoints + pointsEarned;
+            offlineStorage.saveCustomers(customers);
+            console.log(`[POS] Added ${pointsEarned} points to customer ${customerId} offline`);
+          }
+        }
+      }
+
+      // Force POS data to refresh so UI reflects stock and point changes immediately
+      // queryKey must match exactly what usePOSData uses: ['pos', 'data']
+      queryClient.invalidateQueries({ queryKey: ['pos', 'data'] });
+      
+      showToast('Order saved offline. Will sync when connection restored.', 'success');
+      clearCart();
+      setCheckoutModalOpen(false);
+      setSuccessModalOpen(true);
+      return;
+    }
+    
     try {
       if (paymentMethod === 'card') {
         setIsProcessingTerminal(true);
@@ -269,7 +445,7 @@ export default function POS() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-100 overflow-hidden">
+    <div className="flex h-[calc(100vh-4rem)] bg-gray-100 overflow-hidden">
       { }
       <div className="flex-1 flex flex-col min-w-0">
         <header className="bg-white border-b border-gray-200 p-4">
@@ -514,7 +690,11 @@ export default function POS() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-bold text-gray-900">{rfidCustomer.name}</p>
-                      <p className="text-xs text-gray-500">{rfidCustomer.loyalty_points?.toFixed(0) || 0} points</p>
+                      <p className="text-xs text-gray-500">
+                        {rfidCustomer.loyalty_points && rfidCustomer.loyalty_points > 0
+                          ? `${rfidCustomer.loyalty_points.toFixed(0)} points`
+                          : 'N/A'}
+                      </p>
                     </div>
                     <button onClick={clearRfidCustomer} className="text-gray-400 hover:text-red-500">
                       <Trash2 className="w-4 h-4" />
@@ -734,7 +914,7 @@ export default function POS() {
           </div>
 
           {/* Right Column: Payment & Summary */}
-          <div className="space-y-4">
+          <div className="space-y-4 pb-28 md:pb-24">
             {/* Receipt Type */}
             <div>
               <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Receipt Type</label>
@@ -822,35 +1002,37 @@ export default function POS() {
               />
             </div>
 
-            {/* Total */}
-            <div className="bg-gray-900 rounded-xl p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-gray-400 uppercase">Total Amount</span>
-                <span className="text-2xl font-black text-white">₱{finalTotal.toLocaleString()}</span>
-              </div>
-              {selectedReward && (
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-amber-400">Reward: {selectedReward.name}</span>
-                  <span className="text-amber-400">-{selectedReward.points_required} pts</span>
+            <div className="sticky bottom-0 z-10 -mx-1 rounded-t-2xl border-t border-gray-200 bg-white/95 px-1 pt-4 pb-1 shadow-[0_-10px_24px_rgba(15,23,42,0.08)] backdrop-blur">
+              {/* Total */}
+              <div className="bg-gray-900 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-gray-400 uppercase">Total Amount</span>
+                  <span className="text-2xl font-black text-white">₱{finalTotal.toLocaleString()}</span>
                 </div>
-              )}
-            </div>
+                {selectedReward && (
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-amber-400">Reward: {selectedReward.name}</span>
+                    <span className="text-amber-400">-{selectedReward.points_required} pts</span>
+                  </div>
+                )}
+              </div>
 
-            {/* Actions */}
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => handleCheckout('pending')}
-                className="py-3 bg-white border-2 border-gray-200 text-gray-700 rounded-xl text-sm font-bold hover:border-gray-900 transition-colors"
-              >
-                Hold Sale
-              </button>
-              <button
-                onClick={() => handleCheckout('completed')}
-                disabled={isProcessingTerminal}
-                className="py-3 bg-gray-900 text-white rounded-xl text-sm font-bold hover:bg-black disabled:opacity-50 transition-colors"
-              >
-                {isProcessingTerminal ? 'Processing...' : 'Confirm Sale'}
-              </button>
+              {/* Actions */}
+              <div className="grid grid-cols-2 gap-3 mt-3">
+                <button
+                  onClick={() => handleCheckout('pending')}
+                  className="py-3 bg-white border-2 border-gray-200 text-gray-700 rounded-xl text-sm font-bold hover:border-gray-900 transition-colors"
+                >
+                  Hold Sale
+                </button>
+                <button
+                  onClick={() => handleCheckout('completed')}
+                  disabled={isProcessingTerminal}
+                  className="py-3 bg-gray-900 text-white rounded-xl text-sm font-bold hover:bg-black disabled:opacity-50 transition-colors"
+                >
+                  {isProcessingTerminal ? 'Processing...' : 'Confirm Sale'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

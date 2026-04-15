@@ -58,7 +58,14 @@ type checkoutInput struct {
 
 func (h *OrderHandler) List(c *gin.Context) {
 	branchID, _ := GetUintFromContext(c, "branchID")
-	query := database.DB.Where("branch_id = ?", branchID).Preload("Customer").Preload("User").Preload("Items.Product")
+
+	var query *gorm.DB
+	// super_admin (branchID=0) sees all orders, not just branch 0
+	if branchID == 0 {
+		query = database.DB.Preload("Customer").Preload("User").Preload("Items.Product")
+	} else {
+		query = database.DB.Where("branch_id = ?", branchID).Preload("Customer").Preload("User").Preload("Items.Product")
+	}
 
 	if status := c.Query("status"); status != "" {
 		query = query.Where("status = ?", status)

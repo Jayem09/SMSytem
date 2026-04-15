@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Settings as SettingsIcon, Save, Plus, Trash2 } from 'lucide-react';
 import api from '../api/axios';
 import { useToast } from '../context/ToastContext';
+import { startSyncManager, stopSyncManager, isOnline } from '../services/syncManager';
 
 export default function Settings() {
   const [loading, setLoading] = useState(false);
@@ -10,6 +11,7 @@ export default function Settings() {
   const [contactEmail, setContactEmail] = useState('admin@smsystem.com');
   const [serviceAdvisors, setServiceAdvisors] = useState<string[]>([]);
   const [newAdvisor, setNewAdvisor] = useState('');
+  const [offlineMode, setOfflineMode] = useState(false);
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -68,6 +70,18 @@ export default function Settings() {
 
   const removeAdvisor = (name: string) => {
     setServiceAdvisors(serviceAdvisors.filter(sa => sa !== name));
+  };
+
+  const toggleOfflineMode = () => {
+    if (!offlineMode) {
+      setOfflineMode(true);
+      startSyncManager();
+      showToast('Offline mode enabled', 'success');
+    } else {
+      setOfflineMode(false);
+      stopSyncManager();
+      showToast('Offline mode disabled', 'success');
+    }
   };
 
   if (loading) {
@@ -173,6 +187,34 @@ export default function Settings() {
             </button>
           </div>
         </form>
+
+        {/* Offline Mode Toggle */}
+        <div className="bg-white rounded-lg shadow p-4 mb-4">
+          <h3 className="font-medium mb-3">Offline Mode</h3>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">Enable offline mode</p>
+              <p className="text-xs text-gray-500">Work without server connection</p>
+            </div>
+            <button
+              onClick={toggleOfflineMode}
+              className={`px-3 py-1 rounded ${
+                offlineMode ? 'bg-green-500 text-white' : 'bg-gray-300 text-gray-700'
+              }`}
+            >
+              {offlineMode ? 'ON' : 'OFF'}
+            </button>
+          </div>
+          
+          {/* Connection status */}
+          <div className="mt-3 pt-3 border-t">
+            <p className="text-sm">
+              Status: <span className={isOnline.value ? 'text-green-600' : 'text-red-600'}>
+                {isOnline.value ? 'Online' : 'Offline'}
+              </span>
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
