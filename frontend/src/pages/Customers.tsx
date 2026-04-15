@@ -9,6 +9,7 @@ import { useToast } from '../context/ToastContext';
 import { History, Edit2, Trash2, User, Phone, Mail, MapPin, ShoppingBag, CheckCircle, XCircle, Clock, CreditCard, Users, CreditCardIcon } from 'lucide-react';
 import { getIsOfflineMode } from '../context/AuthContext';
 import offlineStorage from '../services/offlineStorage';
+import { createSyncQueueItem, upsertPendingEntityMutation } from '../services/syncQueue';
 
 interface Order {
   id: number;
@@ -173,6 +174,7 @@ export default function Customers() {
     // If offline, save to localStorage instead
     if (getIsOfflineMode()) {
       const customers = offlineStorage.getCustomers();
+      let customerLocalId = '';
       
       if (editing) {
         // Update existing customer
@@ -187,6 +189,7 @@ export default function Customers() {
             rfidCardId: rfidCardId || '',
             synced: false, // Mark as unsynced
           };
+          customerLocalId = String(editing.id);
         }
         showToast('Customer updated (offline)', 'success');
       } else {
@@ -202,8 +205,22 @@ export default function Customers() {
           synced: false, // Mark as unsynced - will sync when back online
         };
         customers.push(newCustomer);
+        customerLocalId = String(newCustomer.id);
         showToast('Customer created (offline - will sync when online)', 'success');
       }
+
+      upsertPendingEntityMutation(createSyncQueueItem({
+        entityType: 'customer',
+        entityLocalId: customerLocalId,
+        operation: editing ? 'update' : 'create',
+        payload: {
+          name,
+          email,
+          phone,
+          address,
+          rfidCardId: rfidCardId || '',
+        },
+      }));
       
       offlineStorage.saveCustomers(customers);
       setModalOpen(false);
@@ -243,6 +260,17 @@ export default function Customers() {
     if (getIsOfflineMode()) {
       const customers = offlineStorage.getCustomers();
       const filtered = customers.filter(customer => customer.id !== c.id);
+
+      upsertPendingEntityMutation(createSyncQueueItem({
+        entityType: 'customer',
+        entityLocalId: String(c.id),
+        operation: 'delete',
+        payload: {
+          id: c.id,
+          name: c.name,
+        },
+      }));
+
       offlineStorage.saveCustomers(filtered);
       showToast('Customer deleted (offline)', 'success');
       fetchCustomers();

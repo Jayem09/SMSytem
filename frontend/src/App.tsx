@@ -31,16 +31,15 @@ import Analytics from './pages/Analytics';
 import PromoEmail from './pages/PromoEmail';
 import Monitoring from './pages/Monitoring';
 import Backups from './pages/Backups';
+import SyncCenter from './pages/SyncCenter';
 import MaintenanceGuard from './components/MaintenanceGuard';
-import { checkHealthNative } from './api/axios';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import LoadingScreen from './components/LoadingScreen';
 import ServerOfflineScreen from './components/ServerOfflineScreen';
 import { waitForConnection, checkServerConnection } from './services/connectionCheck';
-import { startSyncManager, stopSyncManager, setUserOfflineMode, startReconnectChecker } from './services/syncManager';
-import { setOfflineMode, getCachedUser } from './context/AuthContext';
-import offlineStorage, { type LocalProduct } from './services/offlineStorage';
-import api from './api/axios';
+import { setUserOfflineMode, startReconnectChecker } from './services/syncManager';
+import { setOfflineMode } from './context/AuthContext';
+import offlineStorage from './services/offlineStorage';
 
 function App() {
   // Startup health check to auto-retry until backend is online
@@ -211,6 +210,7 @@ function App() {
                     <Route path="/pos" element={<POS />} />
                     <Route path="/customers" element={<Customers />} />
                     <Route path="/orders" element={<Orders />} />
+                    <Route path="/sync-center" element={<ProtectedRoute requiredRole={["admin", "super_admin"]}><SyncCenter /></ProtectedRoute>} />
 
                     { }
                     <Route path="/crm" element={<ProtectedRoute requiredRole="admin"><CRM /></ProtectedRoute>} />

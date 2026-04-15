@@ -19,6 +19,7 @@ const allNavItems = [
   { to: '/purchase-orders', label: 'Purchase Orders', roles: ['super_admin', 'admin', 'purchasing', 'purchaser'] },
   { to: '/suppliers', label: 'Suppliers', roles: ['super_admin', 'admin', 'purchasing', 'purchaser'] },
   { to: '/customers', label: 'Customers', roles: ['super_admin', 'admin', 'cashier'] },
+  { to: '/sync-center', label: 'Sync Center', roles: ['super_admin', 'admin'] },
   { to: '/crm', label: 'CRM Analysis', roles: ['super_admin', 'admin'] },
   { to: '/daily-report', label: 'Daily Summary', roles: ['super_admin', 'admin'] },
   { to: '/promo-email', label: 'Promo Emails', roles: ['super_admin', 'admin'] },

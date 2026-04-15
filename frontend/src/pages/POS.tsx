@@ -10,6 +10,11 @@ import {
 import { useToast } from '../context/ToastContext';
 import { getIsOfflineMode } from '../context/AuthContext';
 import offlineStorage from '../services/offlineStorage';
+import {
+  createSyncQueueItem,
+  enqueueSyncItem,
+  findLatestEntitySyncItem,
+} from '../services/syncQueue';
 import { usePOS, type POSProduct } from '../hooks/usePOS';
 import { usePOSData } from '../hooks/useQueries';
 
@@ -58,6 +63,8 @@ interface Customer {
   address?: string;
   rfid_card_id?: string;
   loyalty_points?: number;
+  rfidCardId?: string;
+  loyaltyPoints?: number;
 }
 
 export default function POS() {
@@ -102,7 +109,7 @@ export default function POS() {
       dispatch({ type: 'SET_CATEGORIES', payload: posData.categories as { id: number; name: string }[] });
       
       // Include loyalty_points in customer data
-      const customersWithPoints = (posData.customers as any[]).map((c: any) => ({
+      const customersWithPoints = (posData.customers as Customer[]).map((c) => ({
         ...c,
         loyalty_points: c.loyalty_points || 0,
       }));
@@ -112,7 +119,7 @@ export default function POS() {
       // If there's an error (API down), try to load from cached customers
       const cachedCustomers = offlineStorage.getCustomers();
       if (cachedCustomers.length > 0) {
-        dispatch({ type: 'SET_CUSTOMERS', payload: cachedCustomers as any[] });
+        dispatch({ type: 'SET_CUSTOMERS', payload: cachedCustomers as Customer[] });
       }
       // For products, rely on posData from usePOSData fallback
     }
@@ -156,7 +163,7 @@ export default function POS() {
     // OFFLINE MODE: Check cached customers for RFID match
     if (getIsOfflineMode()) {
       const customers = offlineStorage.getCustomers();
-      const customer = customers.find((c: any) => c.rfidCardId === uid || c.rfid_card_id === uid);
+      const customer = customers.find((c) => c.rfidCardId === uid || c.rfid_card_id === uid);
       
       if (customer) {
         setRfidCustomer(customer);
@@ -235,12 +242,14 @@ export default function POS() {
     
     // OFFLINE CHECKOUT: Save order locally
     if (getIsOfflineMode()) {
+      const offlineCreatedAt = new Date().toISOString();
+
       // Get customer info if selected
       let customerName = '';
       let customerPhone = '';
       if (customerId) {
         const customers = offlineStorage.getCustomers();
-        const customer = customers.find((c: any) => c.id === parseInt(customerId));
+        const customer = customers.find((c) => c.id === parseInt(customerId));
         if (customer) {
           customerName = customer.name || '';
           customerPhone = customer.phone || '';
@@ -270,11 +279,45 @@ export default function POS() {
           quantity: item.quantity,
           unit_price: item.price
         }))),
-        createdAt: new Date().toISOString(),
+        createdAt: offlineCreatedAt,
         synced: false
       };
       
       offlineStorage.saveOrder(offlineOrder);
+
+      const customerDependency = customerId
+        ? findLatestEntitySyncItem('customer', customerId)
+        : null;
+
+      const orderQueueItem = createSyncQueueItem({
+        entityType: 'order',
+        entityLocalId: offlineCreatedAt,
+        operation: 'create',
+        dependsOn: customerDependency ? [customerDependency.id] : [],
+        payload: {
+          customerId: customerId ? parseInt(customerId) : null,
+          guestName: !customerId ? guestName : '',
+          guestPhone: !customerId ? guestPhone : '',
+          serviceAdvisorName,
+          paymentMethod,
+          discountAmount: parseFloat(discount),
+          status,
+          receiptType,
+          tin,
+          businessAddress,
+          withholdingTaxRate: parseFloat(withholdingTaxRate) || 0,
+          rewardId: selectedReward?.id || null,
+          rewardPoints: selectedReward?.points_required || 0,
+          items: cart.map((item) => ({
+            product_id: item.id,
+            product_name: item.name,
+            quantity: item.quantity,
+            unit_price: item.price,
+          })),
+        },
+      });
+
+      enqueueSyncItem(orderQueueItem);
       
       // Deduct stock from cached products so POS reflects correct quantities
       if (status === 'completed') {
@@ -309,7 +352,7 @@ offlineStorage.saveProducts(cachedProducts);
         discount_amount: parseFloat(discount),
         payment_method: paymentMethod,
         status: status,
-        created_at: new Date().toISOString(),
+        created_at: offlineCreatedAt,
         items: cart.map((item, idx) => ({
           id: idx,
           product_id: item.id,
@@ -326,7 +369,7 @@ offlineStorage.saveProducts(cachedProducts);
       // If using a reward, deduct points from customer's cached balance
       if (selectedReward && customerId) {
         const customers = offlineStorage.getCustomers();
-        const customerIdx = customers.findIndex((c: any) => c.id === parseInt(customerId));
+        const customerIdx = customers.findIndex((c) => c.id === parseInt(customerId));
         if (customerIdx >= 0) {
           const currentPoints = customers[customerIdx].loyaltyPoints || 0;
           const newPoints = currentPoints - (selectedReward.points_required || 0);
@@ -334,12 +377,29 @@ offlineStorage.saveProducts(cachedProducts);
           offlineStorage.saveCustomers(customers);
           
           // Save pending points adjustment for sync
+          const loyaltyTimestamp = new Date().toISOString();
+
           offlineStorage.savePendingPointsAdjustment({
             customerId: parseInt(customerId),
             points: -(selectedReward.points_required || 0),
             orderId: Date.now(),
-            timestamp: new Date().toISOString(),
+            timestamp: loyaltyTimestamp,
           });
+
+          enqueueSyncItem(createSyncQueueItem({
+            entityType: 'loyalty_adjustment',
+            entityLocalId: `${offlineCreatedAt}:reward-redemption`,
+            operation: 'update',
+            dependsOn: [orderQueueItem.id],
+            payload: {
+              customerId: parseInt(customerId),
+              rewardId: selectedReward.id,
+              rewardPoints: selectedReward.points_required || 0,
+              pointsDelta: -(selectedReward.points_required || 0),
+              orderReference: offlineCreatedAt,
+              timestamp: loyaltyTimestamp,
+            },
+          }));
           
           console.log('[POS] Deducted', selectedReward.points_required, 'points from customer', customerId);
         }
@@ -348,12 +408,25 @@ offlineStorage.saveProducts(cachedProducts);
         const pointsEarned = finalTotal / 200.0;
         if (pointsEarned > 0) {
           const customers = offlineStorage.getCustomers();
-          const customerIdx = customers.findIndex((c: any) => c.id === parseInt(customerId));
+          const customerIdx = customers.findIndex((c) => c.id === parseInt(customerId));
           if (customerIdx >= 0) {
             const currentPoints = customers[customerIdx].loyalty_points || customers[customerIdx].loyaltyPoints || 0;
             customers[customerIdx].loyalty_points = currentPoints + pointsEarned;
             customers[customerIdx].loyaltyPoints = currentPoints + pointsEarned;
             offlineStorage.saveCustomers(customers);
+
+            enqueueSyncItem(createSyncQueueItem({
+              entityType: 'loyalty_adjustment',
+              entityLocalId: `${offlineCreatedAt}:points-earned`,
+              operation: 'update',
+              dependsOn: [orderQueueItem.id],
+              payload: {
+                customerId: parseInt(customerId),
+                pointsDelta: pointsEarned,
+                orderReference: offlineCreatedAt,
+              },
+            }));
+
             console.log(`[POS] Added ${pointsEarned} points to customer ${customerId} offline`);
           }
         }
