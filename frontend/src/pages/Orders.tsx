@@ -47,6 +47,7 @@ const statusColors: Record<string, string> = {
 export default function Orders() {
   const { user, isAuthenticated } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'purchasing' || user?.role === 'purchaser';
+  const canCompletePending = user?.role !== 'super_admin';
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [itemsModalOpen, setItemsModalOpen] = useState(false);
@@ -124,6 +125,16 @@ export default function Orders() {
       };
       fetch();
     }
+  }, [isAuthenticated]);
+
+  // Listen for sync completion to refetch orders
+  useEffect(() => {
+    const handleSyncComplete = () => {
+      console.log('[Orders] Sync completed, refetching...');
+      fetchOrders();
+    };
+    window.addEventListener('sync_completed', handleSyncComplete);
+    return () => window.removeEventListener('sync_completed', handleSyncComplete);
   }, [isAuthenticated]);
 
   // Fetch orders function for refresh after delete/complete
@@ -268,7 +279,7 @@ export default function Orders() {
               <Printer className="w-4 h-4" />
             </button>
 
-            {order.status === 'pending' && (
+            {order.status === 'pending' && canCompletePending && (
               <button
                 onClick={() => handleCompletePending(order)}
                 className="p-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl transition-colors cursor-pointer"

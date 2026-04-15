@@ -204,9 +204,9 @@ func (h *InventoryHandler) StockIn(c *gin.Context) {
 		return
 	}
 
-	if err := tx.Model(&models.Product{}).Where("id = ?", input.ProductID).UpdateColumn("stock", gorm.Expr("stock + ?", input.Quantity)).Error; err != nil {
+	if err := syncProductStock(tx, input.ProductID); err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update total product stock"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -284,62 +284,14 @@ func (h *InventoryHandler) StockOut(c *gin.Context) {
 	}
 
 	if remainingToDeduct > 0 {
-
-		var product models.Product
-		if err := tx.First(&product, input.ProductID).Error; err == nil {
-			if product.Stock >= remainingToDeduct {
-
-				legacyBatch := models.Batch{
-					ProductID:   product.ID,
-					WarehouseID: input.WarehouseID,
-					BranchID:    branchID,
-					BatchNumber: "LEGACY-SYNC",
-					Quantity:    product.Stock - remainingToDeduct,
-				}
-
-				var wh models.Warehouse
-				if err := database.DB.First(&wh, input.WarehouseID).Error; err != nil {
-					tx.Rollback()
-					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find warehouse"})
-					return
-				}
-				legacyBatch.BranchID = wh.BranchID
-
-				if err := tx.Create(&legacyBatch).Error; err != nil {
-					tx.Rollback()
-					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create legacy batch"})
-					return
-				}
-
-				movement := models.StockMovement{
-					ProductID:   product.ID,
-					BatchID:     &legacyBatch.ID,
-					WarehouseID: input.WarehouseID,
-					BranchID:    legacyBatch.BranchID,
-					UserID:      &userID,
-					Type:        models.MovementTypeOut,
-					Quantity:    -remainingToDeduct,
-					Reference:   input.Reference + " (Legacy Sync)",
-				}
-				if err := tx.Create(&movement).Error; err != nil {
-					tx.Rollback()
-					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create stock movement"})
-					return
-				}
-				remainingToDeduct = 0
-			}
-		}
-	}
-
-	if remainingToDeduct > 0 {
 		tx.Rollback()
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Insufficient stock available in this warehouse to fullfill the out request."})
 		return
 	}
 
-	if err := tx.Model(&models.Product{}).Where("id = ?", input.ProductID).UpdateColumn("stock", gorm.Expr("stock - ?", input.Quantity)).Error; err != nil {
+	if err := syncProductStock(tx, input.ProductID); err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update total product stock"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -424,19 +376,10 @@ func (h *InventoryHandler) AdjustStock(c *gin.Context) {
 		return
 	}
 
-	if difference > 0 {
-		if err := tx.Model(&models.Product{}).Where("id = ?", batch.ProductID).UpdateColumn("stock", gorm.Expr("stock + ?", difference)).Error; err != nil {
-			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update total product stock"})
-			return
-		}
-	} else {
-
-		if err := tx.Model(&models.Product{}).Where("id = ?", batch.ProductID).UpdateColumn("stock", gorm.Expr("stock - ?", -difference)).Error; err != nil {
-			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update total product stock"})
-			return
-		}
+	if err := syncProductStock(tx, batch.ProductID); err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
 
 	tx.Commit()
@@ -458,12 +401,28 @@ func (h *InventoryHandler) GetLowStockReport(c *gin.Context) {
 	}
 
 	var results []LowStockResult
-
-	database.DB.Table("products").
-		Select("products.id as product_id, products.name as product_name, products.size as product_size, products.stock as current_stock, products.reorder_level, products.primary_supplier_id, suppliers.name as supplier_name").
-		Joins("LEFT JOIN suppliers ON products.primary_supplier_id = suppliers.id").
-		Where("products.is_service = ? AND products.stock <= products.reorder_level AND products.deleted_at IS NULL", false).
-		Scan(&results)
+	branchID, _ := GetUintFromContext(c, "branchID")
+	stockSubquery := "(SELECT SUM(quantity) FROM batches WHERE product_id = products.id)"
+	queryArgs := []interface{}{}
+	if branchID != 0 {
+		stockSubquery = "(SELECT SUM(quantity) FROM batches WHERE product_id = products.id AND branch_id = ?)"
+		queryArgs = append(queryArgs, branchID)
+	}
+	query := database.DB.Table("products").
+		Select(`products.id as product_id,
+			products.name as product_name,
+			products.size as product_size,
+			COALESCE(`+stockSubquery+`, 0) as current_stock,
+			products.reorder_level,
+			products.primary_supplier_id,
+			suppliers.name as supplier_name`, queryArgs...).
+		Joins("LEFT JOIN suppliers ON products.primary_supplier_id = suppliers.id")
+	whereArgs := []interface{}{false}
+	if branchID != 0 {
+		whereArgs = append(whereArgs, branchID)
+	}
+	query = query.Where(`products.is_service = ? AND products.deleted_at IS NULL AND COALESCE(`+stockSubquery+`, 0) <= products.reorder_level`, whereArgs...)
+	query.Scan(&results)
 
 	c.JSON(http.StatusOK, gin.H{"low_stock": results})
 }
@@ -482,15 +441,35 @@ func (h *InventoryHandler) GenerateDraftPOs(c *gin.Context) {
 		}
 	}
 
-	var lowStockProducts []models.Product
-	database.DB.Where("is_service = ? AND stock <= reorder_level AND primary_supplier_id IS NOT NULL", false).Find(&lowStockProducts)
+	branchID, _ := GetUintFromContext(c, "branchID")
+
+	type lowStockProduct struct {
+		models.Product
+		CurrentStock int `json:"current_stock"`
+	}
+
+	var lowStockProducts []lowStockProduct
+	stockSubquery := "(SELECT SUM(quantity) FROM batches WHERE product_id = products.id)"
+	selectArgs := []interface{}{}
+	if branchID != 0 {
+		stockSubquery = "(SELECT SUM(quantity) FROM batches WHERE product_id = products.id AND branch_id = ?)"
+		selectArgs = append(selectArgs, branchID)
+	}
+	query := database.DB.Model(&models.Product{}).
+		Select(`products.*, COALESCE(`+stockSubquery+`, 0) as current_stock`, selectArgs...)
+	whereArgs := []interface{}{false}
+	if branchID != 0 {
+		whereArgs = append(whereArgs, branchID)
+	}
+	query = query.Where(`is_service = ? AND primary_supplier_id IS NOT NULL AND COALESCE(`+stockSubquery+`, 0) <= reorder_level`, whereArgs...)
+	query.Find(&lowStockProducts)
 
 	if len(lowStockProducts) == 0 {
 		c.JSON(http.StatusOK, gin.H{"message": "No low stock products with assigned suppliers found."})
 		return
 	}
 
-	supplierGroups := make(map[uint][]models.Product)
+	supplierGroups := make(map[uint][]lowStockProduct)
 	for _, p := range lowStockProducts {
 		supplierGroups[*p.PrimarySupplierID] = append(supplierGroups[*p.PrimarySupplierID], p)
 	}
@@ -516,7 +495,7 @@ func (h *InventoryHandler) GenerateDraftPOs(c *gin.Context) {
 			var totalCost float64
 			for _, p := range products {
 
-				qtyToOrder := (p.ReorderLevel * 2) - p.Stock
+				qtyToOrder := (p.ReorderLevel * 2) - p.CurrentStock
 				if qtyToOrder <= 0 {
 					qtyToOrder = p.ReorderLevel
 				}

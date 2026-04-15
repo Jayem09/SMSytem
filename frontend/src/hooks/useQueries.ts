@@ -161,16 +161,28 @@ export function useUpdateBrand() {
   });
 }
 
-export function usePOSData() {
+export function usePOSData(branchId?: string) {
   // React Query handles caching - try online first, fallback to cache on error
+  // POS is always branch-scoped. If no concrete branch is selected, do not fetch products.
   return useQuery({
-    queryKey: ['pos', 'data'],
+    queryKey: ['pos', 'data', branchId],
     queryFn: async () => {
+      const categories = offlineStorage.getCategories() as { id: number; name: string }[];
+      const customers = offlineStorage.getCustomers();
+
+      if (!branchId) {
+        return {
+          products: [],
+          categories,
+          customers,
+        };
+      }
+      
       // Try online first
       if (!getIsOfflineMode()) {
         try {
           const [pRes, cRes, custRes] = await Promise.all([
-            get('/api/products?all=1'),
+            get(`/api/products?all=1&branch_id=${branchId}`),
             get('/api/categories'),
             get('/api/customers'),
           ]);
@@ -184,7 +196,7 @@ export function usePOSData() {
           // Transform products to match POS format
           const products = (rawProducts as any[]).map((p: any) => ({
             ...p,
-            branch_stock: p.branch_stock ?? p.stock ?? 0,
+            branch_stock: Number(p.branch_stock ?? 0),
             category: categories.find((c: any) => c.id === p.category_id) || null,
           }));
           
@@ -204,7 +216,7 @@ export function usePOSData() {
           const uniqueCustomers = Array.from(uniqueCustomersMap.values());
           
           // Cache for offline
-          offlineStorage.saveProducts(products);
+          offlineStorage.saveProductsByBranch(branchId, products);
           offlineStorage.saveCategories(categories);
           offlineStorage.saveCustomers(uniqueCustomers);
           
@@ -220,9 +232,7 @@ export function usePOSData() {
       }
       
       // OFFLINE or API failed - load from cached storage
-      const products = offlineStorage.getProducts();
-      const categories = offlineStorage.getCategories() as { id: number; name: string }[];
-      const customers = offlineStorage.getCustomers();
+      const products = offlineStorage.getProductsByBranch(branchId);
       
       const productsWithCategory = products.map((p: any) => ({
         ...p,

@@ -207,7 +207,7 @@ function App() {
                     { }
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/analytics" element={<Analytics />} />
-                    <Route path="/pos" element={<POS />} />
+                    <Route path="/pos" element={<ProtectedRoute requiredRole={["admin", "cashier"]} disallowedRoles={["super_admin"]}><POS /></ProtectedRoute>} />
                     <Route path="/customers" element={<Customers />} />
                     <Route path="/orders" element={<Orders />} />
                     <Route path="/sync-center" element={<ProtectedRoute requiredRole={["admin", "super_admin"]}><SyncCenter /></ProtectedRoute>} />

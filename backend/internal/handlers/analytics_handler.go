@@ -163,7 +163,7 @@ func (h *AnalyticsHandler) processQuery(question string, branchID uint, mode str
 		// Try to parse as JSON chart response using regex for robustness
 		jsonRegex := regexp.MustCompile(`(?s)\{.*\}`)
 		jsonStr := jsonRegex.FindString(resp)
-		
+
 		var chartResp struct {
 			ChartType string    `json:"chart_type"`
 			Title     string    `json:"title"`
@@ -171,7 +171,7 @@ func (h *AnalyticsHandler) processQuery(question string, branchID uint, mode str
 			Values    []float64 `json:"values"`
 			Summary   string    `json:"summary"`
 		}
-		
+
 		if jsonStr != "" && json.Unmarshal([]byte(jsonStr), &chartResp) == nil && chartResp.ChartType != "" {
 			// Convert to chart data format
 			chartData := make([]map[string]interface{}, len(chartResp.Labels))
@@ -477,9 +477,23 @@ func (h *AnalyticsHandler) getQueryPatterns() []QueryPattern {
 				db := database.DB
 				var query string
 				if branchID > 0 {
-					query = `SELECT p.name as product_name, p.stock as current_stock, p.reorder_level FROM products p WHERE p.deleted_at IS NULL AND p.is_service = FALSE AND p.stock <= p.reorder_level ORDER BY p.stock ASC`
+					query = `SELECT p.name as product_name,
+						COALESCE((SELECT SUM(quantity) FROM batches WHERE product_id = p.id AND branch_id = ` + fmt.Sprintf("%d", branchID) + `), 0) as current_stock,
+						p.reorder_level
+						FROM products p
+						WHERE p.deleted_at IS NULL
+						AND p.is_service = FALSE
+						AND COALESCE((SELECT SUM(quantity) FROM batches WHERE product_id = p.id AND branch_id = ` + fmt.Sprintf("%d", branchID) + `), 0) <= p.reorder_level
+						ORDER BY current_stock ASC`
 				} else {
-					query = `SELECT name as product_name, stock as current_stock, reorder_level FROM products WHERE deleted_at IS NULL AND is_service = FALSE AND stock <= reorder_level ORDER BY stock ASC`
+					query = `SELECT p.name as product_name,
+						COALESCE((SELECT SUM(quantity) FROM batches WHERE product_id = p.id), 0) as current_stock,
+						p.reorder_level
+						FROM products p
+						WHERE p.deleted_at IS NULL
+						AND p.is_service = FALSE
+						AND COALESCE((SELECT SUM(quantity) FROM batches WHERE product_id = p.id), 0) <= p.reorder_level
+						ORDER BY current_stock ASC`
 				}
 				var results []LowStockItem
 				db.Raw(query).Scan(&results)
@@ -1186,11 +1200,12 @@ func (h *AnalyticsHandler) getQueryPatterns() []QueryPattern {
 				salesQ := `SELECT COALESCE(SUM(total_amount - discount_amount), 0) as total FROM orders WHERE status != 'cancelled' AND DATE(created_at) = CURDATE()`
 				ordersQ := `SELECT COUNT(*) as count FROM orders WHERE status != 'cancelled' AND DATE(created_at) = CURDATE()`
 				expenseQ := `SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE DATE(expense_date) = CURDATE()`
-				lowStockQ := `SELECT COUNT(*) as count FROM products WHERE deleted_at IS NULL AND stock <= reorder_level`
+				lowStockQ := `SELECT COUNT(*) as count FROM products WHERE deleted_at IS NULL AND COALESCE((SELECT SUM(quantity) FROM batches WHERE product_id = products.id), 0) <= reorder_level`
 				if branchID > 0 {
 					salesQ += fmt.Sprintf(" AND branch_id = %d", branchID)
 					ordersQ += fmt.Sprintf(" AND branch_id = %d", branchID)
 					expenseQ += fmt.Sprintf(" AND branch_id = %d", branchID)
+					lowStockQ = fmt.Sprintf(`SELECT COUNT(*) as count FROM products WHERE deleted_at IS NULL AND COALESCE((SELECT SUM(quantity) FROM batches WHERE product_id = products.id AND branch_id = %d), 0) <= reorder_level`, branchID)
 				}
 				var sales, expense RevenueResult
 				var orders, lowStock struct{ Count int }

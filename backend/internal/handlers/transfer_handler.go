@@ -396,30 +396,6 @@ func (h *TransferHandler) UpdateStatus(c *gin.Context) {
 				}
 				log.Printf("STOCK DEDUCTION: Found %d batches for ProductID=%d at BranchID=%d", len(sourceBatches), product.ID, transfer.SourceBranchID)
 
-				if len(sourceBatches) == 0 && product.Stock >= remaining {
-					log.Printf("STOCK SELF-HEALING: Creating migration batch for ProductID=%d at BranchID=%d", product.ID, transfer.SourceBranchID)
-					var sourceWarehouse models.Warehouse
-					if err := tx.Where("branch_id = ?", transfer.SourceBranchID).First(&sourceWarehouse).Error; err != nil {
-
-						sourceWarehouse = models.Warehouse{
-							Name:     "Default Warehouse",
-							BranchID: transfer.SourceBranchID,
-						}
-						tx.Create(&sourceWarehouse)
-					}
-
-					migrationBatch := models.Batch{
-						ProductID:   product.ID,
-						WarehouseID: sourceWarehouse.ID,
-						BranchID:    transfer.SourceBranchID,
-						BatchNumber: "LEGACY-MIGRATION",
-						Quantity:    product.Stock,
-					}
-					if err := tx.Create(&migrationBatch).Error; err == nil {
-						sourceBatches = append(sourceBatches, migrationBatch)
-					}
-				}
-
 				for _, b := range sourceBatches {
 					log.Printf("  - Batch ID: %d, Qty: %d", b.ID, b.Quantity)
 				}
@@ -452,7 +428,7 @@ func (h *TransferHandler) UpdateStatus(c *gin.Context) {
 					return fmt.Errorf("Insufficient stock at source branch for product ID %d (Need %d more)", product.ID, remaining)
 				}
 
-				if err := tx.Model(&product).Update("stock", product.Stock-item.Quantity).Error; err != nil {
+				if err := syncProductStock(tx, product.ID); err != nil {
 					return err
 				}
 			}
@@ -460,14 +436,9 @@ func (h *TransferHandler) UpdateStatus(c *gin.Context) {
 
 			for i, item := range transfer.Items {
 
-				var destWarehouse models.Warehouse
-				if err := tx.Where("branch_id = ?", transfer.DestinationBranchID).First(&destWarehouse).Error; err != nil {
-
-					destWarehouse = models.Warehouse{
-						Name:     "Default Warehouse",
-						BranchID: transfer.DestinationBranchID,
-					}
-					tx.Create(&destWarehouse)
+				destWarehouse, err := getOrCreateBranchWarehouse(tx, transfer.DestinationBranchID)
+				if err != nil {
+					return err
 				}
 
 				batch := models.Batch{
@@ -481,10 +452,11 @@ func (h *TransferHandler) UpdateStatus(c *gin.Context) {
 					return err
 				}
 
-				// Add stock back to global product.stock (was deducted on ship, now available again at destination)
 				var product models.Product
 				if err := tx.First(&product, item.ProductID).Error; err == nil {
-					tx.Model(&product).Update("stock", product.Stock+item.Quantity)
+					if err := syncProductStock(tx, product.ID); err != nil {
+						return err
+					}
 				}
 
 				// Set received_quantity on the transfer item

@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { Settings, Monitor, FileText, Upload, ChevronDown, LogOut } from 'lucide-react';
+import { Settings, Monitor, FileText, Upload, ChevronDown, LogOut, RefreshCw } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import api from '../api/axios';
 import GlobalSearch from './GlobalSearch';
@@ -9,7 +9,7 @@ import { getIsOfflineMode } from '../context/AuthContext';
 const allNavItems = [
   { to: '/dashboard', label: 'Dashboard', roles: ['super_admin', 'admin', 'cashier', 'purchasing', 'purchaser'] },
   { to: '/analytics', label: 'AI Analytics', roles: ['super_admin', 'admin', 'cashier', 'purchasing', 'purchaser'] },
-  { to: '/pos', label: 'POS Checkout', roles: ['super_admin', 'admin', 'cashier'] },
+  { to: '/pos', label: 'POS Checkout', roles: ['admin', 'cashier'] },
   { to: '/orders', label: 'Orders', roles: ['super_admin', 'admin', 'cashier'] },
   { to: '/transfers', label: 'Branch Transfers', roles: ['super_admin', 'admin', 'cashier', 'user', 'purchasing', 'purchaser'] },
   { to: '/inventory', label: 'Inventory Management', roles: ['super_admin', 'admin', 'purchasing', 'purchaser'] },
@@ -19,7 +19,6 @@ const allNavItems = [
   { to: '/purchase-orders', label: 'Purchase Orders', roles: ['super_admin', 'admin', 'purchasing', 'purchaser'] },
   { to: '/suppliers', label: 'Suppliers', roles: ['super_admin', 'admin', 'purchasing', 'purchaser'] },
   { to: '/customers', label: 'Customers', roles: ['super_admin', 'admin', 'cashier'] },
-  { to: '/sync-center', label: 'Sync Center', roles: ['super_admin', 'admin'] },
   { to: '/crm', label: 'CRM Analysis', roles: ['super_admin', 'admin'] },
   { to: '/daily-report', label: 'Daily Summary', roles: ['super_admin', 'admin'] },
   { to: '/promo-email', label: 'Promo Emails', roles: ['super_admin', 'admin'] },
@@ -30,7 +29,7 @@ const allNavItems = [
 
 // Offline mode: only show POS, Orders, and Customers
 const offlineNavItems = [
-  { to: '/pos', label: 'POS Checkout', roles: ['super_admin', 'admin', 'cashier'] },
+  { to: '/pos', label: 'POS Checkout', roles: ['admin', 'cashier'] },
   { to: '/orders', label: 'Orders', roles: ['super_admin', 'admin', 'cashier'] },
   { to: '/customers', label: 'Customers', roles: ['super_admin', 'admin', 'cashier'] },
 ];
@@ -50,7 +49,8 @@ export default function Layout() {
       }
       try {
         const res = await api.get('/api/transfers/pending-counts');
-        setPendingCounts(res.data.total_actionable || 0);
+        const data = res.data as { total_actionable?: number };
+        setPendingCounts(data.total_actionable || 0);
       } catch (err) {
         console.error('Failed to fetch pending transfer counts', err);
       }
@@ -151,56 +151,59 @@ export default function Layout() {
             ))}
         </nav>
 
-         <div className="border-t border-gray-200 px-4 py-3">
-           {/* User Profile - Clickable Dropdown */}
-           <div className="relative">
-<button
-                onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="w-full flex items-center gap-3 mb-2 hover:bg-gray-50 p-2 -m-2 rounded-lg transition-colors"
-              >
-                <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-sm font-bold">
-                  {user?.email?.charAt(0).toUpperCase() || 'U'}
-                </div>
-                <div className="flex-1 min-w-0 text-left">
-                  <p className="text-sm font-medium text-gray-900 truncate">{user?.email || user?.name}</p>
-                  <p className="text-xs text-gray-400 capitalize">{user?.role}</p>
-                </div>
-                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
-              </button>
-             
-              {/* Dropdown Menu */}
-              {userMenuOpen && (
-                <div className="absolute bottom-full left-0 right-0 mb-2 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
-                  {/* Monitoring Section - Only for admin/superadmin */}
-                  {(user?.role === 'admin' || user?.role === 'super_admin') && (
-                    <div>
-                      <div className="px-3 py-2 text-xs font-medium text-gray-500 border-b bg-gray-50">
-                        System
-                      </div>
-                      <a href="/monitoring" className="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center">
-                        <Monitor className="mr-2 h-4 w-4" /> Monitoring
-                      </a>
-                      <a href="/logs" className="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center">
-                        <FileText className="mr-2 h-4 w-4" /> Logs
-                      </a>
-                      <a href="/backups" className="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center">
-                        <Upload className="mr-2 h-4 w-4" /> Backup
-                      </a>
-                      <div className="border-t border-gray-100" />
+        <div className="border-t border-gray-200 px-4 py-3">
+          {/* User Profile - Clickable Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setUserMenuOpen(!userMenuOpen)}
+              className="w-full flex items-center gap-3 mb-2 hover:bg-gray-50 p-2 -m-2 rounded-lg transition-colors"
+            >
+              <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-sm font-bold">
+                {user?.email?.charAt(0).toUpperCase() || 'U'}
+              </div>
+              <div className="flex-1 min-w-0 text-left">
+                <p className="text-sm font-medium text-gray-900 truncate">{user?.email || user?.name}</p>
+                <p className="text-xs text-gray-400 capitalize">{user?.role}</p>
+              </div>
+              <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* Dropdown Menu */}
+            {userMenuOpen && (
+              <div className="absolute bottom-full left-0 right-0 mb-2 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+                {/* Monitoring Section - Only for admin/superadmin */}
+                {(user?.role === 'admin' || user?.role === 'super_admin') && (
+                  <div>
+                    <div className="px-3 py-2 text-xs font-medium text-gray-500 border-b bg-gray-50">
+                      System
                     </div>
-                  )}
-                  
-                  <button
-                    onClick={handleLogout}
-                    className="w-full px-3 py-2 text-sm text-left text-red-600 hover:bg-red-50 flex items-center"
-                  >
-                    <LogOut className="mr-2 h-4 w-4" /> Logout
-                  </button>
-                </div>
-              )}
-            </div>
+                    <a href="/monitoring" className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center">
+                      <Monitor className="mr-2 h-4 w-4" /> Monitoring
+                    </a>
+                    <a href="/logs" className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center">
+                      <FileText className="mr-2 h-4 w-4" /> Logs
+                    </a>
+                    <a href="/backups" className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center">
+                      <Upload className="mr-2 h-4 w-4" /> Backup
+                    </a>
+                    <a href="/sync-center" className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center">
+                      <RefreshCw className="mr-2 h-4 w-4" /> Sync Center
+                    </a>
+                    <div className="border-t border-gray-100" />
+                  </div>
+                )}
+
+                <button
+                  onClick={handleLogout}
+                  className="w-full px-3 py-2 text-sm text-left text-red-600 hover:bg-red-50 flex items-center"
+                >
+                  <LogOut className="mr-2 h-4 w-4" /> Logout
+                </button>
+              </div>
+            )}
           </div>
-       </aside>
+        </div>
+      </aside>
 
       { }
       <main className="flex-1 ml-56 min-h-screen flex flex-col">

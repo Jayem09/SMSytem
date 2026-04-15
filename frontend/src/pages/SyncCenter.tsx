@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AlertTriangle, Clock3, RefreshCw, ShieldAlert, CheckCircle2 } from 'lucide-react';
 import SyncItemCard from '../components/sync/SyncItemCard';
 import ConflictResolutionModal from '../components/sync/ConflictResolutionModal';
@@ -41,10 +41,20 @@ function SummaryCard({ label, value, icon: Icon, tone }: SummaryCardProps) {
 export default function SyncCenter() {
   const [queue, setQueue] = useState<SyncQueueItem[]>(() => getSyncQueue());
   const [selectedConflict, setSelectedConflict] = useState<SyncQueueItem | null>(null);
+  const [lastRefresh, setLastRefresh] = useState(Date.now());
 
   const refreshQueue = () => {
-    setQueue(getSyncQueue());
+    const newQueue = getSyncQueue();
+    setQueue(newQueue);
+    setLastRefresh(Date.now());
+    console.log('[SyncCenter] Refreshed at', new Date().toLocaleTimeString(), '- items:', newQueue.map(i => ({ id: i.id.slice(0,8), status: i.status })));
   };
+
+  // Auto-refresh queue every 3 seconds
+  useEffect(() => {
+    const interval = setInterval(refreshQueue, 3000);
+    return () => clearInterval(interval);
+  }, []);
 
   const summary = getSyncQueueSummary();
   const pendingItems = queue.filter((item) => item.status === 'pending' || item.status === 'syncing');

@@ -4,6 +4,7 @@ import { setOfflineMode } from '../context/AuthContext';
 import offlineStorage from './offlineStorage';
 import { checkServerConnection } from './connectionCheck';
 import {
+  getSyncQueue,
   getRunnableQueueItems,
   type SyncQueueItem,
   markQueueItemConflicted,
@@ -12,8 +13,9 @@ import {
   markQueueItemSynced,
   markQueueItemSyncing,
 } from './syncQueue';
+import { queryClient } from '../lib/queryClient';
 
-const SYNC_INTERVAL = 30000; // 30 seconds
+const SYNC_INTERVAL = 3000; // 3 seconds - fast enough for small sync queue
 
 // Simple state (not React ref - works in services)
 export const isOnline = { value: true };
@@ -71,9 +73,66 @@ function markOrderQueueItemSynced(item: SyncQueueItem, serverEntityId?: string):
   markQueueItemSynced(item.id, serverEntityId);
 }
 
+function toStringValue(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
+function toNumberValue(value: unknown, fallback = 0): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+function toOptionalIntValue(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function toOptionalUintValue(value: unknown): number | null {
+  const numberValue = toOptionalIntValue(value);
+  return numberValue && numberValue > 0 ? numberValue : null;
+}
+
+function buildOrderSyncPayload(payload: Record<string, unknown>) {
+  const items = Array.isArray(payload.items) ? payload.items : [];
+
+  return {
+    customer_id: toOptionalUintValue(payload.customerId ?? payload.customer_id),
+    branch_id: toOptionalUintValue(payload.branchId ?? payload.branch_id),
+    guest_name: toStringValue(payload.guestName ?? payload.guest_name),
+    guest_phone: toStringValue(payload.guestPhone ?? payload.guest_phone),
+    service_advisor_name: toStringValue(payload.serviceAdvisorName ?? payload.service_advisor_name),
+    payment_method: toStringValue(payload.paymentMethod ?? payload.payment_method),
+    discount_amount: toNumberValue(payload.discountAmount ?? payload.discount_amount),
+    status: toStringValue(payload.status) || 'completed',
+    receipt_type: toStringValue(payload.receiptType ?? payload.receipt_type) || 'SI',
+    tin: toStringValue(payload.tin),
+    business_address: toStringValue(payload.businessAddress ?? payload.business_address),
+    withholding_tax_rate: toNumberValue(payload.withholdingTaxRate ?? payload.withholding_tax_rate),
+    reward_id: toOptionalUintValue(payload.rewardId ?? payload.reward_id),
+    reward_points: toNumberValue(payload.rewardPoints ?? payload.reward_points),
+    items: items
+      .filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null)
+      .map((item) => ({
+        product_id: toNumberValue(item.product_id),
+        quantity: toNumberValue(item.quantity, 1),
+      })),
+  };
+}
+
 async function syncOrderItem(item: SyncQueueItem): Promise<void> {
-  const response = await apiPost('/api/orders', item.payload);
-  const responseData = response.data as { order?: { id?: number }; id?: number };
+  const payload = buildOrderSyncPayload(item.payload);
+  
+  console.log('[syncOrderItem] Sending order to server:', payload);
+  
+  const response = await apiPost('/api/orders', payload);
+  console.log('[syncOrderItem] Server response:', response.status, response.data);
+  
+  const responseData = response.data as { order?: { id?: number }; id?: number; error?: string; details?: string };
+  
+  if (response.status >= 400 || responseData.error) {
+    const errorMessage = responseData.details || responseData.error || `Order sync failed with status ${response.status}`;
+    console.error('[syncOrderItem] Server error:', errorMessage);
+    throw new Error(errorMessage);
+  }
+  
   const serverOrderId = responseData.order?.id ?? responseData.id;
 
   markOrderQueueItemSynced(item, serverOrderId ? String(serverOrderId) : undefined);
@@ -98,38 +157,48 @@ async function syncCustomerItem(item: SyncQueueItem): Promise<void> {
     ? await apiPost('/api/customers', payload)
     : await apiPut(`/api/customers/${item.entityLocalId}`, payload);
 
-  const responseData = response.data as { customer?: { id?: number }; id?: number };
+  const responseData = response.data as { customer?: { id?: number }; id?: number; error?: string; details?: string };
+
+  if (response.status >= 400 || responseData.error) {
+    throw new Error(responseData.details || responseData.error || `Customer sync failed with status ${response.status}`);
+  }
+
   const serverCustomerId = responseData.customer?.id ?? responseData.id;
 
   markCustomerQueueItemSynced(item, serverCustomerId ? String(serverCustomerId) : undefined);
 }
 
 function syncLoyaltyAdjustmentItem(item: SyncQueueItem): void {
+  // Loyalty points are now handled by the ORDER sync on the backend
+  // (backend adds/deducts points when creating the order)
+  // So we just mark this as synced without any API call
+  console.log('[SyncManager] Loyalty adjustment handled by order sync:', item.payload);
   markQueueItemSynced(item.id);
 }
 
-async function processQueueItem(item: SyncQueueItem): Promise<void> {
+async function processQueueItem(item: SyncQueueItem): Promise<boolean> {
   markQueueItemSyncing(item.id);
 
   try {
     if (item.entityType === 'order') {
       await syncOrderItem(item);
-      return;
+      return true;
     }
 
     if (item.entityType === 'customer') {
       await syncCustomerItem(item);
-      return;
+      return true;
     }
 
     syncLoyaltyAdjustmentItem(item);
+    return true;
   } catch (err: unknown) {
     const message = getSyncErrorMessage(err);
 
     if (isConflictError(err)) {
       if (item.entityType === 'order') {
         markQueueItemManualReview(item.id, message);
-        return;
+        return false;
       }
 
       if (item.entityType === 'customer') {
@@ -138,40 +207,80 @@ async function processQueueItem(item: SyncQueueItem): Promise<void> {
           local: item.payload,
           server: getConflictServerSnapshot(err),
         });
-        return;
+        return false;
       }
 
       markQueueItemFailed(item.id, message);
-      return;
+      return false;
     }
 
     markQueueItemFailed(item.id, message);
+    return false;
   }
 }
 
-async function processRunnableQueueItems(): Promise<number> {
+async function processRunnableQueueItems(): Promise<{ processedCount: number; failedCount: number }> {
   const runnableItems = getRunnableQueueItems();
 
-  if (runnableItems.length === 0) {
-    return 0;
+  const priority: Record<string, number> = {
+    customer: 0,
+    order: 1,
+    loyalty_adjustment: 2,
+  };
+
+  const sortedRunnableItems = [...runnableItems].sort(
+    (a, b) => (priority[a.entityType] ?? 99) - (priority[b.entityType] ?? 99),
+  );
+
+  console.log('[processRunnableQueueItems] Runnable items:', sortedRunnableItems.map(i => ({ id: i.id.slice(0,8), status: i.status, type: i.entityType, dependsOn: i.dependsOn })));
+
+  if (sortedRunnableItems.length === 0) {
+    return { processedCount: 0, failedCount: 0 };
   }
 
   let processedCount = 0;
+  let failedCount = 0;
 
-  for (const item of runnableItems) {
-    await processQueueItem(item);
+  for (const item of sortedRunnableItems) {
+    const currentQueue = getSyncQueue();
+    const freshItem = currentQueue.find((candidate) => candidate.id === item.id);
+
+    if (!freshItem) {
+      continue;
+    }
+
+    const dependenciesSatisfied = freshItem.dependsOn.every((dependencyId) => {
+      const dependency = currentQueue.find((candidate) => candidate.id === dependencyId);
+      return dependency?.status === 'synced';
+    });
+
+    if (!dependenciesSatisfied) {
+      console.log('[processRunnableQueueItems] Skipping item with unsatisfied dependencies:', freshItem.id.slice(0,8), freshItem.dependsOn);
+      continue;
+    }
+
+    console.log('[processRunnableQueueItems] Processing:', freshItem.id.slice(0,8), freshItem.entityType, freshItem.operation);
+    const succeeded = await processQueueItem(freshItem);
     processedCount += 1;
+
+    if (!succeeded) {
+      failedCount += 1;
+    }
   }
 
-  return processedCount;
+  return { processedCount, failedCount };
 }
 
 export async function syncOrders(): Promise<{ success: boolean; error?: string }> {
   try {
-    const processed = await processRunnableQueueItems();
+    const { processedCount, failedCount } = await processRunnableQueueItems();
 
-    if (processed > 0) {
+    if (processedCount > 0 && failedCount === 0) {
       updateLastSyncTime();
+    }
+
+    if (failedCount > 0) {
+      return { success: false, error: `${failedCount} sync item(s) failed` };
     }
 
     return { success: true };
@@ -196,9 +305,32 @@ export async function performFullSync(): Promise<{ success: boolean; error?: str
     console.log('[FullSync] Queue-driven sync:', syncResult.success ? 'OK' : syncResult.error);
 
     const pendingPoints = offlineStorage.getPendingPointsAdjustments();
-    if (pendingPoints.length > 0) {
+    if (syncResult.success && pendingPoints.length > 0) {
       console.log(`[FullSync] Clearing ${pendingPoints.length} pending points adjustments after queue sync`);
       offlineStorage.clearPendingPointsAdjustments();
+    }
+
+    // AFTER successful sync: clear stale offline cache and refetch fresh data from server
+    if (syncResult.success) {
+      console.log('[FullSync] Sync successful - clearing offline cache and refetching...');
+      
+      // Clear offline customers cache to force refetch from server
+      const cachedCustomers = offlineStorage.getCustomers();
+      if (cachedCustomers.some(c => !c.synced)) {
+        console.log('[FullSync] Clearing customers cache - will refetch from server');
+        localStorage.removeItem('offline_customers');
+      }
+
+      // Invalidate React Query cache 
+      queryClient.invalidateQueries({ queryKey: ['pos', 'data'] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      
+      // Dispatch custom event for pages that don't use React Query
+      window.dispatchEvent(new CustomEvent('sync_completed', { detail: { success: true } }));
+      
+      console.log('[FullSync] Cache invalidated + event dispatched - UI should update');
     }
 
     isOnline.value = true;
@@ -251,9 +383,11 @@ export function startReconnectChecker(): void {
 }
 
 export function startSyncManager(): void {
+  console.log('[SyncManager] STARTING sync manager...');
   if (syncInterval) return;
 
   checkServerConnection().then(async (connected) => {
+    console.log('[SyncManager] Initial connection check:', connected);
     isOnline.value = connected;
 
     if (!userChoseOffline) {
@@ -263,32 +397,37 @@ export function startSyncManager(): void {
     notifyOnlineStatusChange();
 
     if (connected) {
-      const hasUnsyncedOrders = offlineStorage.getUnsyncedOrders().length > 0;
-      const hasUnsyncedCustomers = offlineStorage.getCustomers().some((customer) => !customer.synced);
-      const hasPendingPoints = offlineStorage.getPendingPointsAdjustments().length > 0;
+      // Check for ANY pending data - queue items or offline storage
+      const queueItems = getSyncQueue();
+      const hasPendingQueue = queueItems.some(item => item.status === 'pending' || item.status === 'failed');
+      
+      console.log('[SyncManager] Startup - queue items:', queueItems.map(i => ({ id: i.id.slice(0,8), status: i.status, type: i.entityType })));
 
-      if (hasUnsyncedOrders || hasUnsyncedCustomers || hasPendingPoints || getRunnableQueueItems().length > 0) {
-        console.log('[SyncManager] Found leftover offline data on startup, triggering full sync...');
+      if (hasPendingQueue) {
+        console.log('[SyncManager] Found pending queue items - triggering full sync...');
         await performFullSync();
       }
     }
   });
 
   syncInterval = setInterval(async () => {
-    const wasOffline = !isOnline.value;
     const connected = await checkServerConnection();
 
     isOnline.value = connected;
     notifyOnlineStatusChange();
 
-    if (connected && wasOffline && !userChoseOffline) {
-      console.log('[SyncManager] Connection restored! Syncing...');
-      setOfflineMode(false);
-      await performFullSync();
-    }
-
+    // ALWAYS check for pending items when connected - don't wait for "wasOffline"
     if (connected) {
-      await syncOrders();
+      const queueItems = getSyncQueue();
+      console.log('[SyncManager] Interval check - queue:', queueItems.map(i => ({ id: i.id.slice(0,8), status: i.status, type: i.entityType })));
+      const pendingItems = queueItems.filter(item => 
+        item.status === 'pending' || item.status === 'failed'
+      );
+      
+      if (pendingItems.length > 0) {
+        console.log('[SyncManager] Found pending items - running FULL sync...');
+        await performFullSync();
+      }
     }
   }, SYNC_INTERVAL);
 }

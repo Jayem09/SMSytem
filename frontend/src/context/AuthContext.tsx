@@ -15,6 +15,19 @@ interface CachedUser {
   lastLogin: string;
 }
 
+interface AuthResponse {
+  token: string;
+  user: User;
+  error?: string;
+}
+
+function normalizeOfflineUser(user: Omit<User, 'created_at'> & Partial<Pick<User, 'created_at'>>): User {
+  return {
+    ...user,
+    created_at: user.created_at ?? new Date().toISOString(),
+  };
+}
+
 function getCachedProfiles(): Record<string, CachedUser> {
   const data = localStorage.getItem(CACHED_PROFILES_KEY);
   return data ? JSON.parse(data) : {};
@@ -85,7 +98,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!isCurrentlyOffline) {
           try {
             const response = await api.get('/api/auth/me');
-            setUser(response.data.user);
+            const data = response.data as { user?: User };
+            setUser(data.user ?? null);
             setToken(savedToken);
           } catch {
             // Token invalid or server down - clear it
@@ -119,13 +133,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       if (cached) {
         // Use cached profile with real branch_id
-        const offlineUser: User = {
+        const offlineUser = normalizeOfflineUser({
           id: 0,
           email: cached.email,
           name: cached.name,
           role: cached.role,
           branch_id: cached.branch_id,
-        };
+        });
         localStorage.setItem('token', 'offline_token');
         localStorage.setItem('user', JSON.stringify(offlineUser));
         setToken('offline_token');
@@ -137,13 +151,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       // No cached profile - use generic offline user
       console.log('[AuthContext] No cached profile found, using generic offline user');
-      const offlineUser: User = {
+      const offlineUser = normalizeOfflineUser({
         id: 0,
         email: 'offline@smsystem.local',
         name: 'Offline User',
         role: 'cashier',
         branch_id: 1,
-      };
+      });
       localStorage.setItem('token', 'offline_token');
       localStorage.setItem('user', JSON.stringify(offlineUser));
       setToken('offline_token');
@@ -154,14 +168,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     
     const response = await api.post('/api/auth/login', { email, password });
-    const data = response.data as { token?: string; user?: unknown; error?: string };
+    const data = response.data as Partial<AuthResponse>;
     // Expect a shape: { token: string, user: object }
     if (!data || !data.token || !data.user) {
       const serverError = data?.error ?? 'Invalid login response';
       throw new Error(typeof serverError === 'string' ? serverError : 'Login failed');
     }
-    const { token: newToken, user: newUser } = data;
+    const { token: newToken, user: newUser } = data as AuthResponse;
     console.debug('Login success payload:', data);
+    
+    // FIRST: Set token so subsequent API calls work
+    localStorage.setItem('token', newToken);
+    localStorage.setItem('user', JSON.stringify(newUser));
+    setToken(newToken);
+    setUser(newUser as User);
     
 // Cache user profile for offline login
     const userObj = newUser as User;
@@ -191,6 +211,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       // Save products and categories directly (OVERWRITE old data)
       offlineStorage.saveProducts(products as LocalProduct[]);
+      if (userObj.branch_id > 0) {
+        offlineStorage.saveProductsByBranch(String(userObj.branch_id), products as LocalProduct[]);
+      }
       offlineStorage.saveCategories(categories);
       
       // Deduplicate customers by phone number before saving
@@ -218,11 +241,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.warn('[AuthContext] Failed to cache offline data:', err);
     }
     
-    localStorage.setItem('token', newToken);
-    localStorage.setItem('user', JSON.stringify(newUser));
-    setToken(newToken);
-    setUser(newUser);
-    
     // Start sync manager AFTER login so it can detect & sync any offline data
     setOfflineMode(false);
     startSyncManager();
@@ -230,7 +248,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = async (name: string, email: string, password: string) => {
     const response = await api.post('/api/auth/register', { name, email, password });
-    const { token: newToken, user: newUser } = response.data;
+    const { token: newToken, user: newUser } = response.data as AuthResponse;
     localStorage.setItem('token', newToken);
     localStorage.setItem('user', JSON.stringify(newUser));
     setToken(newToken);

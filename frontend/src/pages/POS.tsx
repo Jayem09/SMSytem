@@ -17,6 +17,7 @@ import {
 } from '../services/syncQueue';
 import { usePOS, type POSProduct } from '../hooks/usePOS';
 import { usePOSData } from '../hooks/useQueries';
+import { useAuth } from '../hooks/useAuth';
 
 interface Product {
   id: number;
@@ -69,8 +70,10 @@ interface Customer {
 
 export default function POS() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const { state, dispatch, addToCart, removeFromCart, updateQuantity, clearCart, setSearch, setCategory, subtotal: posSubtotal, filteredProducts } = usePOS();
   const { products, categories, customers, cart, search, selectedCategory, loading, error } = state;
+  const isSuperAdmin = user?.role === 'super_admin';
 
   const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
   const [customerId, setCustomerId] = useState('');
@@ -99,8 +102,9 @@ export default function POS() {
   const [selectedReward, setSelectedReward] = useState<Product | null>(null);
 
   const { showToast } = useToast();
+  const resolvedBranchId = user?.branch_id ? String(user.branch_id) : undefined;
 
-  const { data: posData, isLoading: posLoading, error: posError, refetch } = usePOSData();
+  const { data: posData, isLoading: posLoading, error: posError, refetch } = usePOSData(resolvedBranchId);
 
   useEffect(() => {
     dispatch({ type: 'SET_LOADING', payload: posLoading });
@@ -230,6 +234,14 @@ export default function POS() {
 
   const handleCheckout = async (status: 'pending' | 'completed' = 'completed') => {
     if (cart.length === 0) return;
+    if (isSuperAdmin) {
+      showToast('Super Admin cannot create POS transactions. Use a branch staff account.', 'error');
+      return;
+    }
+    if (!resolvedBranchId) {
+      showToast('No branch is assigned to this account.', 'error');
+      return;
+    }
     if (receiptType === 'SI' && !businessAddress.trim()) {
       showToast('Business Address is required for a Sales Invoice (SI).', 'error');
       return;
@@ -258,6 +270,7 @@ export default function POS() {
       
       const offlineOrder = {
         customerId: customerId ? parseInt(customerId) : null,
+        branchId: Number(resolvedBranchId),
         customerName: customerName,
         customerPhone: customerPhone,
         guestName: !customerId ? guestName : '',
@@ -296,6 +309,7 @@ export default function POS() {
         dependsOn: customerDependency ? [customerDependency.id] : [],
         payload: {
           customerId: customerId ? parseInt(customerId) : null,
+          branch_id: Number(resolvedBranchId),
           guestName: !customerId ? guestName : '',
           guestPhone: !customerId ? guestPhone : '',
           serviceAdvisorName,
@@ -321,7 +335,7 @@ export default function POS() {
       
       // Deduct stock from cached products so POS reflects correct quantities
       if (status === 'completed') {
-        const cachedProducts = offlineStorage.getProducts();
+        const cachedProducts = offlineStorage.getProductsByBranch(resolvedBranchId);
         console.log('[POS] Before stock deduction:', cachedProducts.map(p => ({ id: p.id, name: p.name, stock: p.branch_stock })));
         for (const cartItem of cart) {
           const pIdx = cachedProducts.findIndex(p => p.id === cartItem.id);
@@ -331,14 +345,14 @@ export default function POS() {
             console.log('[POS] Deducted', cartItem.quantity, 'from product', cachedProducts[pIdx].name, 'new stock:', cachedProducts[pIdx].branch_stock);
           }
         }
-offlineStorage.saveProducts(cachedProducts);
+        offlineStorage.saveProductsByBranch(resolvedBranchId, cachedProducts);
         console.log('[POS] Deducted stock from cached products for offline order');
         
         // Force POS to re-render with updated stock - invalidate AND manually dispatch
         queryClient.invalidateQueries({ queryKey: ['pos', 'data'] });
         
         // Also manually update the state from localStorage to ensure UI updates immediately
-        const updatedProducts = offlineStorage.getProducts();
+        const updatedProducts = offlineStorage.getProductsByBranch(resolvedBranchId);
         dispatch({ type: 'SET_PRODUCTS', payload: updatedProducts as POSProduct[] });
       }
       
@@ -466,6 +480,7 @@ offlineStorage.saveProducts(cachedProducts);
 
       const payload = {
         customer_id: customerId ? parseInt(customerId) : null,
+        branch_id: Number(resolvedBranchId),
         guest_name: !customerId ? guestName : '',
         guest_phone: !customerId ? guestPhone : '',
         service_advisor_name: serviceAdvisorName,
@@ -516,6 +531,22 @@ offlineStorage.saveProducts(cachedProducts);
       showToast(`${errorMessage}${detailMessage}`, 'error');
     }
   };
+
+  if (isSuperAdmin) {
+    return (
+      <div className="flex h-[calc(100vh-4rem)] items-center justify-center bg-gray-100 p-6">
+        <div className="max-w-lg rounded-3xl border border-gray-200 bg-white p-8 text-center shadow-sm">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
+            <ShoppingCart className="h-8 w-8 text-gray-500" />
+          </div>
+          <h1 className="mb-2 text-2xl font-bold text-gray-900">POS is disabled for Super Admin</h1>
+          <p className="text-sm text-gray-500">
+            Transactions must be created by branch-assigned staff such as admin or cashier accounts. Super Admin can still review data globally from the dashboard and orders screens.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-gray-100 overflow-hidden">

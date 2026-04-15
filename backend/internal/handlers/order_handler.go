@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"smsystem-backend/internal/database"
 	"smsystem-backend/internal/models"
@@ -30,6 +31,7 @@ type orderItemInput struct {
 
 type orderInput struct {
 	CustomerID         *uint            `json:"customer_id"`
+	BranchID           *uint            `json:"branch_id"` // Explicit branch for super_admin orders
 	GuestName          string           `json:"guest_name"`
 	GuestPhone         string           `json:"guest_phone"`
 	ServiceAdvisorName string           `json:"service_advisor_name"`
@@ -110,6 +112,12 @@ func (h *OrderHandler) Create(c *gin.Context) {
 		orderStatus = input.Status
 	}
 
+	userRole, _ := c.Get("userRole")
+	if roleStr, ok := userRole.(string); ok && roleStr == "super_admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Super Admin cannot create POS transactions. Use a branch staff account."})
+		return
+	}
+
 	userIDValue, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
@@ -130,9 +138,18 @@ func (h *OrderHandler) Create(c *gin.Context) {
 	}
 
 	var order models.Order
-	bID := branchID
-	if bID == 0 {
-		bID = 1
+	var bID uint
+
+	// Use explicit branch_id from input if provided (super_admin must specify)
+	if input.BranchID != nil && *input.BranchID > 0 {
+		bID = *input.BranchID
+	} else if branchID > 0 {
+		// Non-super_admin users have a single branch
+		bID = branchID
+	} else {
+		// super_admin without explicit branch_id - reject instead of silently defaulting
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Branch ID is required. Please select a branch for this order."})
+		return
 	}
 	order.BranchID = bID
 	uID := userID
@@ -294,8 +311,8 @@ func (h *OrderHandler) Create(c *gin.Context) {
 					return fmt.Errorf("insufficient batch stock for %s during final deduction", product.Name)
 				}
 
-				if err := tx.Model(&product).Update("stock", product.Stock-item.Quantity).Error; err != nil {
-					return fmt.Errorf("failed to update product stock: %v", err)
+				if err := syncProductStock(tx, product.ID); err != nil {
+					return err
 				}
 			}
 		}
@@ -414,6 +431,12 @@ func (h *OrderHandler) UpdateStatus(c *gin.Context) {
 
 	oldStatus := order.Status
 
+	userRole, _ := c.Get("userRole")
+	if roleStr, ok := userRole.(string); ok && roleStr == "super_admin" && oldStatus == "pending" && input.Status == "completed" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Super Admin cannot complete POS transactions. Use a branch staff account."})
+		return
+	}
+
 	if oldStatus == "pending" && input.Status == "completed" {
 		err := database.DB.Transaction(func(tx *gorm.DB) error {
 
@@ -478,8 +501,8 @@ func (h *OrderHandler) UpdateStatus(c *gin.Context) {
 						return fmt.Errorf("insufficient batch stock for %s (need %d more)", product.Name, remainingToDeduct)
 					}
 
-					if err := tx.Model(&product).Update("stock", product.Stock-item.Quantity).Error; err != nil {
-						return errors.New("failed to update product stock cache for " + product.Name)
+					if err := syncProductStock(tx, product.ID); err != nil {
+						return err
 					}
 				}
 			}
@@ -537,13 +560,27 @@ func (h *OrderHandler) Delete(c *gin.Context) {
 				}
 
 				if !product.IsService {
-					if err := tx.Model(&product).Update("stock", gorm.Expr("stock + ?", item.Quantity)).Error; err != nil {
-						return fmt.Errorf("failed to restore stock for %s", product.Name)
+					warehouse, err := getOrCreateBranchWarehouse(tx, order.BranchID)
+					if err != nil {
+						return err
+					}
+
+					batchNumber := fmt.Sprintf("ORDER-DELETE-%d-%d", order.ID, time.Now().UnixNano())
+					restoreBatch := models.Batch{
+						ProductID:   product.ID,
+						WarehouseID: warehouse.ID,
+						BranchID:    order.BranchID,
+						BatchNumber: batchNumber,
+						Quantity:    item.Quantity,
+					}
+					if err := tx.Create(&restoreBatch).Error; err != nil {
+						return fmt.Errorf("failed to restore batch stock for %s: %v", product.Name, err)
 					}
 
 					movement := models.StockMovement{
 						ProductID:   product.ID,
-						WarehouseID: 1,
+						BatchID:     &restoreBatch.ID,
+						WarehouseID: warehouse.ID,
 						BranchID:    order.BranchID,
 						UserID:      &userID,
 						Type:        models.MovementTypeIn,
@@ -552,6 +589,10 @@ func (h *OrderHandler) Delete(c *gin.Context) {
 					}
 					if err := tx.Create(&movement).Error; err != nil {
 						return fmt.Errorf("failed to record stock movement: %v", err)
+					}
+
+					if err := syncProductStock(tx, product.ID); err != nil {
+						return err
 					}
 				}
 			}

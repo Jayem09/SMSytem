@@ -12,6 +12,7 @@ export interface LocalUser {
 export interface LocalOrder {
   id?: number;
   customerId?: number;
+  branchId?: number;
   customerName?: string;
   customerPhone?: string;
   guestName?: string;
@@ -83,6 +84,8 @@ const STORAGE_KEYS = {
   PENDING_POINTS_ADJUSTMENTS: 'pending_points_adjustments',
 };
 
+const BRANCH_PRODUCT_KEY_PREFIX = 'offline_products_branch_';
+
 export interface LocalProduct {
   id: number;
   name: string;
@@ -122,6 +125,10 @@ function getProducts(): LocalProduct[] {
   return getStoredArray<LocalProduct>(STORAGE_KEYS.PRODUCTS);
 }
 
+function getProductsByBranch(branchKey: string): LocalProduct[] {
+  return getStoredArray<LocalProduct>(`${BRANCH_PRODUCT_KEY_PREFIX}${branchKey}`);
+}
+
 function getCategories(): unknown[] {
   return getStoredArray<unknown>(STORAGE_KEYS.CATEGORIES);
 }
@@ -151,6 +158,10 @@ export const offlineStorage = {
   
   getOrders(): LocalOrder[] {
     return getOrders();
+  },
+  
+  saveOrders(orders: LocalOrder[]): void {
+    saveOrders(orders);
   },
   
   getUnsyncedOrders(): LocalOrder[] {
@@ -213,9 +224,17 @@ export const offlineStorage = {
   saveProducts(products: LocalProduct[]): void {
     localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(products));
   },
+
+  saveProductsByBranch(branchKey: string, products: LocalProduct[]): void {
+    localStorage.setItem(`${BRANCH_PRODUCT_KEY_PREFIX}${branchKey}`, JSON.stringify(products));
+  },
   
   getProducts(): LocalProduct[] {
     return getProducts();
+  },
+
+  getProductsByBranch(branchKey: string): LocalProduct[] {
+    return getProductsByBranch(branchKey);
   },
 
   saveCategories(categories: unknown[]): void {

@@ -51,6 +51,21 @@ type productInput struct {
 
 func (h *ProductHandler) List(c *gin.Context) {
 	branchID, _ := GetUintFromContext(c, "branchID")
+	userRole, _ := c.Get("userRole")
+
+	// For super_admin, allow explicit branch selection via query param
+	if userRole == "super_admin" {
+		branchQuery := c.Query("branch_id")
+		if branchQuery == "ALL" {
+			branchID = 0 // Global stock
+		} else if branchQuery != "" {
+			var bID uint
+			fmt.Sscanf(branchQuery, "%d", &bID)
+			if bID > 0 {
+				branchID = bID
+			}
+		}
+	}
 
 	var results []map[string]interface{}
 
@@ -240,9 +255,9 @@ func (h *ProductHandler) Create(c *gin.Context) {
 		}
 
 		if input.Stock > 0 && !input.IsService {
-			var warehouse models.Warehouse
-			if err := tx.Where("branch_id = ?", bID).First(&warehouse).Error; err != nil {
-				return fmt.Errorf("no warehouse found for this branch to store initial stock")
+			warehouse, err := getOrCreateBranchWarehouse(tx, bID)
+			if err != nil {
+				return err
 			}
 
 			batch := models.Batch{
@@ -276,7 +291,7 @@ func (h *ProductHandler) Create(c *gin.Context) {
 				return err
 			}
 		}
-		return nil
+		return syncProductStock(tx, product.ID)
 	})
 
 	if err != nil {
@@ -332,7 +347,6 @@ func (h *ProductHandler) Update(c *gin.Context) {
 	product.DOTCode = input.DOTCode
 	product.PlyRating = input.PlyRating
 	product.IsService = input.IsService
-	product.Stock = input.Stock
 	product.PointsRequired = input.PointsRequired
 	product.IsReward = input.IsReward
 
@@ -355,16 +369,12 @@ func (h *ProductHandler) Update(c *gin.Context) {
 			return err
 		}
 
-		if err := tx.Model(&product).UpdateColumn("stock", input.Stock).Error; err != nil {
-			return err
-		}
-
 		if !input.IsService && input.Stock != currentStock {
 			diff := input.Stock - currentStock
 
-			var warehouse models.Warehouse
-			if err := tx.Where("branch_id = ?", bID).First(&warehouse).Error; err != nil {
-				return fmt.Errorf("no warehouse found for this branch to store adjustment")
+			warehouse, err := getOrCreateBranchWarehouse(tx, bID)
+			if err != nil {
+				return err
 			}
 
 			batch := models.Batch{
@@ -398,7 +408,7 @@ func (h *ProductHandler) Update(c *gin.Context) {
 				return err
 			}
 		}
-		return nil
+		return syncProductStock(tx, product.ID)
 	})
 
 	if err != nil {

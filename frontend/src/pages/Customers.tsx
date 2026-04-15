@@ -96,6 +96,16 @@ export default function Customers() {
 
   useEffect(() => { fetchCustomers(); }, [fetchCustomers]);
   useEffect(() => { const t = setTimeout(fetchCustomers, 300); return () => clearTimeout(t); }, [fetchCustomers]);
+  
+  // Listen for sync completion to refetch
+  useEffect(() => {
+    const handleSyncComplete = () => {
+      console.log('[Customers] Sync completed, refetching...');
+      fetchCustomers();
+    };
+    window.addEventListener('sync_completed', handleSyncComplete);
+    return () => window.removeEventListener('sync_completed', handleSyncComplete);
+  }, [fetchCustomers]);
 
   const fetchHistory = async (customer: Customer) => {
     setSelectedCustomer(customer);
