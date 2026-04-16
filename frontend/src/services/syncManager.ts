@@ -117,13 +117,54 @@ function buildOrderSyncPayload(payload: Record<string, unknown>) {
   };
 }
 
+function buildTransferSyncPayload(payload: Record<string, unknown>) {
+  const items = Array.isArray(payload.items) ? payload.items : [];
+
+  return {
+    source_branch_id: toNumberValue(payload.source_branch_id ?? payload.sourceBranchId),
+    destination_branch_id: toNumberValue(payload.destination_branch_id ?? payload.destinationBranchId),
+    notes: toStringValue(payload.notes),
+    items: items
+      .filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null)
+      .map((item) => ({
+        product_id: toNumberValue(item.product_id),
+        quantity: toNumberValue(item.quantity, 1),
+      })),
+  };
+}
+
+function buildPurchaseOrderSyncPayload(payload: Record<string, unknown>) {
+  const items = Array.isArray(payload.items) ? payload.items : [];
+
+  return {
+    supplier_id: toOptionalUintValue(payload.supplier_id ?? payload.supplierId),
+    order_date: toStringValue(payload.order_date ?? payload.orderDate),
+    notes: toStringValue(payload.notes),
+    items: items
+      .filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null)
+      .map((item) => ({
+        product_id: toNumberValue(item.product_id),
+        quantity: toNumberValue(item.quantity, 1),
+        unit_cost: toNumberValue(item.unit_cost ?? item.unitCost),
+      })),
+  };
+}
+
+function buildExpenseSyncPayload(payload: Record<string, unknown>) {
+  return {
+    description: toStringValue(payload.description),
+    amount: toNumberValue(payload.amount),
+    category: toStringValue(payload.category),
+    expense_date: toStringValue(payload.expense_date ?? payload.expenseDate),
+    product_id: toOptionalUintValue(payload.product_id ?? payload.productId),
+    quantity: toNumberValue(payload.quantity),
+  };
+}
+
 async function syncOrderItem(item: SyncQueueItem): Promise<void> {
   const payload = buildOrderSyncPayload(item.payload);
   
-  console.log('[syncOrderItem] Sending order to server:', payload);
-  
   const response = await apiPost('/api/orders', payload);
-  console.log('[syncOrderItem] Server response:', response.status, response.data);
   
   const responseData = response.data as { order?: { id?: number }; id?: number; error?: string; details?: string };
   
@@ -168,6 +209,57 @@ async function syncCustomerItem(item: SyncQueueItem): Promise<void> {
   markCustomerQueueItemSynced(item, serverCustomerId ? String(serverCustomerId) : undefined);
 }
 
+async function syncTransferItem(item: SyncQueueItem): Promise<void> {
+  if (item.operation !== 'create') {
+    throw new Error(`Transfer sync does not support ${item.operation} operations`);
+  }
+
+  const payload = buildTransferSyncPayload(item.payload);
+  const response = await apiPost('/api/transfers', payload);
+  const responseData = response.data as { transfer?: { id?: number }; error?: string; details?: string };
+
+  if (response.status >= 400 || responseData.error) {
+    throw new Error(responseData.details || responseData.error || `Transfer sync failed with status ${response.status}`);
+  }
+
+  const serverTransferId = responseData.transfer?.id;
+  markQueueItemSynced(item.id, serverTransferId ? String(serverTransferId) : undefined);
+}
+
+async function syncPurchaseOrderItem(item: SyncQueueItem): Promise<void> {
+  if (item.operation !== 'create') {
+    throw new Error(`Purchase order sync does not support ${item.operation} operations`);
+  }
+
+  const payload = buildPurchaseOrderSyncPayload(item.payload);
+  const response = await apiPost('/api/purchase-orders', payload);
+  const responseData = response.data as { purchase_order?: { id?: number }; error?: string; details?: string };
+
+  if (response.status >= 400 || responseData.error) {
+    throw new Error(responseData.details || responseData.error || `Purchase order sync failed with status ${response.status}`);
+  }
+
+  const serverPurchaseOrderId = responseData.purchase_order?.id;
+  markQueueItemSynced(item.id, serverPurchaseOrderId ? String(serverPurchaseOrderId) : undefined);
+}
+
+async function syncExpenseItem(item: SyncQueueItem): Promise<void> {
+  if (item.operation !== 'create') {
+    throw new Error(`Expense sync does not support ${item.operation} operations`);
+  }
+
+  const payload = buildExpenseSyncPayload(item.payload);
+  const response = await apiPost('/api/expenses', payload);
+  const responseData = response.data as { id?: number; error?: string; details?: string };
+
+  if (response.status >= 400 || responseData.error) {
+    throw new Error(responseData.details || responseData.error || `Expense sync failed with status ${response.status}`);
+  }
+
+  const serverExpenseId = responseData.id;
+  markQueueItemSynced(item.id, serverExpenseId ? String(serverExpenseId) : undefined);
+}
+
 function syncLoyaltyAdjustmentItem(item: SyncQueueItem): void {
   // Loyalty points are now handled by the ORDER sync on the backend
   // (backend adds/deducts points when creating the order)
@@ -187,6 +279,21 @@ async function processQueueItem(item: SyncQueueItem): Promise<boolean> {
 
     if (item.entityType === 'customer') {
       await syncCustomerItem(item);
+      return true;
+    }
+
+    if (item.entityType === 'transfer') {
+      await syncTransferItem(item);
+      return true;
+    }
+
+    if (item.entityType === 'purchase_order') {
+      await syncPurchaseOrderItem(item);
+      return true;
+    }
+
+    if (item.entityType === 'expense') {
+      await syncExpenseItem(item);
       return true;
     }
 
@@ -225,14 +332,15 @@ async function processRunnableQueueItems(): Promise<{ processedCount: number; fa
   const priority: Record<string, number> = {
     customer: 0,
     order: 1,
-    loyalty_adjustment: 2,
+    transfer: 2,
+    purchase_order: 3,
+    expense: 4,
+    loyalty_adjustment: 5,
   };
 
   const sortedRunnableItems = [...runnableItems].sort(
     (a, b) => (priority[a.entityType] ?? 99) - (priority[b.entityType] ?? 99),
   );
-
-  console.log('[processRunnableQueueItems] Runnable items:', sortedRunnableItems.map(i => ({ id: i.id.slice(0,8), status: i.status, type: i.entityType, dependsOn: i.dependsOn })));
 
   if (sortedRunnableItems.length === 0) {
     return { processedCount: 0, failedCount: 0 };
@@ -255,11 +363,9 @@ async function processRunnableQueueItems(): Promise<{ processedCount: number; fa
     });
 
     if (!dependenciesSatisfied) {
-      console.log('[processRunnableQueueItems] Skipping item with unsatisfied dependencies:', freshItem.id.slice(0,8), freshItem.dependsOn);
       continue;
     }
 
-    console.log('[processRunnableQueueItems] Processing:', freshItem.id.slice(0,8), freshItem.entityType, freshItem.operation);
     const succeeded = await processQueueItem(freshItem);
     processedCount += 1;
 

@@ -15,6 +15,10 @@ import {
   enqueueSyncItem,
   findLatestEntitySyncItem,
 } from '../services/syncQueue';
+import {
+  mergeOfflineBranchProductsIntoPosData,
+  persistOfflineBranchStockDeduction,
+} from '../services/offlinePosStock';
 import { usePOS, type POSProduct } from '../hooks/usePOS';
 import { usePOSData } from '../hooks/useQueries';
 import { useAuth } from '../hooks/useAuth';
@@ -105,6 +109,12 @@ export default function POS() {
   const resolvedBranchId = user?.branch_id ? String(user.branch_id) : undefined;
 
   const { data: posData, isLoading: posLoading, error: posError, refetch } = usePOSData(resolvedBranchId);
+
+  type CachedPosData = {
+    products: POSProduct[];
+    categories: { id: number; name: string }[];
+    customers: Customer[];
+  };
 
   useEffect(() => {
     dispatch({ type: 'SET_LOADING', payload: posLoading });
@@ -335,25 +345,22 @@ export default function POS() {
       
       // Deduct stock from cached products so POS reflects correct quantities
       if (status === 'completed') {
-        const cachedProducts = offlineStorage.getProductsByBranch(resolvedBranchId);
-        console.log('[POS] Before stock deduction:', cachedProducts.map(p => ({ id: p.id, name: p.name, stock: p.branch_stock })));
-        for (const cartItem of cart) {
-          const pIdx = cachedProducts.findIndex(p => p.id === cartItem.id);
-          console.log('[POS] Cart item:', cartItem.id, cartItem.name, 'pIdx:', pIdx);
-          if (pIdx >= 0 && !cachedProducts[pIdx].is_service) {
-            cachedProducts[pIdx].branch_stock = Math.max(0, (cachedProducts[pIdx].branch_stock || 0) - cartItem.quantity);
-            console.log('[POS] Deducted', cartItem.quantity, 'from product', cachedProducts[pIdx].name, 'new stock:', cachedProducts[pIdx].branch_stock);
-          }
+        const updatedProducts = persistOfflineBranchStockDeduction(
+          resolvedBranchId,
+          cart.map((item) => ({ productId: item.id, quantity: item.quantity })),
+        );
+
+        const updatedPosData = mergeOfflineBranchProductsIntoPosData(
+          queryClient.getQueryData<CachedPosData>(['pos', 'data', resolvedBranchId]),
+          updatedProducts,
+        );
+
+        if (updatedPosData) {
+          queryClient.setQueryData(['pos', 'data', resolvedBranchId], updatedPosData);
+          dispatch({ type: 'SET_PRODUCTS', payload: updatedPosData.products });
+        } else {
+          dispatch({ type: 'SET_PRODUCTS', payload: updatedProducts as POSProduct[] });
         }
-        offlineStorage.saveProductsByBranch(resolvedBranchId, cachedProducts);
-        console.log('[POS] Deducted stock from cached products for offline order');
-        
-        // Force POS to re-render with updated stock - invalidate AND manually dispatch
-        queryClient.invalidateQueries({ queryKey: ['pos', 'data'] });
-        
-        // Also manually update the state from localStorage to ensure UI updates immediately
-        const updatedProducts = offlineStorage.getProductsByBranch(resolvedBranchId);
-        dispatch({ type: 'SET_PRODUCTS', payload: updatedProducts as POSProduct[] });
       }
       
       // Also set lastOrder so print works

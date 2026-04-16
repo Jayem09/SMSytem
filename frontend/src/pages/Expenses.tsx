@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import api from '../api/axios';
 import { useAuth } from '../hooks/useAuth';
+import { getIsOfflineMode } from '../context/AuthContext';
+import { enqueueSyncItem } from '../services/syncQueue';
+import { buildExpenseCreateQueueItem } from '../services/offlineQueueBuilders';
 
 interface Expense {
   id: number;
@@ -57,15 +60,63 @@ export default function Expenses() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const payload = {
+      ...formData,
+      amount: Number(formData.amount),
+      expense_date: new Date(formData.expense_date).toISOString(),
+      product_id: formData.category === 'Inventory' ? Number(formData.product_id) : null,
+      quantity: formData.category === 'Inventory' ? Number(formData.quantity) : 0,
+    };
+
     try {
-      await api.post('/api/expenses', {
-        ...formData,
-        amount: Number(formData.amount),
-        expense_date: new Date(formData.expense_date).toISOString(),
-        product_id: formData.category === 'Inventory' ? Number(formData.product_id) : null,
-        quantity: formData.category === 'Inventory' ? Number(formData.quantity) : 0
-      });
+      if (getIsOfflineMode()) {
+        enqueueSyncItem(buildExpenseCreateQueueItem({
+          description: payload.description,
+          amount: payload.amount,
+          category: payload.category,
+          expenseDate: payload.expense_date,
+          productId: payload.product_id,
+          quantity: payload.quantity,
+        }));
+
+        setExpenses((current) => [
+          {
+            id: Date.now(),
+            description: payload.description,
+            amount: payload.amount,
+            category: payload.category,
+            expense_date: payload.expense_date,
+            user_id: Number(user?.id ?? 0),
+            user: user?.name ? { name: user.name } : undefined,
+            product_id: payload.product_id ?? undefined,
+            quantity: payload.quantity,
+            product: payload.product_id ? products.find((product) => product.id === payload.product_id) : undefined,
+          },
+          ...current,
+        ]);
+        setIsModalOpen(false);
+        setFormData({
+          description: '',
+          amount: '',
+          category: 'Other',
+          expense_date: new Date().toISOString().split('T')[0],
+          product_id: '',
+          quantity: '',
+        });
+        return;
+      }
+
+      await api.post('/api/expenses', payload);
       setIsModalOpen(false);
+      setFormData({
+        description: '',
+        amount: '',
+        category: 'Other',
+        expense_date: new Date().toISOString().split('T')[0],
+        product_id: '',
+        quantity: '',
+      });
       fetchExpenses();
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'Operation failed');

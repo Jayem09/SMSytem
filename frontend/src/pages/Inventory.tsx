@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import api from '../api/axios';
+import { getIsOfflineMode } from '../context/AuthContext';
 import * as XLSX from 'xlsx';
 import { 
   Package, 
@@ -18,6 +19,8 @@ import { useToast } from '../context/ToastContext';
 import BatchHistoryModal from '../components/BatchHistoryModal';
 import { Activity, ChevronDown, ChevronUp } from 'lucide-react';
 import { SkeletonTable } from '../components/EmptyState';
+import { enqueueSyncItem } from '../services/syncQueue';
+import { buildPurchaseOrderCreateQueueItem } from '../services/offlineQueueBuilders';
 
 interface Warehouse {
   id: number;
@@ -258,6 +261,22 @@ export default function Inventory() {
           notes: reference,
           items: validItems
         };
+
+        if (getIsOfflineMode()) {
+          enqueueSyncItem(buildPurchaseOrderCreateQueueItem({
+            supplierId: payload.supplier_id,
+            orderDate: payload.order_date,
+            notes: payload.notes,
+            items: payload.items,
+          }));
+          showToast('Purchase order queued for sync when online!', 'success');
+          setSupplierId('');
+          setOrderDate(new Date().toISOString().split('T')[0]);
+          setReference('');
+          setItems([{ product_id: 0, quantity: 1, unit_cost: 0 }]);
+          return;
+        }
+
         await api.post('/api/purchase-orders', payload);
         showToast('Successfully created a new Pending Purchase Order!', 'success');
         

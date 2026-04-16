@@ -1,4 +1,11 @@
-export type SyncEntityType = 'order' | 'customer' | 'loyalty_adjustment';
+export type SyncEntityType =
+  | 'order'
+  | 'customer'
+  | 'loyalty_adjustment'
+  | 'transfer'
+  | 'purchase_order'
+  | 'expense'
+  | 'inventory_adjustment';
 
 export type SyncOperation = 'create' | 'update' | 'delete';
 
@@ -74,7 +81,15 @@ function isSyncOperation(value: unknown): value is SyncOperation {
 }
 
 function isSyncEntityType(value: unknown): value is SyncEntityType {
-  return typeof value === 'string' && ['order', 'customer', 'loyalty_adjustment'].includes(value);
+  return typeof value === 'string' && [
+    'order',
+    'customer',
+    'loyalty_adjustment',
+    'transfer',
+    'purchase_order',
+    'expense',
+    'inventory_adjustment',
+  ].includes(value);
 }
 
 function isConflictSnapshot(value: unknown): value is SyncConflictSnapshot | null {

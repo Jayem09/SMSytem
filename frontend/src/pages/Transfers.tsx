@@ -3,8 +3,11 @@ import { useAuth } from '../hooks/useAuth';
 import api from '../api/axios';
 import { Package, Plus, CheckCircle, Truck, XCircle, Search, Inbox } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
+import { getIsOfflineMode } from '../context/AuthContext';
 import Modal from '../components/Modal';
 import FormField from '../components/FormField';
+import { enqueueSyncItem } from '../services/syncQueue';
+import { buildTransferCreateQueueItem } from '../services/offlineQueueBuilders';
 
 interface Product {
   id: number;
@@ -152,13 +155,37 @@ export default function Transfers() {
       showToast('Please select a branch and add at least one item', 'error');
       return;
     }
+
+    if (!myBranchId) {
+      showToast('Your account does not have an assigned branch', 'error');
+      return;
+    }
+
+    const items = requestItems.map((item) => ({ product_id: item.product_id, quantity: item.quantity }));
+
+    if (getIsOfflineMode()) {
+      enqueueSyncItem(buildTransferCreateQueueItem({
+        sourceBranchId: parseInt(targetBranchId),
+        destinationBranchId: myBranchId,
+        notes,
+        items,
+      }));
+
+      setRequestModalOpen(false);
+      setRequestItems([]);
+      setNotes('');
+      setTargetBranchId('');
+      window.dispatchEvent(new Event('transfer_updated'));
+      showToast('Transfer request queued for sync when online', 'success');
+      return;
+    }
     
     try {
       await api.post('/api/transfers', {
         source_branch_id: parseInt(targetBranchId),
         destination_branch_id: myBranchId,
         notes: notes,
-        items: requestItems.map(item => ({ product_id: item.product_id, quantity: item.quantity }))
+        items,
       });
       setRequestModalOpen(false);
       fetchData();
