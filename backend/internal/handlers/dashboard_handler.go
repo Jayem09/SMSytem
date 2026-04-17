@@ -86,23 +86,50 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 	_ = dateFilter // unused for now but kept for future filtering
 
 	var totalSales float64
+	var totalCostOfGoods float64
 	var totalExpenses float64
 	var productCount int64
 	var orderCount int64
 	var customerCount int64
 
 	ordersQuery := database.DB.Model(&models.Order{})
+	completedOrdersQuery := database.DB.Model(&models.Order{}).Where("status = ?", "completed")
 	expensesQuery := database.DB.Model(&models.Expense{})
 	if branchID != 0 {
 		ordersQuery = ordersQuery.Where("branch_id = ?", branchID)
+		completedOrdersQuery = completedOrdersQuery.Where("branch_id = ?", branchID)
 		expensesQuery = expensesQuery.Where("branch_id = ?", branchID)
 	}
 
-	ordersQuery.Select("COALESCE(SUM(total_amount), 0)").Scan(&totalSales)
+	sumCompletedOrderCostOfGoods := func(extraWhere string, args ...interface{}) float64 {
+		var total float64
+
+		costQuery := database.DB.Table("order_items").
+			Select("COALESCE(SUM(order_items.quantity * COALESCE(products.cost_price, 0)), 0)").
+			Joins("JOIN orders ON orders.id = order_items.order_id").
+			Joins("JOIN products ON products.id = order_items.product_id").
+			Where("orders.status = ?", "completed")
+
+		if branchID != 0 {
+			costQuery = costQuery.Where("orders.branch_id = ?", branchID)
+		}
+
+		if extraWhere != "" {
+			costQuery = costQuery.Where(extraWhere, args...)
+		}
+
+		costQuery.Scan(&total)
+		return total
+	}
+
+	completedOrdersQuery.Select("COALESCE(SUM(total_amount), 0)").Scan(&totalSales)
+	totalCostOfGoods = sumCompletedOrderCostOfGoods("")
 	expensesQuery.Select("COALESCE(SUM(amount), 0)").Scan(&totalExpenses)
 	database.DB.Model(&models.Product{}).Count(&productCount)
-	ordersQuery.Count(&orderCount)
+	completedOrdersQuery.Count(&orderCount)
 	database.DB.Model(&models.Customer{}).Count(&customerCount)
+
+	summary := buildDashboardSummary(totalSales, totalCostOfGoods, totalExpenses)
 
 	var salesTrend []DailySale
 	ordersQuery.Select("DATE(created_at) as date, SUM(total_amount) as amount").
@@ -224,6 +251,7 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 	// (Product revenue is fetched earlier in this function)
 
 	var currentSales, prevSales float64
+	var currentCostOfGoods, prevCostOfGoods float64
 	var currentExpenses, prevExpenses float64
 
 	cmStart := "DATE_FORMAT(NOW() ,'%Y-%m-01')"
@@ -232,6 +260,7 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 	pmEnd := "LAST_DAY(DATE_SUB(NOW(), INTERVAL 1 MONTH))"
 
 	ordersQuery.Where("created_at >= " + cmStart + " AND status = 'completed'").Select("COALESCE(SUM(total_amount), 0)").Scan(&currentSales)
+	currentCostOfGoods = sumCompletedOrderCostOfGoods("orders.created_at >= " + cmStart)
 	database.DB.Model(&models.Order{}).
 		Where(func() string {
 			if branchID != 0 {
@@ -241,6 +270,7 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 		}(), branchID).
 		Where("created_at BETWEEN " + pmStart + " AND " + pmEnd + " AND status = 'completed'").
 		Select("COALESCE(SUM(total_amount), 0)").Scan(&prevSales)
+	prevCostOfGoods = sumCompletedOrderCostOfGoods("orders.created_at BETWEEN " + pmStart + " AND " + pmEnd)
 
 	expensesQuery.Where("created_at >= " + cmStart).Select("COALESCE(SUM(amount), 0)").Scan(&currentExpenses)
 
@@ -273,14 +303,14 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 	salesChange := calculateChange(currentSales, prevSales)
 	expensesChange := calculateChange(currentExpenses, prevExpenses)
 
-	currentProfit := currentSales - currentExpenses
-	prevProfit := prevSales - prevExpenses
+	currentProfit := currentSales - currentCostOfGoods - currentExpenses
+	prevProfit := prevSales - prevCostOfGoods - prevExpenses
 	profitChange := calculateChange(currentProfit, prevProfit)
 
 	c.JSON(http.StatusOK, gin.H{
-		"total_sales":        totalSales,
-		"total_expenses":     totalExpenses,
-		"net_profit":         totalSales - totalExpenses,
+		"total_sales":        summary.TotalSales,
+		"total_expenses":     summary.TotalExpenses,
+		"net_profit":         summary.NetProfit,
 		"sales_change":       salesChange,
 		"expenses_change":    expensesChange,
 		"profit_change":      profitChange,

@@ -41,12 +41,10 @@ function SummaryCard({ label, value, icon: Icon, tone }: SummaryCardProps) {
 export default function SyncCenter() {
   const [queue, setQueue] = useState<SyncQueueItem[]>(() => getSyncQueue());
   const [selectedConflict, setSelectedConflict] = useState<SyncQueueItem | null>(null);
-  const [lastRefresh, setLastRefresh] = useState(Date.now());
 
   const refreshQueue = () => {
     const newQueue = getSyncQueue();
     setQueue(newQueue);
-    setLastRefresh(Date.now());
     console.log('[SyncCenter] Refreshed at', new Date().toLocaleTimeString(), '- items:', newQueue.map(i => ({ id: i.id.slice(0,8), status: i.status })));
   };
 

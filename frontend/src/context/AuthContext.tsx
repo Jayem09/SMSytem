@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, type ReactNode } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import api from '../api/axios';
 import { AuthContext, type User } from './AuthContextObject';
-import offlineStorage, { type LocalProduct, type LocalCustomer } from '../services/offlineStorage';
+import offlineStorage, { type LocalProduct } from '../services/offlineStorage';
 import { startSyncManager } from '../services/syncManager';
 
 // Cache for offline login - stores multiple user profiles by email
@@ -52,16 +52,19 @@ function getCachedUser(email: string): CachedUser | null {
   return profiles[email.toLowerCase()] || null;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export { getCachedUser };
 
 // Global flag to track offline mode
 let isOfflineMode = false;
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function setOfflineMode(offline: boolean) {
   isOfflineMode = offline;
 }
 
 // Getter for other components/hooks to check offline status
+// eslint-disable-next-line react-refresh/only-export-components
 export function getIsOfflineMode(): boolean {
   return isOfflineMode;
 }
@@ -217,14 +220,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       offlineStorage.saveCategories(categories);
       
       // Deduplicate customers by phone number before saving
-      const uniqueCustomersMap = new Map();
-      (serverCustomers as any[]).forEach((c: any) => {
-        const phone = c.phone || '';
+      const uniqueCustomersMap = new Map<string, object>();
+      (serverCustomers as object[]).forEach((c) => {
+        const customer = c as Record<string, unknown>;
+        const phone = String(customer.phone || '');
         if (phone && !uniqueCustomersMap.has(phone)) {
           uniqueCustomersMap.set(phone, {
-            ...c,
-            rfidCardId: c.rfid_card_id,
-            loyaltyPoints: c.loyalty_points ?? 0,
+            ...customer,
+            rfidCardId: customer.rfid_card_id,
+            loyaltyPoints: (customer.loyalty_points as number) ?? 0,
             synced: true,
           });
         }

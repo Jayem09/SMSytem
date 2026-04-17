@@ -9,7 +9,7 @@ import { printDeliveryReceipt } from '../components/DeliveryReceipt';
 import { getIsOfflineMode } from '../context/AuthContext';
 import offlineStorage, { type LocalOrder } from '../services/offlineStorage';
 
-interface Customer { id: number; name: string; }
+interface Customer { id: number; name: string; phone?: string; }
 interface Product { id: number; name: string; price: number; branch_stock: number; stock?: number; is_service?: boolean; }
 interface OrderItem {
   id: number;
@@ -18,6 +18,7 @@ interface OrderItem {
   unit_price: number;
   subtotal: number;
   product?: Product;
+  product_name?: string;
 }
 interface Order {
   id: number;
@@ -35,6 +36,16 @@ interface Order {
   created_at: string;
   customer?: Customer;
   items?: OrderItem[];
+}
+
+// Local offline item shape from parsed JSON
+interface RawOfflineItem {
+  id?: number;
+  product_id?: number;
+  product_name?: string;
+  quantity?: number;
+  unit_price?: number;
+  [key: string]: unknown;
 }
 
 const statusColors: Record<string, string> = {
@@ -67,7 +78,7 @@ export default function Orders() {
           // Transform to match Order interface (totalAmount -> total_amount)
           const transformed = (cached || []).map((o: LocalOrder) => {
             // Parse items and add computed fields
-            let items: any[] = [];
+            let items: RawOfflineItem[] = [];
             try {
               items = o.items ? JSON.parse(o.items) : [];
               // Add computed fields for display
@@ -142,11 +153,11 @@ export default function Orders() {
     if (getIsOfflineMode()) {
       const allCached = offlineStorage.getOrders();
       const cached = allCached.filter(o => !o.synced);
-      const transformed = (cached || []).map((o: LocalOrder) => {
-        let items: any[] = [];
-        try {
-          items = o.items ? JSON.parse(o.items) : [];
-          items = items.map((item, idx) => ({
+        const transformed = (cached || []).map((o: LocalOrder) => {
+          let items: RawOfflineItem[] = [];
+          try {
+            items = o.items ? JSON.parse(o.items) : [];
+            items = items.map((item, idx) => ({
             ...item,
             id: item.id || idx,
             product: { name: item.product_name || `Product #${item.product_id}` },
@@ -223,7 +234,7 @@ export default function Orders() {
     // Ensure items have required fields for receipt
     const orderForReceipt = {
       ...order,
-      items: (order.items || []).map((item: any) => ({
+      items: (order.items || []).map((item: OrderItem) => ({
         ...item,
         unit_price: item.unit_price ?? item.price ?? 0,
         subtotal: item.subtotal ?? ((item.quantity || 0) * (item.unit_price ?? item.price ?? 0)),
@@ -231,10 +242,10 @@ export default function Orders() {
       })),
     };
     
-    if ((order as any).receipt_type === 'SI') {
-      await printReceipt(orderForReceipt, (order as any).tin || '', (order as any).business_address || '', (order as any).withholding_tax_rate || 0);
+    if (order.receipt_type === 'SI') {
+      await printReceipt(orderForReceipt, order.tin || '', order.business_address || '', order.withholding_tax_rate || 0);
     } else {
-      await printDeliveryReceipt(orderForReceipt, (order as any).tin || '', (order as any).business_address || '', (order as any).withholding_tax_rate || 0);
+      await printDeliveryReceipt(orderForReceipt, order.tin || '', order.business_address || '', order.withholding_tax_rate || 0);
     }
   };
 
@@ -341,7 +352,7 @@ export default function Orders() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {selectedOrder.items?.map((item: any, idx: number) => (
+                  {selectedOrder.items?.map((item: OrderItem, idx: number) => (
                     <tr key={item?.id || idx} className="hover:bg-gray-50/50 transition-colors">
                       <td className="py-4 px-4 text-gray-900 font-bold">{item?.product?.name || item?.product_name || `Product #${item?.product_id || 'N/A'}`}</td>
                       <td className="py-4 px-4 text-gray-600 text-center font-medium">{item?.quantity || 0}</td>
@@ -358,18 +369,18 @@ export default function Orders() {
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500 font-medium">Subtotal</span>
                   <span className="text-gray-900 font-bold">
-                    ₱{selectedOrder.items?.reduce((sum: number, item: any) => sum + (item?.subtotal ?? 0), 0).toLocaleString()}
+                    ₱{selectedOrder.items?.reduce((sum: number, item: OrderItem) => sum + (item?.subtotal ?? 0), 0).toLocaleString()}
                   </span>
                 </div>
-                {((selectedOrder as any)?.discount_amount ?? 0) > 0 && (
+                {(selectedOrder?.discount_amount ?? 0) > 0 && (
                   <div className="flex justify-between text-sm text-red-600">
                     <span className="font-medium">Discount</span>
-                    <span className="font-bold">-₱{((selectedOrder as any)?.discount_amount ?? 0).toLocaleString()}</span>
+                    <span className="font-bold">-₱{(selectedOrder?.discount_amount ?? 0).toLocaleString()}</span>
                   </div>
                 )}
                 <div className="flex justify-between items-center pt-3 border-t border-gray-100">
                   <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Paid</span>
-                  <span className="text-2xl font-black text-gray-900 tracking-tighter">₱{((selectedOrder as any)?.total_amount ?? 0).toLocaleString()}</span>
+                  <span className="text-2xl font-black text-gray-900 tracking-tighter">₱{(selectedOrder?.total_amount ?? 0).toLocaleString()}</span>
                 </div>
               </div>
             </div>

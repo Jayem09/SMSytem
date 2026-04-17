@@ -112,30 +112,8 @@ func (h *OrderHandler) Create(c *gin.Context) {
 		orderStatus = input.Status
 	}
 
-	userRole, _ := c.Get("userRole")
-	if roleStr, ok := userRole.(string); ok && roleStr == "super_admin" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Super Admin cannot create POS transactions. Use a branch staff account."})
-		return
-	}
-
-	userIDValue, exists := c.Get("userID")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
-		return
-	}
-
 	branchID, _ := GetUintFromContext(c, "branchID")
 	userID, _ := GetUintFromContext(c, "userID")
-
-	_ = userIDValue
-
-	if input.CustomerID != nil && *input.CustomerID > 0 {
-		var customer models.Customer
-		if err := database.DB.First(&customer, *input.CustomerID).Error; err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Customer not found"})
-			return
-		}
-	}
 
 	var order models.Order
 	var bID uint
@@ -430,12 +408,6 @@ func (h *OrderHandler) UpdateStatus(c *gin.Context) {
 	}
 
 	oldStatus := order.Status
-
-	userRole, _ := c.Get("userRole")
-	if roleStr, ok := userRole.(string); ok && roleStr == "super_admin" && oldStatus == "pending" && input.Status == "completed" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Super Admin cannot complete POS transactions. Use a branch staff account."})
-		return
-	}
 
 	if oldStatus == "pending" && input.Status == "completed" {
 		err := database.DB.Transaction(func(tx *gorm.DB) error {

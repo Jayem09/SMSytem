@@ -42,11 +42,14 @@ import { setOfflineMode } from './context/AuthContext';
 import offlineStorage from './services/offlineStorage';
 
 function App() {
+  const OFFLINE_SCREEN_FAILURE_THRESHOLD = 2;
+
   // Startup health check to auto-retry until backend is online
   const [booting, setBooting] = useState(true);
   const [backendOnline, setBackendOnline] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'checking' | 'online' | 'offline'>('checking');
   const [offlineModeActive, setOfflineModeActive] = useState(false);
+  const [consecutiveConnectionFailures, setConsecutiveConnectionFailures] = useState(0);
 
   useEffect(() => {
     let retryInterval: ReturnType<typeof setInterval>;
@@ -55,15 +58,18 @@ function App() {
         // Wait up to 5 seconds for connection
         const connected = await waitForConnection(5000);
         if (connected) {
+          setConsecutiveConnectionFailures(0);
           setConnectionStatus('online');
           setBackendOnline(true);
           setBooting(false);
         } else {
           // Show offline option after timeout
+          setConsecutiveConnectionFailures(OFFLINE_SCREEN_FAILURE_THRESHOLD);
           setConnectionStatus('offline');
           setBooting(false);
         }
       } catch {
+        setConsecutiveConnectionFailures(OFFLINE_SCREEN_FAILURE_THRESHOLD);
         setConnectionStatus('offline');
         setBooting(false);
       }
@@ -89,6 +95,7 @@ function App() {
         // Clear offline mode flags
         setOfflineMode(false);
         setUserOfflineMode(false);
+        setConsecutiveConnectionFailures(0);
         setConnectionStatus('online');
         setBackendOnline(true);
 
@@ -107,22 +114,39 @@ function App() {
     return () => clearInterval(checkInterval);
   }, [offlineModeActive]);
 
-  // Also continuously check connection even when online - to auto-detect going offline
+  // Continuously check connection whenever the user has not explicitly entered offline mode.
+  // This avoids false "server unavailable" screens from a single flaky health check and
+  // also allows automatic recovery if the warning screen is showing.
   useEffect(() => {
+    if (booting || offlineModeActive) return;
+
     const connectionCheckInterval = setInterval(async () => {
-      // Only check if we're showing as online and not already in offline mode
-      if (connectionStatus === 'online' && !offlineModeActive) {
-        const connected = await checkServerConnection();
-        if (!connected) {
-          console.log('[App] Connection lost! Showing offline screen...');
+      const connected = await checkServerConnection();
+
+      if (connected) {
+        setConsecutiveConnectionFailures(0);
+        setConnectionStatus('online');
+        setBackendOnline(true);
+        return;
+      }
+
+      setConsecutiveConnectionFailures((previousFailures) => {
+        const nextFailures = previousFailures + 1;
+
+        if (nextFailures >= OFFLINE_SCREEN_FAILURE_THRESHOLD) {
+          console.log('[App] Connection lost after consecutive failed checks. Showing offline screen...');
           setConnectionStatus('offline');
           setBackendOnline(false);
+        } else {
+          console.log('[App] Connection check failed once. Waiting for confirmation before showing offline screen...');
         }
-      }
+
+        return nextFailures;
+      });
     }, 5000);
 
     return () => clearInterval(connectionCheckInterval);
-  }, [connectionStatus, offlineModeActive]);
+  }, [booting, offlineModeActive]);
 
   // Startup screen conditions
   if (booting) {
@@ -149,6 +173,7 @@ function App() {
           // Set offline mode FIRST
           setOfflineMode(true);
           setUserOfflineMode(true); // User explicitly chose offline
+          setConsecutiveConnectionFailures(0);
           console.log('[App] setOfflineMode(true) called');
 
           // Start reconnection checker (to auto-detect when internet is back)

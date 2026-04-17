@@ -9,6 +9,7 @@ import { useDataFetch } from '../hooks/useDataFetch';
 
 interface Category { id: number; name: string; }
 interface Brand { id: number; name: string; }
+interface Supplier { id: number; name: string; }
 interface Product {
   id: number;
   name: string;
@@ -22,8 +23,10 @@ interface Product {
   parent_id?: number;
   category_id: number;
   brand_id: number;
+  primary_supplier_id?: number;
   category?: Category;
   brand?: Brand;
+  supplier?: Supplier;
   
   pcd?: string;
   offset_et?: string;
@@ -46,6 +49,7 @@ export default function Products() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
@@ -65,6 +69,7 @@ export default function Products() {
   const [parentId, setParentId] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [brandId, setBrandId] = useState('');
+  const [supplierId, setSupplierId] = useState('');
   const [isService, setIsService] = useState(false);
 
   
@@ -104,8 +109,9 @@ export default function Products() {
     queryFn: () => Promise.all([
       api.get('/api/categories'),
       api.get('/api/brands'),
-    ]).then(([catRes, brandRes]) => ({
-      data: { categories: catRes.data.categories, brands: brandRes.data.brands },
+      api.get('/api/suppliers'),
+    ]).then(([catRes, brandRes, supRes]) => ({
+      data: { categories: catRes.data.categories, brands: brandRes.data.brands, suppliers: supRes.data.suppliers || [] },
       status: catRes.status,
       statusText: catRes.statusText,
       headers: {},
@@ -122,9 +128,10 @@ export default function Products() {
 
   useEffect(() => {
     if (metaData) {
-      const data = metaData as { categories?: Category[]; brands?: Brand[] };
+      const data = metaData as { categories?: Category[]; brands?: Brand[]; suppliers?: Supplier[] };
       setCategories(data.categories || []);
       setBrands(data.brands || []);
+      setSuppliers(data.suppliers || []);
     }
   }, [metaData]);
 
@@ -136,7 +143,7 @@ export default function Products() {
     setEditing(null);
     setName(''); setDescription(''); setPrice(''); setCostPrice(''); setStock('0');
     setSize(''); setParentId('');
-    setCategoryId(''); setBrandId('');
+    setCategoryId(''); setBrandId(''); setSupplierId('');
     setIsService(false);
     
     setPcd(''); setOffsetEt(''); setWidth(''); setBore(''); setFinish('');
@@ -161,6 +168,7 @@ export default function Products() {
     setParentId(p.parent_id ? String(p.parent_id) : '');
     setCategoryId(String(p.category_id));
     setBrandId(String(p.brand_id));
+    setSupplierId(p.primary_supplier_id ? String(p.primary_supplier_id) : '');
     setIsService(!!p.is_service);
     
     setPcd(p.pcd || ''); setOffsetEt(p.offset_et || ''); setWidth(p.width || '');
@@ -188,6 +196,7 @@ export default function Products() {
       parent_id: parentId ? parseInt(parentId) : null,
       category_id: parseInt(categoryId),
       brand_id: parseInt(brandId),
+      primary_supplier_id: supplierId ? parseInt(supplierId) : null,
       is_service: isService,
       pcd,
       offset_et: offsetEt,
@@ -389,6 +398,18 @@ export default function Products() {
                   options={brands.map((b) => ({ value: b.id, label: b.name }))}
                 />
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <FormField
+                  label="Primary Supplier (Optional)"
+                  type="select"
+                  value={supplierId}
+                  onChange={setSupplierId}
+                  options={[
+                    { value: '', label: 'No supplier' },
+                    ...suppliers.map((s) => ({ value: s.id, label: s.name }))
+                  ]}
+                />
+              </div>
 
                <div className="mt-4 flex items-center gap-2">
                  <input 
@@ -489,6 +510,10 @@ export default function Products() {
               <div>
                 <p className="text-xs font-medium text-gray-500 uppercase">Brand</p>
                 <p className="text-sm text-gray-900">{viewingProduct.brand?.name || '--'}</p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase">Primary Supplier</p>
+                <p className="text-sm text-gray-900">{(viewingProduct as any).supplier_name || viewingProduct.primary_supplier_id || '--'}</p>
               </div>
             </div>
 

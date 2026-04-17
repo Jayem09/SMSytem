@@ -1,9 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
 import { get, post, put, del } from '../api/axios';
 import type { QueryParams } from '../types/api';
 import { getIsOfflineMode } from '../context/AuthContext';
-import offlineStorage, { type LocalProduct } from '../services/offlineStorage';
+import offlineStorage from '../services/offlineStorage';
 
 export function useProductsQuery(params?: QueryParams) {
   return useQuery({
@@ -194,21 +193,25 @@ export function usePOSData(branchId?: string) {
           const rawCustomers = (custRes.data as { customers?: unknown[] }).customers || [];
           
           // Transform products to match POS format
-          const products = (rawProducts as any[]).map((p: any) => ({
-            ...p,
-            branch_stock: Number(p.branch_stock ?? 0),
-            category: categories.find((c: any) => c.id === p.category_id) || null,
-          }));
+          const products = (rawProducts as object[]).map((p) => {
+            const prod = p as Record<string, unknown>;
+            return {
+              ...prod,
+              branch_stock: Number(prod.branch_stock ?? 0),
+              category: (categories as { id: number }[]).find((c) => c.id === prod.category_id) || null,
+            };
+          });
           
           // Deduplicate and save customers
-          const uniqueCustomersMap = new Map();
-          (rawCustomers as any[]).forEach((c: any) => {
-            const phone = c.phone || '';
+          const uniqueCustomersMap = new Map<string, object>();
+          (rawCustomers as object[]).forEach((c) => {
+            const cust = c as Record<string, unknown>;
+            const phone = String(cust.phone || '');
             if (phone && !uniqueCustomersMap.has(phone)) {
               uniqueCustomersMap.set(phone, {
-                ...c,
-                rfidCardId: c.rfid_card_id,
-                loyaltyPoints: c.loyalty_points ?? 0,
+                ...cust,
+                rfidCardId: cust.rfid_card_id,
+                loyaltyPoints: (cust.loyalty_points as number) ?? 0,
                 synced: true,
               });
             }
@@ -234,10 +237,13 @@ export function usePOSData(branchId?: string) {
       // OFFLINE or API failed - load from cached storage
       const products = offlineStorage.getProductsByBranch(branchId);
       
-      const productsWithCategory = products.map((p: any) => ({
-        ...p,
-        category: categories.find((c: any) => c.id === p.category_id) || null,
-      }));
+      const productsWithCategory = products.map((p) => {
+        const prod = p as Record<string, unknown>;
+        return {
+          ...prod,
+          category: (categories as { id: number }[]).find((c) => c.id === prod.category_id) || null,
+        };
+      });
       
       return {
         products: productsWithCategory,
@@ -254,5 +260,8 @@ export function usePOSData(branchId?: string) {
 export function findCustomerByRfid(rfidCode: string) {
   const customers = offlineStorage.getCustomers();
   // Look for RFID match in cached customers
-  return customers.find((c: any) => c.rfid_card_id === rfidCode || c.rfidCardId === rfidCode);
+  return customers.find((c) => {
+    const cust = c as Record<string, unknown>;
+    return cust.rfid_card_id === rfidCode || cust.rfidCardId === rfidCode;
+  });
 }

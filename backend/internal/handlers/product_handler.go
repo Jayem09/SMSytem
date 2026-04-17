@@ -44,9 +44,10 @@ type productInput struct {
 	DOTCode     string `json:"dot_code"`
 	PlyRating   string `json:"ply_rating"`
 
-	IsService      bool `json:"is_service"`
-	PointsRequired int  `json:"points_required"`
-	IsReward       bool `json:"is_reward"`
+	IsService         bool  `json:"is_service"`
+	PointsRequired    int   `json:"points_required"`
+	IsReward          bool  `json:"is_reward"`
+	PrimarySupplierID *uint `json:"primary_supplier_id"`
 }
 
 func (h *ProductHandler) List(c *gin.Context) {
@@ -77,10 +78,11 @@ func (h *ProductHandler) List(c *gin.Context) {
 				p.primary_supplier_id, p.is_service, p.pcd, p.offset_et, p.width, p.bore, p.finish,
 				p.speed_rating, p.load_index, p.dot_code, p.ply_rating, p.points_required, p.is_reward,
 				p.created_at, p.updated_at,
-				c.name as category_name, br.name as brand_name
+				c.name as category_name, br.name as brand_name, s.name as supplier_name
 			FROM products p 
 			LEFT JOIN categories c ON p.category_id = c.id
 			LEFT JOIN brands br ON p.brand_id = br.id
+			LEFT JOIN suppliers s ON p.primary_supplier_id = s.id
 			LEFT JOIN (
 				SELECT product_id, SUM(quantity) as quantity 
 				FROM batches 
@@ -103,10 +105,11 @@ func (h *ProductHandler) List(c *gin.Context) {
 				p.primary_supplier_id, p.is_service, p.pcd, p.offset_et, p.width, p.bore, p.finish,
 				p.speed_rating, p.load_index, p.dot_code, p.ply_rating, p.points_required, p.is_reward,
 				p.created_at, p.updated_at,
-				c.name as category_name, br.name as brand_name
+				c.name as category_name, br.name as brand_name, s.name as supplier_name
 			FROM products p 
 			LEFT JOIN categories c ON p.category_id = c.id
 			LEFT JOIN brands br ON p.brand_id = br.id
+			LEFT JOIN suppliers s ON p.primary_supplier_id = s.id
 			LEFT JOIN (
 				SELECT product_id, SUM(quantity) as quantity 
 				FROM batches 
@@ -218,28 +221,29 @@ func (h *ProductHandler) Create(c *gin.Context) {
 	}
 
 	product := models.Product{
-		Name:           input.Name,
-		Description:    input.Description,
-		Price:          input.Price,
-		CostPrice:      input.CostPrice,
-		Stock:          input.Stock,
-		Size:           input.Size,
-		ParentID:       input.ParentID,
-		ImageURL:       input.ImageURL,
-		CategoryID:     input.CategoryID,
-		BrandID:        input.BrandID,
-		PCD:            input.PCD,
-		OffsetET:       input.OffsetET,
-		Width:          input.Width,
-		Bore:           input.Bore,
-		Finish:         input.Finish,
-		SpeedRating:    input.SpeedRating,
-		LoadIndex:      input.LoadIndex,
-		DOTCode:        input.DOTCode,
-		PlyRating:      input.PlyRating,
-		IsService:      input.IsService,
-		PointsRequired: input.PointsRequired,
-		IsReward:       input.IsReward,
+		Name:              input.Name,
+		Description:       input.Description,
+		Price:             input.Price,
+		CostPrice:         input.CostPrice,
+		Stock:             input.Stock,
+		Size:              input.Size,
+		ParentID:          input.ParentID,
+		ImageURL:          input.ImageURL,
+		CategoryID:        input.CategoryID,
+		BrandID:           input.BrandID,
+		PCD:               input.PCD,
+		OffsetET:          input.OffsetET,
+		Width:             input.Width,
+		Bore:              input.Bore,
+		Finish:            input.Finish,
+		SpeedRating:       input.SpeedRating,
+		LoadIndex:         input.LoadIndex,
+		DOTCode:           input.DOTCode,
+		PlyRating:         input.PlyRating,
+		IsService:         input.IsService,
+		PointsRequired:    input.PointsRequired,
+		IsReward:          input.IsReward,
+		PrimarySupplierID: input.PrimarySupplierID,
 	}
 
 	bID, _ := GetUintFromContext(c, "branchID")

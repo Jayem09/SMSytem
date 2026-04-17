@@ -19,6 +19,7 @@ import {
   mergeOfflineBranchProductsIntoPosData,
   persistOfflineBranchStockDeduction,
 } from '../services/offlinePosStock';
+import { invalidateDashboardQueries } from '../services/dashboardRefresh';
 import { usePOS, type POSProduct } from '../hooks/usePOS';
 import { usePOSData } from '../hooks/useQueries';
 import { useAuth } from '../hooks/useAuth';
@@ -530,6 +531,7 @@ export default function POS() {
       setDiscount('0');
       setSelectedReward(null);
 
+      await invalidateDashboardQueries(queryClient);
       fetchData();
     } catch (err: unknown) {
       const axiosError = err as { response?: { data?: { error?: string, details?: string } } };

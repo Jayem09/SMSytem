@@ -93,16 +93,6 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 
-	// Debug - add route BEFORE everything else
-	router.GET("/api/firsttest", func(c *gin.Context) {
-		c.JSON(200, gin.H{"message": "first test works"})
-	})
-
-	// Catch-all for debugging
-	router.GET("/api/catchall", func(c *gin.Context) {
-		c.JSON(200, gin.H{"path": c.Request.URL.Path, "matched": "yes"})
-	})
-
 	router.Use(gin.Recovery())
 	router.Use(middleware.MetricsMiddleware())
 

@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import api from '../api/axios';
 import GlobalSearch from './GlobalSearch';
 import { getIsOfflineMode } from '../context/AuthContext';
+import { getBranchDisplayName } from '../utils/branchDisplay';
 
 const allNavItems = [
   { to: '/dashboard', label: 'Dashboard', roles: ['super_admin', 'admin', 'cashier', 'purchasing', 'purchaser'] },
@@ -214,7 +215,7 @@ export default function Layout() {
           <div className="flex items-center gap-4">
             <div className="text-right hidden md:block">
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{new Date().toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}</p>
-              <p className="text-xs font-bold text-gray-900">{user?.branch?.name || 'Main Office'}</p>
+              <p className="text-xs font-bold text-gray-900">{getBranchDisplayName(user)}</p>
             </div>
           </div>
         </header>

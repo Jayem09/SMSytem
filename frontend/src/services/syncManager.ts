@@ -14,6 +14,7 @@ import {
   markQueueItemSyncing,
 } from './syncQueue';
 import { queryClient } from '../lib/queryClient';
+import { invalidateDashboardQueries } from './dashboardRefresh';
 
 const SYNC_INTERVAL = 3000; // 3 seconds - fast enough for small sync queue
 
@@ -432,6 +433,7 @@ export async function performFullSync(): Promise<{ success: boolean; error?: str
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
+      invalidateDashboardQueries(queryClient);
       
       // Dispatch custom event for pages that don't use React Query
       window.dispatchEvent(new CustomEvent('sync_completed', { detail: { success: true } }));

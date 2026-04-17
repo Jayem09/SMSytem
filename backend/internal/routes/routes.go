@@ -1,7 +1,6 @@
 package routes
 
 import (
-	"log"
 	"net/http"
 
 	"smsystem-backend/internal/config"
@@ -247,11 +246,6 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 	}
 
 	router.Use(static.Serve("/", static.LocalFile("./public", true)))
-
-	router.GET("/api/zzztest", func(c *gin.Context) {
-		log.Println("=== ZZZ TEST ROUTE HIT ===")
-		c.JSON(200, gin.H{"message": "zzz test works"})
-	})
 
 	router.NoRoute(func(c *gin.Context) {
 		c.File("./public/index.html")

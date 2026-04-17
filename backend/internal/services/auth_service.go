@@ -13,16 +13,13 @@ import (
 	"gorm.io/gorm"
 )
 
-
 type AuthService struct {
 	Config *config.Config
 }
 
-
 func NewAuthService(cfg *config.Config) *AuthService {
 	return &AuthService{Config: cfg}
 }
-
 
 type RegisterInput struct {
 	Name     string `json:"name" binding:"required,min=2,max=100"`
@@ -30,21 +27,18 @@ type RegisterInput struct {
 	Password string `json:"password" binding:"required,min=6"`
 }
 
-
 type LoginInput struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required"`
 }
-
 
 type AuthResponse struct {
 	Token string      `json:"token"`
 	User  models.User `json:"user"`
 }
 
-
 func (s *AuthService) Register(input RegisterInput) (*AuthResponse, error) {
-	
+
 	var existing models.User
 	result := database.DB.Where("email = ?", input.Email).First(&existing)
 	if result.Error == nil {
@@ -54,7 +48,6 @@ func (s *AuthService) Register(input RegisterInput) (*AuthResponse, error) {
 		return nil, result.Error
 	}
 
-	
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, errors.New("failed to hash password")
@@ -63,7 +56,7 @@ func (s *AuthService) Register(input RegisterInput) (*AuthResponse, error) {
 	// If this is the very first user, make them super_admin automatically
 	var userCount int64
 	database.DB.Model(&models.User{}).Count(&userCount)
-	
+
 	role := "pending"
 	if userCount == 0 {
 		role = "super_admin"
@@ -85,7 +78,6 @@ func (s *AuthService) Register(input RegisterInput) (*AuthResponse, error) {
 		return nil, errors.New("failed to create user record: " + err.Error())
 	}
 
-	
 	token, err := s.GenerateToken(user)
 	if err != nil {
 		return nil, err
@@ -93,7 +85,6 @@ func (s *AuthService) Register(input RegisterInput) (*AuthResponse, error) {
 
 	return &AuthResponse{Token: token, User: user}, nil
 }
-
 
 func (s *AuthService) Login(input LoginInput) (*AuthResponse, error) {
 	var user models.User
@@ -105,12 +96,18 @@ func (s *AuthService) Login(input LoginInput) (*AuthResponse, error) {
 		return nil, result.Error
 	}
 
-	
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(input.Password)); err != nil {
 		return nil, errors.New("invalid email or password")
 	}
 
-	
+	// Manually load branch since Preload has issues with nullable bigint FK
+	if user.BranchID != 0 {
+		var branch models.Branch
+		if err := database.DB.First(&branch, user.BranchID).Error; err == nil {
+			user.Branch = branch
+		}
+	}
+
 	token, err := s.GenerateToken(user)
 	if err != nil {
 		return nil, err
@@ -119,7 +116,6 @@ func (s *AuthService) Login(input LoginInput) (*AuthResponse, error) {
 	return &AuthResponse{Token: token, User: user}, nil
 }
 
-
 func (s *AuthService) GetUserByID(userID uint) (*models.User, error) {
 	var user models.User
 	if err := database.DB.Preload("Branch").First(&user, userID).Error; err != nil {
@@ -127,7 +123,6 @@ func (s *AuthService) GetUserByID(userID uint) (*models.User, error) {
 	}
 	return &user, nil
 }
-
 
 func (s *AuthService) GenerateToken(user models.User) (string, error) {
 	duration, err := time.ParseDuration(s.Config.JWTExpiry)
