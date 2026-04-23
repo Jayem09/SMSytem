@@ -18,6 +18,24 @@ type BackupService struct {
 	cfg *config.Config
 }
 
+func saveBackupRecord(backup *models.Backup) error {
+	if err := database.DB.Save(backup).Error; err != nil {
+		return fmt.Errorf("failed to save backup record: %v", err)
+	}
+
+	return nil
+}
+
+func updateBackupStatus(backup *models.Backup, status string) error {
+	backup.Status = status
+
+	if err := saveBackupRecord(backup); err != nil {
+		return fmt.Errorf("failed to update backup status to %s: %v", status, err)
+	}
+
+	return nil
+}
+
 func NewBackupService(cfg *config.Config) *BackupService {
 	return &BackupService{cfg: cfg}
 }
@@ -154,12 +172,14 @@ func (s *BackupService) RestoreBackup(backupID uint) error {
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
-	backup.Status = "in_progress"
-	_ = database.DB.Save(backup).Error
+	if err := updateBackupStatus(backup, "in_progress"); err != nil {
+		return err
+	}
 
 	if err := cmd.Run(); err != nil {
-		backup.Status = "failed"
-		_ = database.DB.Save(backup).Error
+		if saveErr := updateBackupStatus(backup, "failed"); saveErr != nil {
+			return fmt.Errorf("mysql restore failed: %v (also failed to persist status: %v)", err, saveErr)
+		}
 		details := strings.TrimSpace(stderr.String())
 		if details != "" {
 			return fmt.Errorf("mysql restore failed: %v: %s", err, details)
@@ -167,8 +187,7 @@ func (s *BackupService) RestoreBackup(backupID uint) error {
 		return fmt.Errorf("mysql restore failed: %v", err)
 	}
 
-	backup.Status = "completed"
-	if err := database.DB.Save(backup).Error; err != nil {
+	if err := updateBackupStatus(backup, "completed"); err != nil {
 		return fmt.Errorf("restore completed but failed to update backup status: %v", err)
 	}
 
@@ -214,7 +233,9 @@ func (s *BackupService) RunAutoBackup() (*models.Backup, error) {
 
 	// Update backup type to auto
 	backup.Type = "auto"
-	database.DB.Save(backup)
+	if err := saveBackupRecord(backup); err != nil {
+		return nil, err
+	}
 
 	// Clean old auto backups (keep last 7)
 	s.cleanOldAutoBackups(7)
@@ -232,7 +253,9 @@ func (s *BackupService) RunAutoBackupWithConfig(cfg *config.Config) (*models.Bac
 
 	// Update backup type to auto
 	backup.Type = "auto"
-	database.DB.Save(backup)
+	if err := saveBackupRecord(backup); err != nil {
+		return nil, err
+	}
 
 	// Handle compression if enabled
 	if cfg.BackupCompress {
@@ -243,7 +266,9 @@ func (s *BackupService) RunAutoBackupWithConfig(cfg *config.Config) (*models.Bac
 		} else {
 			// Update filename to compressed version
 			backup.Filename = gzPath
-			database.DB.Save(backup)
+			if err := saveBackupRecord(backup); err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -298,8 +323,13 @@ func (s *BackupService) CheckBackupEnabled() bool {
 	if err != nil {
 		return false
 	}
-	f.Close()
-	os.Remove(testFile)
+	if err := f.Close(); err != nil {
+		_ = os.Remove(testFile)
+		return false
+	}
+	if err := os.Remove(testFile); err != nil {
+		return false
+	}
 
 	return true
 }

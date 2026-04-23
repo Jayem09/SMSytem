@@ -37,8 +37,7 @@ type purchaseOrderInput struct {
 
 func (h *PurchaseOrderHandler) List(c *gin.Context) {
 	branchID, _ := GetUintFromContext(c, "branchID")
-	userRole, _ := c.Get("userRole")
-	roleStr, _ := userRole.(string)
+	roleStr, _ := GetStringFromContext(c, "userRole")
 
 	query := database.DB.
 		Preload("Supplier").
@@ -91,8 +90,12 @@ func (h *PurchaseOrderHandler) Create(c *gin.Context) {
 		return
 	}
 
-	userID, _ := c.Get("userID")
+	userID, hasUserID := GetUintFromContext(c, "userID")
 	branchID, _ := GetUintFromContext(c, "branchID")
+	if !hasUserID {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized user context"})
+		return
+	}
 
 	var totalCost float64
 	var items []models.PurchaseOrderItem
@@ -109,7 +112,7 @@ func (h *PurchaseOrderHandler) Create(c *gin.Context) {
 
 	po := models.PurchaseOrder{
 		SupplierID: input.SupplierID,
-		UserID:     userID.(uint),
+		UserID:     userID,
 		BranchID:   branchID,
 		Status:     "pending",
 		TotalCost:  totalCost,
@@ -125,7 +128,7 @@ func (h *PurchaseOrderHandler) Create(c *gin.Context) {
 
 	database.DB.Preload("Supplier").Preload("User").Preload("Items.Product").First(&po, po.ID)
 
-	h.LogService.Record(userID.(uint), "CREATE", "Purchase Order", strconv.Itoa(int(po.ID)), fmt.Sprintf("Created PO to supplier #%d", po.SupplierID), c.ClientIP())
+	h.LogService.Record(userID, "CREATE", "Purchase Order", strconv.Itoa(int(po.ID)), fmt.Sprintf("Created PO to supplier #%d", po.SupplierID), c.ClientIP())
 
 	c.JSON(http.StatusCreated, gin.H{"message": "Purchase order created", "purchase_order": po})
 }
@@ -163,9 +166,12 @@ func (h *PurchaseOrderHandler) Receive(c *gin.Context) {
 	}
 	fmt.Printf("Purchase Order Receive payload: po_number='%s'\n", receiveInput.PONumber)
 
-	branchIDValue, _ := c.Get("branchID")
-	userIDCtx, _ := c.Get("userID")
-	branchID := branchIDValue.(uint)
+	branchID, hasBranchID := GetUintFromContext(c, "branchID")
+	if !hasBranchID {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized branch context"})
+		return
+	}
+	userID, hasUserID := GetUintFromContext(c, "userID")
 
 	for _, item := range po.Items {
 
@@ -205,9 +211,8 @@ func (h *PurchaseOrderHandler) Receive(c *gin.Context) {
 		}
 
 		var uid *uint
-		if userIDCtx != nil {
-			u := userIDCtx.(uint)
-			uid = &u
+		if hasUserID {
+			uid = &userID
 		}
 		movement := models.StockMovement{
 			ProductID:   item.ProductID,
@@ -240,9 +245,8 @@ func (h *PurchaseOrderHandler) Receive(c *gin.Context) {
 
 	database.DB.Preload("Supplier").Preload("User").Preload("Items.Product").First(&po, po.ID)
 
-	userIDValue, _ := c.Get("userID")
-	if userIDValue != nil {
-		h.LogService.Record(userIDValue.(uint), "UPDATE", "Purchase Order", strconv.Itoa(int(po.ID)), "Received items and updated stock", c.ClientIP())
+	if userID, ok := GetUintFromContext(c, "userID"); ok {
+		h.LogService.Record(userID, "UPDATE", "Purchase Order", strconv.Itoa(int(po.ID)), "Received items and updated stock", c.ClientIP())
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Purchase order received. Stock updated.", "purchase_order": po})
@@ -269,9 +273,8 @@ func (h *PurchaseOrderHandler) Delete(c *gin.Context) {
 	database.DB.Where("purchase_order_id = ?", id).Delete(&models.PurchaseOrderItem{})
 	database.DB.Delete(&po)
 
-	userIDValue, _ := c.Get("userID")
-	if userIDValue != nil {
-		h.LogService.Record(userIDValue.(uint), "DELETE", "Purchase Order", strconv.Itoa(int(id)), fmt.Sprintf("Deleted PO #%d", id), c.ClientIP())
+	if userID, ok := GetUintFromContext(c, "userID"); ok {
+		h.LogService.Record(userID, "DELETE", "Purchase Order", strconv.Itoa(int(id)), fmt.Sprintf("Deleted PO #%d", id), c.ClientIP())
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Purchase order deleted"})

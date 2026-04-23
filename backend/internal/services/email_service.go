@@ -8,7 +8,9 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strings"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 type EmailService struct {
@@ -112,7 +114,7 @@ func statusLabel(status string) string {
 	if label, ok := labels[status]; ok {
 		return label
 	}
-	return strings.Title(status)
+	return cases.Title(language.English).String(status)
 }
 
 func statusColor(status string) string {
@@ -128,23 +130,6 @@ func statusColor(status string) string {
 		return color
 	}
 	return "#4f46e5"
-}
-
-// adjustColor returns a second gradient color for the header
-func adjustColor(hex string) string {
-	gradients := map[string]string{
-		"#f59e0b": "#d97706",
-		"#3b82f6": "#2563eb",
-		"#8b5cf6": "#7c3aed",
-		"#10b981": "#059669",
-		"#ef4444": "#dc2626",
-		"#6b7280": "#4b5563",
-		"#4f46e5": "#4338ca",
-	}
-	if g, ok := gradients[hex]; ok {
-		return g
-	}
-	return hex
 }
 
 func statusEmoji(status string) string {

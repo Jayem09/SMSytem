@@ -1,10 +1,10 @@
 package handlers
 
 import (
-	"fmt"
 	"net/http"
 	"smsystem-backend/internal/database"
 	"smsystem-backend/internal/models"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -46,34 +46,27 @@ func (h *ReportHandler) GetDailySummary(c *gin.Context) {
 		dateStr = time.Now().Format("2006-01-02")
 	}
 
-	
 	startOfDay, err := time.ParseInLocation("2006-01-02", dateStr, time.Local)
 	if err != nil {
 		startOfDay, _ = time.ParseInLocation("2006-01-02", time.Now().Format("2006-01-02"), time.Local)
 	}
 	endOfDay := startOfDay.Add(24 * time.Hour)
-	branchIDValue, _ := c.Get("branchID") 
-	userRole, _ := c.Get("userRole")
-	var branchID uint
-	if branchIDValue != nil {
-		branchID = branchIDValue.(uint)
-	}
+	branchID, _ := GetUintFromContext(c, "branchID")
+	userRole, _ := GetStringFromContext(c, "userRole")
 
-	
 	if userRole == "super_admin" {
 		branchQuery := c.Query("branch_id")
 		if branchQuery == "ALL" {
-			branchID = 0 
+			branchID = 0
 		} else if branchQuery != "" {
-			var bID uint
-			fmt.Sscanf(branchQuery, "%d", &bID)
-			if bID > 0 {
-				branchID = bID
+			if parsedBranchID, err := strconv.ParseUint(branchQuery, 10, 64); err == nil {
+				if parsedBranchID > 0 {
+					branchID = uint(parsedBranchID)
+				}
 			}
 		}
 	}
 
-	
 	var advisors []AdvisorPerformance
 	database.DB.Table("orders").
 		Select("orders.service_advisor_name as advisor_name, SUM(order_items.quantity) as tires_sold").
@@ -92,7 +85,6 @@ func (h *ReportHandler) GetDailySummary(c *gin.Context) {
 		Order("tires_sold DESC").
 		Scan(&advisors)
 
-	
 	var categories []CategorySale
 	database.DB.Table("order_items").
 		Select("COALESCE(categories.name, 'Uncategorized') as category, SUM(order_items.subtotal) as total_sales").
@@ -111,7 +103,6 @@ func (h *ReportHandler) GetDailySummary(c *gin.Context) {
 		Order("total_sales DESC").
 		Scan(&categories)
 
-	
 	var payments []PaymentSummary
 	database.DB.Model(&models.Order{}).
 		Select("payment_method as method, SUM(total_amount) as total").
@@ -126,7 +117,6 @@ func (h *ReportHandler) GetDailySummary(c *gin.Context) {
 		Group("payment_method").
 		Scan(&payments)
 
-	
 	var ar float64
 	database.DB.Model(&models.Order{}).
 		Select("COALESCE(SUM(total_amount), 0)").
@@ -140,7 +130,6 @@ func (h *ReportHandler) GetDailySummary(c *gin.Context) {
 		}(), branchID).
 		Scan(&ar)
 
-	
 	var totalSales float64
 	database.DB.Model(&models.Order{}).
 		Select("COALESCE(SUM(total_amount), 0)").

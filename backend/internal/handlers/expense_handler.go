@@ -25,21 +25,8 @@ func (h *ExpenseHandler) Create(c *gin.Context) {
 		return
 	}
 
-	userIDValue, _ := c.Get("userID")
-	branchIDValue, _ := c.Get("branchID")
-
-	var userID uint
-	var branchID uint
-	if userIDValue != nil {
-		if v, ok := userIDValue.(uint); ok {
-			userID = v
-		}
-	}
-	if branchIDValue != nil {
-		if v, ok := branchIDValue.(uint); ok {
-			branchID = v
-		}
-	}
+	userID, _ := GetUintFromContext(c, "userID")
+	branchID, _ := GetUintFromContext(c, "branchID")
 
 	expense.UserID = userID
 	expense.BranchID = branchID
@@ -66,9 +53,8 @@ func (h *ExpenseHandler) Create(c *gin.Context) {
 }
 
 func (h *ExpenseHandler) List(c *gin.Context) {
-	branchID, _ := c.Get("branchID")
-	userRole, _ := c.Get("userRole")
-	roleStr, _ := userRole.(string)
+	branchID, _ := GetUintFromContext(c, "branchID")
+	roleStr, _ := GetStringFromContext(c, "userRole")
 
 	var expenses []models.Expense
 	query := database.DB.Preload("User").Preload("Product").Order("expense_date desc")
@@ -103,9 +89,8 @@ func (h *ExpenseHandler) Update(c *gin.Context) {
 		return
 	}
 
-	userIDValue, _ := c.Get("userID")
-	if userIDValue != nil {
-		h.LogService.Record(userIDValue.(uint), "UPDATE", "Expense", strconv.Itoa(id), "Updated expense details", c.ClientIP())
+	if userID, ok := GetUintFromContext(c, "userID"); ok {
+		h.LogService.Record(userID, "UPDATE", "Expense", strconv.Itoa(id), "Updated expense details", c.ClientIP())
 	}
 
 	c.JSON(http.StatusOK, expense)
@@ -126,9 +111,8 @@ func (h *ExpenseHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	userIDValue, _ := c.Get("userID")
-	if userIDValue != nil {
-		h.LogService.Record(userIDValue.(uint), "DELETE", "Expense", strconv.Itoa(id), "Deleted expense", c.ClientIP())
+	if userID, ok := GetUintFromContext(c, "userID"); ok {
+		h.LogService.Record(userID, "DELETE", "Expense", strconv.Itoa(id), "Deleted expense", c.ClientIP())
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Expense deleted successfully"})

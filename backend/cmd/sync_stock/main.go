@@ -3,9 +3,9 @@ package main
 import (
 	"fmt"
 	"log"
+	"smsystem-backend/internal/config"
 	"smsystem-backend/internal/database"
 	"smsystem-backend/internal/models"
-	"smsystem-backend/internal/config"
 )
 
 func main() {
@@ -22,10 +22,13 @@ func main() {
 
 	for _, p := range products {
 		var totalStock int
-		database.DB.Model(&models.Batch{}).
+		if err := database.DB.Model(&models.Batch{}).
 			Where("product_id = ?", p.ID).
 			Select("COALESCE(SUM(quantity), 0)").
-			Row().Scan(&totalStock)
+			Row().Scan(&totalStock); err != nil {
+			log.Printf("Skipping product %d stock sync: %v", p.ID, err)
+			continue
+		}
 
 		if p.Stock != totalStock {
 			fmt.Printf("📦 Product ID %d (%s): Syncing %d -> %d\n", p.ID, p.Name, p.Stock, totalStock)

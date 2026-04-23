@@ -1,7 +1,6 @@
 package config
 
 import (
-	"errors"
 	"log"
 	"os"
 	"path/filepath"
@@ -18,18 +17,20 @@ func parseInt(s string, defaultVal int) int {
 }
 
 type Config struct {
-	DBHost      string
-	DBPort      string
-	DBUser      string
-	DBPassword  string
-	DBName      string
-	DatabaseURL string
-	ServerPort  string
-	JWTSecret   string
-	JWTExpiry   string
-	RedisHost   string
-	RedisPort   string
-	BackupPath  string
+	DBHost             string
+	DBPort             string
+	DBUser             string
+	DBPassword         string
+	DBName             string
+	DatabaseURL        string
+	ServerPort         string
+	JWTSecret          string
+	JWTExpiry          string
+	RedisHost          string
+	RedisPort          string
+	BackupPath         string
+	TerminalSimulation bool
+	TerminalPort       string
 	// Backup settings
 	AutoBackupEnabled bool   // Enable automatic backups
 	AutoBackupCron    string // Cron schedule (e.g., "0 2 * * *" = 2am daily)
@@ -58,18 +59,20 @@ func Load() *Config {
 	}
 
 	return &Config{
-		DBHost:      getEnv("DB_HOST", "127.0.0.1"),
-		DBPort:      getEnv("DB_PORT", "3306"),
-		DBUser:      getEnv("DB_USER", "smsystem"),
-		DBPassword:  getEnv("DB_PASSWORD", "smsystem_secret"),
-		DBName:      getEnv("DB_NAME", "smsystem_db"),
-		DatabaseURL: getEnv("DATABASE_URL", ""),
-		ServerPort:  getEnv("SERVER_PORT", "8080"),
-		JWTSecret:   jwtSecret,
-		JWTExpiry:   getEnv("JWT_EXPIRY", "24h"),
-		RedisHost:   getEnv("REDIS_HOST", "127.0.0.1"),
-		RedisPort:   getEnv("REDIS_PORT", "6379"),
-		BackupPath:  getEnv("BACKUP_PATH", "/var/backups/smsystem"),
+		DBHost:             getEnv("DB_HOST", "127.0.0.1"),
+		DBPort:             getEnv("DB_PORT", "3306"),
+		DBUser:             getEnv("DB_USER", "smsystem"),
+		DBPassword:         getEnv("DB_PASSWORD", "smsystem_secret"),
+		DBName:             getEnv("DB_NAME", "smsystem_db"),
+		DatabaseURL:        getEnv("DATABASE_URL", ""),
+		ServerPort:         getEnv("SERVER_PORT", "8080"),
+		JWTSecret:          jwtSecret,
+		JWTExpiry:          getEnv("JWT_EXPIRY", "24h"),
+		RedisHost:          getEnv("REDIS_HOST", "127.0.0.1"),
+		RedisPort:          getEnv("REDIS_PORT", "6379"),
+		BackupPath:         getEnv("BACKUP_PATH", "/var/backups/smsystem"),
+		TerminalSimulation: getEnv("TERMINAL_SIMULATION", "true") == "true",
+		TerminalPort:       getEnv("TERMINAL_PORT", "COM1"),
 		// Backup settings
 		AutoBackupEnabled: getEnv("AUTO_BACKUP_ENABLED", "false") == "true",
 		AutoBackupCron:    getEnv("AUTO_BACKUP_CRON", "0 2 * * *"), // Default: 2am daily
@@ -83,12 +86,4 @@ func getEnv(key, fallback string) string {
 		return value
 	}
 	return fallback
-}
-
-func requireEnv(key string) (string, error) {
-	value := os.Getenv(key)
-	if value == "" {
-		return "", errors.New(key + " environment variable is required")
-	}
-	return value, nil
 }

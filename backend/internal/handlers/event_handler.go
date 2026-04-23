@@ -108,9 +108,15 @@ func (h *EventHandler) Stream(c *gin.Context) {
 			if err != nil {
 				continue
 			}
-			c.Writer.Write([]byte("data: "))
-			c.Writer.Write(data)
-			c.Writer.Write([]byte("\n\n"))
+			if _, err := c.Writer.Write([]byte("data: ")); err != nil {
+				return
+			}
+			if _, err := c.Writer.Write(data); err != nil {
+				return
+			}
+			if _, err := c.Writer.Write([]byte("\n\n")); err != nil {
+				return
+			}
 			c.Writer.Flush()
 		}
 	}

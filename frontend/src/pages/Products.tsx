@@ -513,7 +513,7 @@ export default function Products() {
               </div>
               <div>
                 <p className="text-xs font-medium text-gray-500 uppercase">Primary Supplier</p>
-                <p className="text-sm text-gray-900">{(viewingProduct as any).supplier_name || viewingProduct.primary_supplier_id || '--'}</p>
+                <p className="text-sm text-gray-900">{viewingProduct.primary_supplier_id && ('supplier_name' in viewingProduct ? (viewingProduct as { supplier_name?: string }).supplier_name : viewingProduct.primary_supplier_id) || '--'}</p>
               </div>
             </div>
 

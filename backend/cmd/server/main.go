@@ -63,7 +63,7 @@ func main() {
 			cfg.AutoBackupCron, cfg.BackupRetention, cfg.BackupCompress)
 	}
 
-	terminalService := services.NewTerminalService(true, "COM1")
+	terminalService := services.NewTerminalService(cfg.TerminalSimulation, cfg.TerminalPort)
 
 	h := &routes.Handlers{
 		Auth:          handlers.NewAuthHandler(authService, logService),

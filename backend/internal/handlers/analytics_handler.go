@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"regexp"
 	"smsystem-backend/internal/database"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -94,12 +95,8 @@ type ServiceAdvisor struct {
 }
 
 func (h *AnalyticsHandler) Query(c *gin.Context) {
-	branchIDValue, _ := c.Get("branchID")
-	userRole, _ := c.Get("userRole")
-	var branchID uint
-	if branchIDValue != nil {
-		branchID = branchIDValue.(uint)
-	}
+	branchID, _ := GetUintFromContext(c, "branchID")
+	userRole, _ := GetStringFromContext(c, "userRole")
 
 	log.Printf("Analytics Query received: role=%s branchID=%d", userRole, branchID)
 
@@ -108,9 +105,8 @@ func (h *AnalyticsHandler) Query(c *gin.Context) {
 		if branchQuery == "ALL" {
 			branchID = 0
 		} else if branchQuery != "" {
-			var bID uint
-			if _, err := fmt.Sscanf(branchQuery, "%d", &bID); err == nil {
-				branchID = bID
+			if parsedBranchID, err := strconv.ParseUint(branchQuery, 10, 64); err == nil {
+				branchID = uint(parsedBranchID)
 			}
 		}
 	}

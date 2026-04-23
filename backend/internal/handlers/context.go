@@ -46,3 +46,17 @@ func GetUintPtrFromContext(c *gin.Context, key string) (*uint, bool) {
 		return nil, false
 	}
 }
+
+func GetStringFromContext(c *gin.Context, key string) (string, bool) {
+	value, exists := c.Get(key)
+	if !exists {
+		return "", false
+	}
+
+	stringValue, ok := value.(string)
+	if !ok {
+		return "", false
+	}
+
+	return stringValue, true
+}

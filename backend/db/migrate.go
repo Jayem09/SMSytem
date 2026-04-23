@@ -6,6 +6,7 @@ import (
 	"log"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"gorm.io/gorm"
@@ -224,8 +225,11 @@ func loadMigrations() ([]Migration, error) {
 }
 
 func parseInt(s string) int {
-	var n int
-	fmt.Sscanf(s, "%d", &n)
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		return 0
+	}
+
 	return n
 }
 

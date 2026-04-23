@@ -49,6 +49,8 @@ function App() {
   const [backendOnline, setBackendOnline] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'checking' | 'online' | 'offline'>('checking');
   const [offlineModeActive, setOfflineModeActive] = useState(false);
+  // Track connection failures for debugging - state unused but kept for future logic
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [consecutiveConnectionFailures, setConsecutiveConnectionFailures] = useState(0);
 
   useEffect(() => {

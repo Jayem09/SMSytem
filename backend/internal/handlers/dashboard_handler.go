@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"smsystem-backend/internal/database"
 	"smsystem-backend/internal/models"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -57,25 +58,23 @@ type CategoryProfit struct {
 }
 
 func (h *DashboardHandler) GetStats(c *gin.Context) {
-	branchIDValue, _ := c.Get("branchID")
-	userRole, _ := c.Get("userRole")
-	var branchID uint
-	if branchIDValue != nil {
-		branchID = branchIDValue.(uint)
-	}
+	branchID, _ := GetUintFromContext(c, "branchID")
+	userRoleStr, _ := GetStringFromContext(c, "userRole")
 
-	if userRole == "super_admin" {
+	if userRoleStr == "super_admin" {
 		branchQuery := c.Query("branch_id")
 		if branchQuery == "ALL" {
 			branchID = 0
 		} else if branchQuery != "" {
-			var bID uint
-			fmt.Sscanf(branchQuery, "%d", &bID)
-			if bID > 0 {
-				branchID = bID
+			if parsedBranchID, err := strconv.ParseUint(branchQuery, 10, 64); err == nil {
+				if parsedBranchID > 0 {
+					branchID = uint(parsedBranchID)
+				}
 			}
 		}
 	}
+
+	branchScope := newDashboardBranchScope(branchID)
 
 	days := c.DefaultQuery("days", "0")
 	var dateFilter string
@@ -92,14 +91,9 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 	var orderCount int64
 	var customerCount int64
 
-	ordersQuery := database.DB.Model(&models.Order{})
-	completedOrdersQuery := database.DB.Model(&models.Order{}).Where("status = ?", "completed")
-	expensesQuery := database.DB.Model(&models.Expense{})
-	if branchID != 0 {
-		ordersQuery = ordersQuery.Where("branch_id = ?", branchID)
-		completedOrdersQuery = completedOrdersQuery.Where("branch_id = ?", branchID)
-		expensesQuery = expensesQuery.Where("branch_id = ?", branchID)
-	}
+	ordersQuery := branchScope.apply(database.DB.Model(&models.Order{}), branchScope.directBranchColumn())
+	completedOrdersQuery := branchScope.apply(database.DB.Model(&models.Order{}).Where("status = ?", "completed"), branchScope.directBranchColumn())
+	expensesQuery := branchScope.apply(database.DB.Model(&models.Expense{}), branchScope.directBranchColumn())
 
 	sumCompletedOrderCostOfGoods := func(extraWhere string, args ...interface{}) float64 {
 		var total float64
@@ -110,9 +104,7 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 			Joins("JOIN products ON products.id = order_items.product_id").
 			Where("orders.status = ?", "completed")
 
-		if branchID != 0 {
-			costQuery = costQuery.Where("orders.branch_id = ?", branchID)
-		}
+		costQuery = branchScope.apply(costQuery, branchScope.orderJoinBranchColumn())
 
 		if extraWhere != "" {
 			costQuery = costQuery.Where(extraWhere, args...)
@@ -136,7 +128,7 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 		Where("created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)").
 		Where("status = ?", "completed").
 		Group("DATE(created_at)").
-		Order("date ASC").
+		Order("DATE(created_at) ASC").
 		Scan(&salesTrend)
 
 	var lowStockProducts []models.Product
@@ -172,7 +164,8 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 		Joins("JOIN orders ON orders.id = order_items.order_id").
 		Joins("JOIN products ON products.id = order_items.product_id").
 		Joins("LEFT JOIN categories ON categories.id = products.category_id").
-		Where("DATE(orders.created_at) = CURDATE()")
+		Where("DATE(orders.created_at) = CURDATE()").
+		Where("orders.status = ?", "completed")
 
 	if branchID != 0 {
 		topProductsQuery = topProductsQuery.Where("orders.branch_id = ?", branchID)
@@ -190,12 +183,13 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 		Joins("JOIN orders ON orders.id = order_items.order_id").
 		Joins("JOIN products ON products.id = order_items.product_id").
 		Joins("LEFT JOIN categories ON categories.id = products.category_id").
+		Where("orders.status = ?", "completed").
 		Group("COALESCE(categories.name, 'Uncategorized')").
 		Order("revenue DESC")
 
-	crQuery.Scan(&categoryRevenue)
+	crQuery = branchScope.apply(crQuery, branchScope.orderJoinBranchColumn())
 
-	fmt.Printf("[DEBUG] Category revenue count: %d\n", len(categoryRevenue))
+	crQuery.Scan(&categoryRevenue)
 
 	// Get product revenue for bar/line charts (top 8 products)
 	var productRevenue []ProductRevenue
@@ -203,30 +197,14 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 		Select("products.name as product, COALESCE(SUM(order_items.subtotal), 0) as revenue, COALESCE(SUM(order_items.subtotal) - SUM(order_items.quantity * COALESCE(products.cost_price, 0)), 0) as profit, COALESCE(SUM(order_items.subtotal), 0) as income").
 		Joins("JOIN orders ON orders.id = order_items.order_id").
 		Joins("JOIN products ON products.id = order_items.product_id").
+		Where("orders.status = ?", "completed").
 		Group("products.id, products.name").
 		Order("revenue DESC").
 		Limit(8)
 
+	prQuery = branchScope.apply(prQuery, branchScope.orderJoinBranchColumn())
+
 	prQuery.Scan(&productRevenue)
-
-	fmt.Printf("[DEBUG] Product revenue count: %d\n", len(productRevenue))
-
-	// Sales trend - all orders
-	database.DB.Model(&models.Order{}).
-		Select("DATE(created_at) as date, SUM(total_amount) as amount").
-		Where("created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)").
-		Group("DATE(created_at)").
-		Order("date ASC").
-		Scan(&salesTrend)
-
-	fmt.Printf("[DEBUG] Sales trend count: %d\n", len(salesTrend))
-
-	// Also get total sales count for debug
-	var totalSalesCount int64
-	database.DB.Model(&models.Order{}).Count(&totalSalesCount)
-	var completedSalesCount int64
-	database.DB.Model(&models.Order{}).Where("status = ?", "completed").Count(&completedSalesCount)
-	fmt.Printf("[DEBUG] Total orders: %d, Completed: %d\n", totalSalesCount, completedSalesCount)
 
 	// Calculate revenue percentages for pie chart (by category)
 	var totalCategoryRevenue float64
@@ -261,32 +239,21 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 
 	ordersQuery.Where("created_at >= " + cmStart + " AND status = 'completed'").Select("COALESCE(SUM(total_amount), 0)").Scan(&currentSales)
 	currentCostOfGoods = sumCompletedOrderCostOfGoods("orders.created_at >= " + cmStart)
-	database.DB.Model(&models.Order{}).
-		Where(func() string {
-			if branchID != 0 {
-				return "branch_id = ?"
-			}
-			return "1=1"
-		}(), branchID).
-		Where("created_at BETWEEN " + pmStart + " AND " + pmEnd + " AND status = 'completed'").
+
+	// Fix: properly build query with branch filter
+	prevOrdersQuery := branchScope.apply(database.DB.Model(&models.Order{}), branchScope.directBranchColumn())
+	prevOrdersQuery.Where("created_at BETWEEN " + pmStart + " AND " + pmEnd + " AND status = 'completed'").
 		Select("COALESCE(SUM(total_amount), 0)").Scan(&prevSales)
 	prevCostOfGoods = sumCompletedOrderCostOfGoods("orders.created_at BETWEEN " + pmStart + " AND " + pmEnd)
 
 	expensesQuery.Where("created_at >= " + cmStart).Select("COALESCE(SUM(amount), 0)").Scan(&currentExpenses)
 
-	database.DB.Model(&models.Expense{}).
-		Where(func() string {
-			if branchID != 0 {
-				return "branch_id = ?"
-			}
-			return "1=1"
-		}(), branchID).
-		Where("created_at BETWEEN " + pmStart + " AND " + pmEnd).
+	// Fix: properly build query with branch filter
+	prevExpQuery := branchScope.apply(database.DB.Model(&models.Expense{}), branchScope.directBranchColumn())
+	prevExpQuery.Where("created_at BETWEEN " + pmStart + " AND " + pmEnd).
 		Select("COALESCE(SUM(amount), 0)").Scan(&prevExpenses)
 
 	calculateChange := func(current, prev float64) string {
-		// Debug: just show current vs prev
-		fmt.Printf("[DEBUG] Sales - Current: %.2f, Previous: %.2f\n", current, prev)
 		if prev == 0 {
 			if current > 0 {
 				return "NEW"

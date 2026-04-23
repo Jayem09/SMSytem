@@ -31,16 +31,24 @@ func main() {
 
 	switch flag.Args()[0] {
 	case "up":
-		upCmd.Parse(flag.Args()[1:])
+		if err := upCmd.Parse(flag.Args()[1:]); err != nil {
+			log.Fatalf("Failed to parse up command flags: %v", err)
+		}
 		runUp(databaseDB)
 	case "down":
-		downCmd.Parse(flag.Args()[1:])
+		if err := downCmd.Parse(flag.Args()[1:]); err != nil {
+			log.Fatalf("Failed to parse down command flags: %v", err)
+		}
 		runDown(databaseDB)
 	case "reset":
-		resetCmd.Parse(flag.Args()[1:])
+		if err := resetCmd.Parse(flag.Args()[1:]); err != nil {
+			log.Fatalf("Failed to parse reset command flags: %v", err)
+		}
 		runReset(databaseDB)
 	case "status":
-		statusCmd.Parse(flag.Args()[1:])
+		if err := statusCmd.Parse(flag.Args()[1:]); err != nil {
+			log.Fatalf("Failed to parse status command flags: %v", err)
+		}
 		runStatus(databaseDB)
 	default:
 		printUsage()
@@ -74,7 +82,9 @@ func runDown(db *gorm.DB) {
 func runReset(db *gorm.DB) {
 	fmt.Print("This will DROP ALL TABLES. Are you sure? (yes/no): ")
 	var confirm string
-	fmt.Scanln(&confirm)
+	if _, err := fmt.Scanln(&confirm); err != nil {
+		log.Fatalf("Failed to read confirmation: %v", err)
+	}
 
 	if confirm != "yes" {
 		log.Println("Aborted")
@@ -102,8 +112,14 @@ func runStatus(db *gorm.DB) {
 		hasMigrations = true
 		var version int
 		var appliedAt interface{}
-		rows.Scan(&version, &appliedAt)
+		if err := rows.Scan(&version, &appliedAt); err != nil {
+			log.Fatalf("Failed to scan migration status row: %v", err)
+		}
 		fmt.Printf("  v%d - Applied\n", version)
+	}
+
+	if err := rows.Err(); err != nil {
+		log.Fatalf("Failed while iterating migration status rows: %v", err)
 	}
 
 	if !hasMigrations {

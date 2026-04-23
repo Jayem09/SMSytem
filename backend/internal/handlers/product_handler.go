@@ -60,10 +60,10 @@ func (h *ProductHandler) List(c *gin.Context) {
 		if branchQuery == "ALL" {
 			branchID = 0 // Global stock
 		} else if branchQuery != "" {
-			var bID uint
-			fmt.Sscanf(branchQuery, "%d", &bID)
-			if bID > 0 {
-				branchID = bID
+			if parsedBranchID, err := strconv.ParseUint(branchQuery, 10, 64); err == nil {
+				if parsedBranchID > 0 {
+					branchID = uint(parsedBranchID)
+				}
 			}
 		}
 	}
@@ -145,13 +145,13 @@ func (h *ProductHandler) List(c *gin.Context) {
 		} else {
 			switch v := r["branch_stock"].(type) {
 			case []uint8:
-				var stock int
-				fmt.Sscanf(string(v), "%d", &stock)
-				r["branch_stock"] = stock
+				if stock, err := strconv.Atoi(string(v)); err == nil {
+					r["branch_stock"] = stock
+				}
 			case string:
-				var stock int
-				fmt.Sscanf(v, "%d", &stock)
-				r["branch_stock"] = stock
+				if stock, err := strconv.Atoi(v); err == nil {
+					r["branch_stock"] = stock
+				}
 			}
 		}
 	}
@@ -364,10 +364,12 @@ func (h *ProductHandler) Update(c *gin.Context) {
 	err = database.DB.Transaction(func(tx *gorm.DB) error {
 
 		var currentStock int
-		tx.Model(&models.Batch{}).
+		if err := tx.Model(&models.Batch{}).
 			Where("product_id = ? AND branch_id = ?", product.ID, bID).
 			Select("COALESCE(SUM(quantity), 0)").
-			Row().Scan(&currentStock)
+			Row().Scan(&currentStock); err != nil {
+			return err
+		}
 
 		if err := tx.Save(&product).Error; err != nil {
 			return err
