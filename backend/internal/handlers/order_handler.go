@@ -3,8 +3,10 @@ package handlers
 import (
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"smsystem-backend/internal/database"
@@ -44,18 +46,76 @@ type orderInput struct {
 }
 
 type statusInput struct {
-	Status string `json:"status" binding:"required,oneof=pending confirmed completed cancelled"`
+	Status     string   `json:"status" binding:"required,oneof=pending confirmed completed cancelled"`
+	AmountPaid *float64 `json:"amount_paid" binding:"omitempty,min=0"`
 }
 
 type checkoutInput struct {
 	orderInput
-	Status             string  `json:"status" binding:"omitempty,oneof=pending completed"`
-	ReceiptType        string  `json:"receipt_type" binding:"required,oneof=SI DR"`
-	TIN                string  `json:"tin"`
-	BusinessAddress    string  `json:"business_address"`
-	WithholdingTaxRate float64 `json:"withholding_tax_rate"`
-	RewardID           *uint   `json:"reward_id"`     // Product ID being redeemed as reward
-	RewardPoints       int     `json:"reward_points"` // Points used for reward redemption
+	Status             string   `json:"status" binding:"omitempty,oneof=pending completed"`
+	ReceiptType        string   `json:"receipt_type" binding:"required,oneof=SI DR"`
+	TIN                string   `json:"tin"`
+	BusinessAddress    string   `json:"business_address"`
+	WithholdingTaxRate float64  `json:"withholding_tax_rate"`
+	AmountPaid         *float64 `json:"amount_paid" binding:"omitempty,min=0"`
+	RewardID           *uint    `json:"reward_id"`     // Product ID being redeemed as reward
+	RewardPoints       int      `json:"reward_points"` // Points used for reward redemption
+}
+
+func clampAmountPaid(amountPaid, totalAmount float64) float64 {
+	if amountPaid < 0 {
+		return 0
+	}
+	if amountPaid > totalAmount {
+		return totalAmount
+	}
+	return amountPaid
+}
+
+func isDeferredPaymentMethod(paymentMethod string) bool {
+	switch strings.ToLower(strings.TrimSpace(paymentMethod)) {
+	case "dated_check", "post_dated_check":
+		return true
+	default:
+		return false
+	}
+}
+
+func derivePaymentStatus(amountPaid, balanceDue float64) string {
+	if balanceDue <= 0 {
+		return "paid"
+	}
+	if amountPaid > 0 {
+		return "partial"
+	}
+	return "unpaid"
+}
+
+func resolveOrderPayment(totalAmount float64, providedAmountPaid *float64, status, paymentMethod string) (float64, float64, string) {
+	resolvedAmountPaid := 0.0
+
+	if providedAmountPaid != nil {
+		resolvedAmountPaid = clampAmountPaid(*providedAmountPaid, totalAmount)
+	} else if status == "completed" && !isDeferredPaymentMethod(paymentMethod) {
+		resolvedAmountPaid = totalAmount
+	}
+
+	balanceDue := math.Max(totalAmount-resolvedAmountPaid, 0)
+	return resolvedAmountPaid, balanceDue, derivePaymentStatus(resolvedAmountPaid, balanceDue)
+}
+
+func resolveUpdatedOrderPayment(order models.Order, providedAmountPaid *float64, newStatus string) (float64, float64, string) {
+	if providedAmountPaid != nil {
+		return resolveOrderPayment(order.TotalAmount, providedAmountPaid, newStatus, order.PaymentMethod)
+	}
+
+	if order.AmountPaid > 0 {
+		amountPaid := clampAmountPaid(order.AmountPaid, order.TotalAmount)
+		balanceDue := math.Max(order.TotalAmount-amountPaid, 0)
+		return amountPaid, balanceDue, derivePaymentStatus(amountPaid, balanceDue)
+	}
+
+	return resolveOrderPayment(order.TotalAmount, nil, newStatus, order.PaymentMethod)
 }
 
 func (h *OrderHandler) List(c *gin.Context) {
@@ -182,6 +242,8 @@ func (h *OrderHandler) Create(c *gin.Context) {
 			finalTotal += input.TaxAmount
 		}
 
+		amountPaid, balanceDue, paymentStatus := resolveOrderPayment(finalTotal, input.AmountPaid, orderStatus, input.PaymentMethod)
+
 		order = models.Order{
 			CustomerID:         input.CustomerID,
 			GuestName:          input.GuestName,
@@ -189,12 +251,15 @@ func (h *OrderHandler) Create(c *gin.Context) {
 			UserID:             uID,
 			ServiceAdvisorName: input.ServiceAdvisorName,
 			TotalAmount:        finalTotal,
+			AmountPaid:         amountPaid,
+			BalanceDue:         balanceDue,
 			DiscountAmount:     input.DiscountAmount,
 			DiscountType:       input.DiscountType,
 			TaxAmount:          input.TaxAmount,
 			IsTaxInclusive:     input.IsTaxInclusive,
 			Status:             orderStatus,
 			PaymentMethod:      input.PaymentMethod,
+			PaymentStatus:      paymentStatus,
 			Items:              orderItems,
 			ReceiptType:        input.ReceiptType,
 			TIN:                input.TIN,
@@ -485,7 +550,11 @@ func (h *OrderHandler) UpdateStatus(c *gin.Context) {
 				}
 			}
 
+			amountPaid, balanceDue, paymentStatus := resolveUpdatedOrderPayment(order, input.AmountPaid, input.Status)
 			order.Status = input.Status
+			order.AmountPaid = amountPaid
+			order.BalanceDue = balanceDue
+			order.PaymentStatus = paymentStatus
 			return tx.Save(&order).Error
 		})
 
@@ -495,7 +564,11 @@ func (h *OrderHandler) UpdateStatus(c *gin.Context) {
 		}
 	} else {
 
+		amountPaid, balanceDue, paymentStatus := resolveUpdatedOrderPayment(order, input.AmountPaid, input.Status)
 		order.Status = input.Status
+		order.AmountPaid = amountPaid
+		order.BalanceDue = balanceDue
+		order.PaymentStatus = paymentStatus
 		if err := database.DB.Save(&order).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update order status"})
 			return

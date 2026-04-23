@@ -26,9 +26,12 @@ interface Order {
   guest_name?: string;
   guest_phone?: string;
   total_amount: number;
+  amount_paid?: number;
+  balance_due?: number;
   discount_amount: number;
   status: string;
   payment_method: string;
+  payment_status?: 'paid' | 'partial' | 'unpaid';
   receipt_type: 'SI' | 'DR';
   tin: string;
   business_address: string;
@@ -97,9 +100,12 @@ export default function Orders() {
               ...o,
               id: o.id || Date.now(),
               total_amount: o.totalAmount || 0,
+              amount_paid: o.amountPaid || 0,
+              balance_due: o.balanceDue || 0,
               discount_amount: o.discountAmount || 0,
               created_at: o.createdAt || new Date().toISOString(),
               payment_method: o.paymentMethod || 'cash',
+              payment_status: o.paymentStatus || 'unpaid',
               receipt_type: o.receiptType || 'SI',
               tin: o.tin || '',
               business_address: o.businessAddress || '',
@@ -171,9 +177,12 @@ export default function Orders() {
           ...o,
           id: o.id || Date.now(),
           total_amount: o.totalAmount || 0,
+          amount_paid: o.amountPaid || 0,
+          balance_due: o.balanceDue || 0,
           discount_amount: o.discountAmount || 0,
           created_at: o.createdAt || new Date().toISOString(),
           payment_method: o.paymentMethod || 'cash',
+          payment_status: o.paymentStatus || 'unpaid',
           receipt_type: o.receiptType || 'SI',
           tin: o.tin || '',
           business_address: o.businessAddress || '',

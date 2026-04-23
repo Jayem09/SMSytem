@@ -85,7 +85,7 @@ func (h *ReportHandler) GetDailySummary(c *gin.Context) {
 
 	advisors := make([]AdvisorPerformance, 0)
 	database.DB.Table("orders").
-		Select("orders.service_advisor_name as advisor_name, SUM(order_items.quantity) as tires_sold").
+		Select("COALESCE(NULLIF(TRIM(orders.service_advisor_name), ''), 'Unassigned') as advisor_name, SUM(order_items.quantity) as tires_sold").
 		Joins("JOIN order_items ON orders.id = order_items.order_id").
 		Joins("JOIN products ON order_items.product_id = products.id").
 		Joins("JOIN categories ON products.category_id = categories.id").
@@ -97,7 +97,7 @@ func (h *ReportHandler) GetDailySummary(c *gin.Context) {
 			}
 			return "1=1"
 		}(), branchID).
-		Group("orders.service_advisor_name").
+		Group("COALESCE(NULLIF(TRIM(orders.service_advisor_name), ''), 'Unassigned')").
 		Order("tires_sold DESC").
 		Scan(&advisors)
 
@@ -135,8 +135,8 @@ func (h *ReportHandler) GetDailySummary(c *gin.Context) {
 
 	var ar float64
 	database.DB.Model(&models.Order{}).
-		Select("COALESCE(SUM(total_amount), 0)").
-		Where("status = 'pending'").
+		Select("COALESCE(SUM(balance_due), 0)").
+		Where("balance_due > 0 AND status != 'cancelled'").
 		Where("created_at >= ? AND created_at < ?", startOfDay, endOfDay).
 		Where(func() string {
 			if branchID != 0 {

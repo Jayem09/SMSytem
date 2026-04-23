@@ -18,9 +18,12 @@ export interface LocalOrder {
   guestName?: string;
   guestPhone?: string;
   totalAmount: number;
+  amountPaid?: number;
+  balanceDue?: number;
   discountAmount: number;
   status: string;
   paymentMethod: string;
+  paymentStatus?: 'paid' | 'partial' | 'unpaid';
   receiptType: string;
   tin?: string;
   businessAddress?: string;

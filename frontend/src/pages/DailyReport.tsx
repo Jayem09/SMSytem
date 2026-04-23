@@ -45,6 +45,11 @@ function normalizeDailySummary(data: DailySummaryApiResponse, fallbackDate: stri
   };
 }
 
+function getAdvisorDisplayName(advisorName: string | undefined) {
+  const trimmedName = advisorName?.trim();
+  return trimmedName ? trimmedName : 'Unassigned';
+}
+
 export default function DailyReport() {
   const [date, setDate] = useState(getLocalDateInputValue);
   const [data, setData] = useState<DailySummary | null>(null);
@@ -184,9 +189,9 @@ export default function DailyReport() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {advisorPerformance.map((sa, i) => (
-                  <tr key={sa.advisor_name} className="hover:bg-gray-50">
+                  <tr key={`${getAdvisorDisplayName(sa.advisor_name)}-${i}`} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-sm text-gray-500">{i + 1}</td>
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{sa.advisor_name}</td>
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{getAdvisorDisplayName(sa.advisor_name)}</td>
                     <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">{sa.tires_sold}</td>
                   </tr>
                 ))}

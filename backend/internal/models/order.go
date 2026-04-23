@@ -13,12 +13,15 @@ type Order struct {
 	BranchID           uint      `gorm:"index;not null" json:"branch_id"`
 	ServiceAdvisorName string    `gorm:"size:255" json:"service_advisor_name"`
 	TotalAmount        float64   `gorm:"not null;default:0" json:"total_amount"`
+	AmountPaid         float64   `gorm:"not null;default:0" json:"amount_paid"`
+	BalanceDue         float64   `gorm:"not null;default:0;index" json:"balance_due"`
 	DiscountAmount     float64   `gorm:"default:0" json:"discount_amount"`
 	DiscountType       string    `gorm:"size:20;default:fixed" json:"discount_type"`
 	TaxAmount          float64   `gorm:"default:0" json:"tax_amount"`
 	IsTaxInclusive     bool      `gorm:"default:false" json:"is_tax_inclusive"`
 	Status             string    `gorm:"size:50;not null;default:pending;index" json:"status"`
 	PaymentMethod      string    `gorm:"size:100" json:"payment_method"`
+	PaymentStatus      string    `gorm:"size:20;not null;default:unpaid;index" json:"payment_status"`
 	ReceiptType        string    `gorm:"size:10;default:SI" json:"receipt_type"`
 	TIN                string    `gorm:"size:100" json:"tin"`
 	BusinessAddress    string    `gorm:"size:255" json:"business_address"`

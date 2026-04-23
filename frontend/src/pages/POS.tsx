@@ -1091,7 +1091,15 @@ export default function POS() {
               <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Payment Method</label>
               <select
                 value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value)}
+                onChange={(e) => {
+                  setPaymentMethod(e.target.value);
+                  if (!amountPaidManuallyEdited || isLockedAmountPaidMethod(e.target.value)) {
+                    setAmountPaid(formatMoneyInputValue(getSuggestedAmountPaid(finalTotal, e.target.value)));
+                  }
+                  if (isLockedAmountPaidMethod(e.target.value)) {
+                    setAmountPaidManuallyEdited(false);
+                  }
+                }}
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
                 <option value="cash">Cash</option>
@@ -1101,6 +1109,37 @@ export default function POS() {
                 <option value="dated_check">Dated Check</option>
                 <option value="post_dated_check">Post-Dated Check</option>
               </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Amount Paid</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={amountPaid}
+                  onChange={(e) => {
+                    setAmountPaid(e.target.value);
+                    setAmountPaidManuallyEdited(true);
+                  }}
+                  disabled={isLockedAmountPaidMethod(paymentMethod)}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-100 disabled:text-gray-500"
+                  placeholder="0.00"
+                />
+                <p className="mt-2 text-[11px] text-gray-500">
+                  {paymentMethod === 'card'
+                    ? 'Card payments are recorded as fully paid after terminal approval.'
+                    : isDeferredPaymentMethod(paymentMethod)
+                      ? 'Checks are tracked as receivables until they are cleared.'
+                      : 'Lower this amount to record a partial payment and leave a balance due.'}
+                </p>
+              </div>
+              <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Balance Due</p>
+                <p className="text-xl font-black text-gray-900">₱{previewBalanceDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                <p className="mt-2 text-[11px] font-semibold uppercase tracking-wider text-gray-500">Payment Status: {previewPaymentStatus}</p>
+              </div>
             </div>
 
             {/* Discount */}
