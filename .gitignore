@@ -4,9 +4,11 @@
 .env.*.local
 .env.production
 .env.development
+login-data.txt
 
 # Backend
 backend/.env
+backend/server
 backend/smsystem-server
 backend/smsystem.exe
 backend/main
