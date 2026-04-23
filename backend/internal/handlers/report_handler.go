@@ -10,6 +10,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const dailySummaryDateLayout = "2006-01-02"
+
 type ReportHandler struct{}
 
 func NewReportHandler() *ReportHandler {
@@ -40,17 +42,31 @@ type DailySummaryResponse struct {
 	TotalSales         float64              `json:"total_sales"`
 }
 
-func (h *ReportHandler) GetDailySummary(c *gin.Context) {
-	dateStr := c.Query("date")
+func resolveDailySummaryDate(dateStr string) string {
 	if dateStr == "" {
-		dateStr = time.Now().Format("2006-01-02")
+		return time.Now().Format(dailySummaryDateLayout)
 	}
 
-	startOfDay, err := time.ParseInLocation("2006-01-02", dateStr, time.Local)
-	if err != nil {
-		startOfDay, _ = time.ParseInLocation("2006-01-02", time.Now().Format("2006-01-02"), time.Local)
+	if _, err := time.Parse(dailySummaryDateLayout, dateStr); err != nil {
+		return time.Now().Format(dailySummaryDateLayout)
 	}
-	endOfDay := startOfDay.Add(24 * time.Hour)
+
+	return dateStr
+}
+
+func nextDailySummaryDate(dateStr string) string {
+	parsedDate, err := time.Parse(dailySummaryDateLayout, dateStr)
+	if err != nil {
+		return time.Now().Add(24 * time.Hour).Format(dailySummaryDateLayout)
+	}
+
+	return parsedDate.Add(24 * time.Hour).Format(dailySummaryDateLayout)
+}
+
+func (h *ReportHandler) GetDailySummary(c *gin.Context) {
+	dateStr := resolveDailySummaryDate(c.Query("date"))
+	startOfDay := dateStr + " 00:00:00"
+	endOfDay := nextDailySummaryDate(dateStr) + " 00:00:00"
 	branchID, _ := GetUintFromContext(c, "branchID")
 	userRole, _ := GetStringFromContext(c, "userRole")
 
@@ -67,7 +83,7 @@ func (h *ReportHandler) GetDailySummary(c *gin.Context) {
 		}
 	}
 
-	var advisors []AdvisorPerformance
+	advisors := make([]AdvisorPerformance, 0)
 	database.DB.Table("orders").
 		Select("orders.service_advisor_name as advisor_name, SUM(order_items.quantity) as tires_sold").
 		Joins("JOIN order_items ON orders.id = order_items.order_id").
@@ -85,7 +101,7 @@ func (h *ReportHandler) GetDailySummary(c *gin.Context) {
 		Order("tires_sold DESC").
 		Scan(&advisors)
 
-	var categories []CategorySale
+	categories := make([]CategorySale, 0)
 	database.DB.Table("order_items").
 		Select("COALESCE(categories.name, 'Uncategorized') as category, SUM(order_items.subtotal) as total_sales").
 		Joins("JOIN products ON order_items.product_id = products.id").
@@ -103,7 +119,7 @@ func (h *ReportHandler) GetDailySummary(c *gin.Context) {
 		Order("total_sales DESC").
 		Scan(&categories)
 
-	var payments []PaymentSummary
+	payments := make([]PaymentSummary, 0)
 	database.DB.Model(&models.Order{}).
 		Select("payment_method as method, SUM(total_amount) as total").
 		Where("status = 'completed'").

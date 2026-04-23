@@ -2,6 +2,12 @@ import { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { Printer, Calendar } from 'lucide-react';
 
+const DATE_INPUT_FORMAT = 'en-CA';
+
+function getLocalDateInputValue() {
+  return new Date().toLocaleDateString(DATE_INPUT_FORMAT);
+}
+
 interface AdvisorPerformance {
   advisor_name: string;
   tires_sold: number;
@@ -26,16 +32,38 @@ interface DailySummary {
   total_sales: number;
 }
 
+type DailySummaryApiResponse = Partial<DailySummary> | null | undefined;
+
+function normalizeDailySummary(data: DailySummaryApiResponse, fallbackDate: string): DailySummary {
+  return {
+    date: typeof data?.date === 'string' && data.date ? data.date : fallbackDate,
+    advisor_performance: Array.isArray(data?.advisor_performance) ? data.advisor_performance : [],
+    category_sales: Array.isArray(data?.category_sales) ? data.category_sales : [],
+    payment_summary: Array.isArray(data?.payment_summary) ? data.payment_summary : [],
+    account_receivables: typeof data?.account_receivables === 'number' ? data.account_receivables : 0,
+    total_sales: typeof data?.total_sales === 'number' ? data.total_sales : 0,
+  };
+}
+
 export default function DailyReport() {
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(getLocalDateInputValue);
   const [data, setData] = useState<DailySummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const fetchReport = async () => {
+    setLoading(true);
+    setErrorMessage('');
+
     try {
-      const res = await api.get(`/api/reports/daily-summary?date=${date}&_t=${Date.now()}`);
-      setData(res.data as DailySummary);
+      const res = await api.get(`/api/reports/daily-summary?date=${encodeURIComponent(date)}&_t=${Date.now()}`);
+      setData(normalizeDailySummary(res.data as DailySummaryApiResponse, date));
     } catch (error) {
       console.error('Failed to fetch report:', error);
+      setData(null);
+      setErrorMessage('Failed to load the daily summary. Check the selected date and your connection, then try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -50,7 +78,11 @@ export default function DailyReport() {
     window.print();
   };
 
-  const totalQtySold = (data?.advisor_performance || []).reduce((acc: number, curr: AdvisorPerformance) => acc + curr.tires_sold, 0) || 0;
+  const advisorPerformance = data?.advisor_performance ?? [];
+  const categorySales = data?.category_sales ?? [];
+  const paymentSummary = data?.payment_summary ?? [];
+
+  const totalQtySold = advisorPerformance.reduce((acc: number, curr: AdvisorPerformance) => acc + curr.tires_sold, 0) || 0;
   
   const paymentMethodsDisplay = [
     { key: 'cash', label: 'Cash' },
@@ -66,13 +98,13 @@ export default function DailyReport() {
   ];
 
   const getPaymentValue = (key: string) => {
-    return (data?.payment_summary || []).find((p: PaymentSummary) => p.method.toLowerCase() === key.toLowerCase())?.total || 0;
+    return paymentSummary.find((p: PaymentSummary) => p.method.toLowerCase() === key.toLowerCase())?.total || 0;
   };
 
-  const totalGoodAsCash = (data?.payment_summary || []).reduce((acc: number, curr: PaymentSummary) => acc + curr.total, 0) || 0;
+  const totalGoodAsCash = paymentSummary.reduce((acc: number, curr: PaymentSummary) => acc + curr.total, 0) || 0;
 
   return (
-    <div className="p-6">
+    <div className="daily-report-print p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-6 no-print">
         <h1 className="text-xl font-semibold text-gray-900">Daily Report</h1>
@@ -96,23 +128,40 @@ export default function DailyReport() {
         </div>
       </div>
 
+      <div className="print-only mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Daily Summary Report</h1>
+        <p className="text-sm text-gray-600">Report Date: {date}</p>
+      </div>
+
+      {errorMessage && (
+        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {errorMessage}
+        </div>
+      )}
+
+      {!errorMessage && !loading && data && data.total_sales === 0 && advisorPerformance.length === 0 && categorySales.length === 0 && (
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+          No completed sales were found for {date}. If you expect data here, double-check the report date first.
+        </div>
+      )}
+
       {/* Summary Cards */}
       <div className="grid grid-cols-4 gap-4 mb-6">
         <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
           <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Total Sales</p>
-          <p className="text-2xl font-bold text-gray-900">₱{(data?.total_sales || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+          <p className="text-2xl font-bold text-gray-900">{loading ? 'Loading...' : `₱${(data?.total_sales || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`}</p>
         </div>
         <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
           <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Items Sold</p>
-          <p className="text-2xl font-bold text-gray-900">{totalQtySold}</p>
+          <p className="text-2xl font-bold text-gray-900">{loading ? 'Loading...' : totalQtySold}</p>
         </div>
         <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
           <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Good as Cash</p>
-          <p className="text-2xl font-bold text-gray-900">₱{totalGoodAsCash.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+          <p className="text-2xl font-bold text-gray-900">{loading ? 'Loading...' : `₱${totalGoodAsCash.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}</p>
         </div>
         <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
           <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Receivables</p>
-          <p className="text-2xl font-bold text-amber-600">₱{(data?.account_receivables || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+          <p className="text-2xl font-bold text-amber-600">{loading ? 'Loading...' : `₱${(data?.account_receivables || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`}</p>
         </div>
       </div>
 
@@ -134,14 +183,14 @@ export default function DailyReport() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {(data?.advisor_performance || []).map((sa, i) => (
+                {advisorPerformance.map((sa, i) => (
                   <tr key={sa.advisor_name} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-sm text-gray-500">{i + 1}</td>
                     <td className="px-4 py-3 text-sm font-medium text-gray-900">{sa.advisor_name}</td>
                     <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">{sa.tires_sold}</td>
                   </tr>
                 ))}
-                {(!data?.advisor_performance || data.advisor_performance.length === 0) && (
+                {advisorPerformance.length === 0 && (
                   <tr><td colSpan={3} className="px-4 py-6 text-center text-sm text-gray-500">No data</td></tr>
                 )}
               </tbody>
@@ -161,13 +210,13 @@ export default function DailyReport() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {(data?.category_sales || []).map((cat) => (
+                {categorySales.map((cat) => (
                   <tr key={cat.category} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-sm font-medium text-gray-900">{cat.category}</td>
                     <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">₱{cat.total_sales.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                   </tr>
                 ))}
-                {(!data?.category_sales || data.category_sales.length === 0) && (
+                {categorySales.length === 0 && (
                   <tr><td colSpan={2} className="px-4 py-6 text-center text-sm text-gray-500">No data</td></tr>
                 )}
               </tbody>
@@ -204,8 +253,13 @@ export default function DailyReport() {
 
       {/* Print Styles */}
       <style>{`
+        .print-only { display: none; }
+
         @media print {
           @page { margin: 0.5cm; size: portrait; }
+          #root { display: block !important; min-height: auto !important; }
+          .daily-report-print { display: block !important; padding: 0 !important; }
+          .print-only { display: block !important; }
           .no-print { display: none !important; }
           .bg-gray-50 { background-color: #f9fafb !important; }
           body { background: white !important; }

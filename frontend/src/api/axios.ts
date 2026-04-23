@@ -1,6 +1,19 @@
 import { invoke } from '@tauri-apps/api/core';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://168.144.46.137:8080';
+const PRODUCTION_API_BASE = 'http://168.144.46.137:8080';
+const LOCAL_DEV_API_BASE = 'http://localhost:8080';
+
+function resolveApiBase() {
+  const configuredBase = import.meta.env.VITE_API_BASE_URL?.trim();
+
+  if (import.meta.env.DEV && (!configuredBase || configuredBase === PRODUCTION_API_BASE)) {
+    return LOCAL_DEV_API_BASE;
+  }
+
+  return configuredBase || PRODUCTION_API_BASE;
+}
+
+const API_BASE = resolveApiBase();
 console.debug('API_BASE:', API_BASE);
 
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;

@@ -5,10 +5,22 @@ import (
 	"strings"
 
 	"smsystem-backend/internal/config"
+	"smsystem-backend/internal/database"
+	"smsystem-backend/internal/models"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 )
+
+func loadCurrentUserContext(userID uint) (*models.User, error) {
+	var user models.User
+
+	if err := database.DB.Select("id", "email", "role", "branch_id").First(&user, userID).Error; err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
 
 func getUintClaim(claims jwt.MapClaims, key string) (uint, bool) {
 	val, ok := claims[key]
@@ -27,15 +39,6 @@ func getUintClaim(claims jwt.MapClaims, key string) (uint, bool) {
 	default:
 		return 0, false
 	}
-}
-
-func getStringClaim(claims jwt.MapClaims, key string) (string, bool) {
-	val, ok := claims[key]
-	if !ok {
-		return "", false
-	}
-	s, ok := val.(string)
-	return s, ok
 }
 
 func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
@@ -83,20 +86,24 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 			return
 		}
 
-		branchID, _ := getUintClaim(claims, "branch_id")
+		user, err := loadCurrentUserContext(userID)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found or no longer accessible"})
+			c.Abort()
+			return
+		}
 
-		role, ok := getStringClaim(claims, "role")
-		if !ok {
+		role := strings.ToLower(user.Role)
+		if role == "" {
 			role = "user"
 		}
-		role = strings.ToLower(role)
 
-		// super_admin always gets branchID=0 to see all data
+		branchID := user.BranchID
 		if role == "super_admin" {
 			branchID = 0
 		}
 
-		userEmail, _ := getStringClaim(claims, "email")
+		userEmail := user.Email
 
 		c.Set("userID", userID)
 		c.Set("branchID", branchID)
