@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -14,11 +15,12 @@ import (
 )
 
 type CustomerHandler struct {
-	LogService *services.LogService
+	LogService   *services.LogService
+	CacheService *services.CacheService
 }
 
-func NewCustomerHandler(logService *services.LogService) *CustomerHandler {
-	return &CustomerHandler{LogService: logService}
+func NewCustomerHandler(logService *services.LogService, cacheService *services.CacheService) *CustomerHandler {
+	return &CustomerHandler{LogService: logService, CacheService: cacheService}
 }
 
 type customerInput struct {
@@ -31,6 +33,27 @@ type customerInput struct {
 }
 
 func (h *CustomerHandler) List(c *gin.Context) {
+	ctx := c.Request.Context()
+	branchID, _ := GetUintFromContext(c, "branchID")
+	userRole, _ := c.Get("userRole")
+	roleStr := ""
+	if userRole != nil {
+		roleStr = userRole.(string)
+	}
+
+	// Build cache key with branch ID, role, and query params
+	cacheKey := services.BuildScopedListKey(services.CustomerListPrefix, branchID, roleStr, c.Request.URL.Query())
+
+	// Try read-through cache first (60s TTL)
+	if h.CacheService != nil && h.CacheService.Enabled() {
+		var cached []map[string]interface{}
+		found, err := h.CacheService.GetJSON(ctx, cacheKey, &cached)
+		if err == nil && found && len(cached) > 0 {
+			c.JSON(http.StatusOK, gin.H{"customers": cached})
+			return
+		}
+	}
+
 	query := database.DB.Model(&models.Customer{})
 
 	if search := c.Query("search"); search != "" {
@@ -43,7 +66,31 @@ func (h *CustomerHandler) List(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch customers"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"customers": customers})
+
+	// Convert to map for caching
+	var results []map[string]interface{}
+	for _, customer := range customers {
+		results = append(results, map[string]interface{}{
+			"id":            customer.ID,
+			"name":          customer.Name,
+			"email":         customer.Email,
+			"phone":         customer.Phone,
+			"address":       customer.Address,
+			"rfid_card_id":  customer.RFIDCardID,
+			"loyalty_points": customer.LoyaltyPoints,
+			"created_at":   customer.CreatedAt,
+			"updated_at":   customer.UpdatedAt,
+		})
+	}
+
+	// Cache the result with 60s TTL
+	if h.CacheService != nil && h.CacheService.Enabled() {
+		if err := h.CacheService.SetJSON(ctx, cacheKey, results, 60*time.Second); err != nil {
+			log.Printf("Warning: failed to cache customer list: %v", err)
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"customers": results})
 }
 
 func (h *CustomerHandler) GetByID(c *gin.Context) {
@@ -104,6 +151,16 @@ func (h *CustomerHandler) Create(c *gin.Context) {
 		}
 	}
 
+	// Invalidate customer list and dashboard caches after successful create
+	if h.CacheService != nil && h.CacheService.Enabled() {
+		if err := h.CacheService.InvalidateCustomers(c.Request.Context()); err != nil {
+			log.Printf("Warning: failed to invalidate customer list cache: %v", err)
+		}
+		if err := h.CacheService.InvalidateDashboard(c.Request.Context()); err != nil {
+			log.Printf("Warning: failed to invalidate dashboard cache: %v", err)
+		}
+	}
+
 	c.JSON(http.StatusCreated, gin.H{"message": "Customer created", "customer": customer})
 }
 
@@ -147,6 +204,16 @@ func (h *CustomerHandler) Update(c *gin.Context) {
 		}
 	}
 
+	// Invalidate customer list and dashboard caches after successful update
+	if h.CacheService != nil && h.CacheService.Enabled() {
+		if err := h.CacheService.InvalidateCustomers(c.Request.Context()); err != nil {
+			log.Printf("Warning: failed to invalidate customer list cache: %v", err)
+		}
+		if err := h.CacheService.InvalidateDashboard(c.Request.Context()); err != nil {
+			log.Printf("Warning: failed to invalidate dashboard cache: %v", err)
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "Customer updated", "customer": customer})
 }
 
@@ -167,6 +234,16 @@ func (h *CustomerHandler) Delete(c *gin.Context) {
 	if userIDValue != nil {
 		if uid, ok := userIDValue.(uint); ok {
 			h.LogService.Record(uid, "DELETE", "Customer", strconv.Itoa(int(id)), fmt.Sprintf("Deleted customer #%d", id), c.ClientIP())
+		}
+	}
+
+	// Invalidate customer list and dashboard caches after successful delete
+	if h.CacheService != nil && h.CacheService.Enabled() {
+		if err := h.CacheService.InvalidateCustomers(c.Request.Context()); err != nil {
+			log.Printf("Warning: failed to invalidate customer list cache: %v", err)
+		}
+		if err := h.CacheService.InvalidateDashboard(c.Request.Context()); err != nil {
+			log.Printf("Warning: failed to invalidate dashboard cache: %v", err)
 		}
 	}
 

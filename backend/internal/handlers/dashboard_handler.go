@@ -2,17 +2,23 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"net/http"
+	"time"
+
 	"smsystem-backend/internal/database"
 	"smsystem-backend/internal/models"
+	"smsystem-backend/internal/services"
 
 	"github.com/gin-gonic/gin"
 )
 
-type DashboardHandler struct{}
+type DashboardHandler struct {
+	CacheService *services.CacheService
+}
 
-func NewDashboardHandler() *DashboardHandler {
-	return &DashboardHandler{}
+func NewDashboardHandler(cache *services.CacheService) *DashboardHandler {
+	return &DashboardHandler{CacheService: cache}
 }
 
 type DailySale struct {
@@ -57,14 +63,19 @@ type CategoryProfit struct {
 }
 
 func (h *DashboardHandler) GetStats(c *gin.Context) {
+	ctx := c.Request.Context()
 	branchIDValue, _ := c.Get("branchID")
 	userRole, _ := c.Get("userRole")
+	roleStr := ""
+	if userRole != nil {
+		roleStr = userRole.(string)
+	}
 	var branchID uint
 	if branchIDValue != nil {
 		branchID = branchIDValue.(uint)
 	}
 
-	if userRole == "super_admin" {
+	if roleStr == "super_admin" {
 		branchQuery := c.Query("branch_id")
 		if branchQuery == "ALL" {
 			branchID = 0
@@ -78,6 +89,21 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 	}
 
 	days := c.DefaultQuery("days", "0")
+
+	// Build cache key with branch ID, role, and query params
+	cacheKey := services.DashboardStatsKey(branchID, roleStr, c.Request.URL.Query())
+
+	// Try read-through cache first
+	if h.CacheService != nil && h.CacheService.Enabled() {
+		var cached map[string]interface{}
+		found, err := h.CacheService.GetJSON(ctx, cacheKey, &cached)
+		if err == nil && found {
+			// Cache hit - return immediately
+			c.JSON(http.StatusOK, cached)
+			return
+		}
+	}
+
 	var dateFilter string
 	if days != "0" {
 		dateFilter = fmt.Sprintf("DATE_SUB(NOW(), INTERVAL %s DAY)", days)
@@ -307,7 +333,7 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 	prevProfit := prevSales - prevCostOfGoods - prevExpenses
 	profitChange := calculateChange(currentProfit, prevProfit)
 
-	c.JSON(http.StatusOK, gin.H{
+	response := gin.H{
 		"total_sales":        summary.TotalSales,
 		"total_expenses":     summary.TotalExpenses,
 		"net_profit":         summary.NetProfit,
@@ -323,5 +349,14 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 		"top_products_today": topProducts,
 		"category_profits":   categoryProfits,
 		"product_revenue":    productRevenue,
-	})
+	}
+
+	// Cache the result with 20s TTL (matches spec recommendation)
+	if h.CacheService != nil && h.CacheService.Enabled() {
+		if err := h.CacheService.SetJSON(ctx, cacheKey, response, 20*time.Second); err != nil {
+			log.Printf("Warning: failed to cache dashboard stats: %v", err)
+		}
+	}
+
+	c.JSON(http.StatusOK, response)
 }

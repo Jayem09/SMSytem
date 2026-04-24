@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"os/exec"
 	"runtime"
@@ -19,10 +20,11 @@ import (
 
 type SystemHandler struct {
 	BackupService *services.BackupService
+	CacheService  *services.CacheService
 }
 
-func NewSystemHandler(backupSvc *services.BackupService) *SystemHandler {
-	return &SystemHandler{BackupService: backupSvc}
+func NewSystemHandler(backupSvc *services.BackupService, cacheSvc *services.CacheService) *SystemHandler {
+	return &SystemHandler{BackupService: backupSvc, CacheService: cacheSvc}
 }
 
 type SystemMetrics struct {
@@ -44,7 +46,33 @@ type SystemMetrics struct {
 	Status            string  `json:"status"`
 }
 
+// statusCacheResult holds the cached system status response
+type statusCacheResult struct {
+	Maintenance bool   `json:"maintenance"`
+	MinVersion  string `json:"min_version"`
+	Message    string `json:"message"`
+}
+
 func (h *SystemHandler) GetStatus(c *gin.Context) {
+	ctx := c.Request.Context()
+	cacheKey := services.SystemStatusKey()
+
+	// Try cache first (read-through pattern)
+	if h.CacheService != nil && h.CacheService.Enabled() {
+		var cached statusCacheResult
+		found, err := h.CacheService.GetJSON(ctx, cacheKey, &cached)
+		if err == nil && found {
+			// Cache hit - return immediately
+			c.JSON(http.StatusOK, gin.H{
+				"maintenance": cached.Maintenance,
+				"min_version": cached.MinVersion,
+				"message":    cached.Message,
+			})
+			return
+		}
+	}
+
+	// Cache miss - run existing DB logic
 	var maintenanceMode models.Setting
 	var minAppVersion models.Setting
 
@@ -55,6 +83,19 @@ func (h *SystemHandler) GetStatus(c *gin.Context) {
 	minVersion := minAppVersion.Value
 	if minVersion == "" {
 		minVersion = "0.0.0"
+	}
+
+	result := statusCacheResult{
+		Maintenance: isMaintenance,
+		MinVersion:  minVersion,
+		Message:    "System status retrieved successfully",
+	}
+
+	// Cache result with 20s TTL (matches spec TTL range for system status)
+	if h.CacheService != nil && h.CacheService.Enabled() {
+		if err := h.CacheService.SetJSON(ctx, cacheKey, result, 20*time.Second); err != nil {
+			log.Printf("Warning: failed to cache system status: %v", err)
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{

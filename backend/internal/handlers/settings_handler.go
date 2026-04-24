@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 
 	"smsystem-backend/internal/database"
@@ -12,11 +13,12 @@ import (
 )
 
 type SettingsHandler struct {
-	LogService *services.LogService
+	LogService  *services.LogService
+	CacheService *services.CacheService
 }
 
-func NewSettingsHandler(logService *services.LogService) *SettingsHandler {
-	return &SettingsHandler{LogService: logService}
+func NewSettingsHandler(logService *services.LogService, cacheService *services.CacheService) *SettingsHandler {
+	return &SettingsHandler{LogService: logService, CacheService: cacheService}
 }
 
 
@@ -49,6 +51,9 @@ func (h *SettingsHandler) UpdateBulk(c *gin.Context) {
 		return
 	}
 
+	// Track if system status cache needs invalidation
+	invalidateCache := false
+
 	tx := database.DB.Begin()
 	for key, value := range input {
 		strValue := ""
@@ -75,8 +80,21 @@ func (h *SettingsHandler) UpdateBulk(c *gin.Context) {
 				return
 			}
 		}
+
+		// Check if this update affects system status cache
+		if key == "maintenance_mode" || key == "min_app_version" {
+			invalidateCache = true
+		}
 	}
 	tx.Commit()
+
+	// Invalidate system status cache if needed
+	if invalidateCache && h.CacheService != nil {
+		ctx := c.Request.Context()
+		if err := h.CacheService.InvalidateSystemStatus(ctx); err != nil {
+			log.Printf("Warning: failed to invalidate system status cache: %v", err)
+		}
+	}
 
 	currentUserID, _ := c.Get("userID")
 	if currentUserID != nil {

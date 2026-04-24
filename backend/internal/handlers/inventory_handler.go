@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -15,11 +16,12 @@ import (
 )
 
 type InventoryHandler struct {
-	LogService *services.LogService
+	LogService   *services.LogService
+	CacheService *services.CacheService
 }
 
-func NewInventoryHandler(logService *services.LogService) *InventoryHandler {
-	return &InventoryHandler{LogService: logService}
+func NewInventoryHandler(logService *services.LogService, cacheSvc *services.CacheService) *InventoryHandler {
+	return &InventoryHandler{LogService: logService, CacheService: cacheSvc}
 }
 
 func (h *InventoryHandler) GetWarehouses(c *gin.Context) {
@@ -215,6 +217,16 @@ func (h *InventoryHandler) StockIn(c *gin.Context) {
 	h.LogService.Record(userID, "CREATE", "Inventory", strconv.Itoa(int(movement.ID)), fmt.Sprintf("Stock In: +%d for Product #%d", input.Quantity, input.ProductID), c.ClientIP())
 
 	c.JSON(http.StatusOK, gin.H{"message": "Stock successfully received", "batch": batch})
+
+	// Invalidate product list and dashboard caches after successful stock in
+	if h.CacheService != nil && h.CacheService.Enabled() {
+		if err := h.CacheService.InvalidateProducts(c.Request.Context()); err != nil {
+			log.Printf("Warning: failed to invalidate product list cache: %v", err)
+		}
+		if err := h.CacheService.InvalidateDashboard(c.Request.Context()); err != nil {
+			log.Printf("Warning: failed to invalidate dashboard cache: %v", err)
+		}
+	}
 }
 
 func (h *InventoryHandler) StockOut(c *gin.Context) {
@@ -300,6 +312,16 @@ func (h *InventoryHandler) StockOut(c *gin.Context) {
 	h.LogService.Record(userID, "CREATE", "Inventory", strconv.Itoa(int(input.ProductID)), fmt.Sprintf("Stock Out: -%d for Product #%d", input.Quantity, input.ProductID), c.ClientIP())
 
 	c.JSON(http.StatusOK, gin.H{"message": "Stock successfully deducted"})
+
+	// Invalidate product list and dashboard caches after successful stock out
+	if h.CacheService != nil && h.CacheService.Enabled() {
+		if err := h.CacheService.InvalidateProducts(c.Request.Context()); err != nil {
+			log.Printf("Warning: failed to invalidate product list cache: %v", err)
+		}
+		if err := h.CacheService.InvalidateDashboard(c.Request.Context()); err != nil {
+			log.Printf("Warning: failed to invalidate dashboard cache: %v", err)
+		}
+	}
 }
 
 type adjustStockInput struct {
@@ -387,6 +409,16 @@ func (h *InventoryHandler) AdjustStock(c *gin.Context) {
 	h.LogService.Record(userID, "UPDATE", "Inventory", strconv.Itoa(int(batch.ID)), fmt.Sprintf("Adjusted Batch #%d to %d", batch.ID, input.NewQuantity), c.ClientIP())
 
 	c.JSON(http.StatusOK, gin.H{"message": "Stock successfully adjusted"})
+
+	// Invalidate product list and dashboard caches after successful adjustment
+	if h.CacheService != nil && h.CacheService.Enabled() {
+		if err := h.CacheService.InvalidateProducts(c.Request.Context()); err != nil {
+			log.Printf("Warning: failed to invalidate product list cache: %v", err)
+		}
+		if err := h.CacheService.InvalidateDashboard(c.Request.Context()); err != nil {
+			log.Printf("Warning: failed to invalidate dashboard cache: %v", err)
+		}
+	}
 
 	// Broadcast event for live dashboard updates
 	services.GetBroadcaster().BroadcastToBranch(services.EventStockAdjusted, branchID, nil)

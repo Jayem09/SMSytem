@@ -18,12 +18,13 @@ import (
 )
 
 type TransferHandler struct {
-	LogService   *services.LogService
-	EmailService *services.EmailService
+	LogService    *services.LogService
+	EmailService  *services.EmailService
+	CacheService  *services.CacheService
 }
 
-func NewTransferHandler(logSvc *services.LogService, emailSvc *services.EmailService) *TransferHandler {
-	return &TransferHandler{LogService: logSvc, EmailService: emailSvc}
+func NewTransferHandler(logSvc *services.LogService, emailSvc *services.EmailService, cacheSvc *services.CacheService) *TransferHandler {
+	return &TransferHandler{LogService: logSvc, EmailService: emailSvc, CacheService: cacheSvc}
 }
 
 type transferItemInput struct {
@@ -222,6 +223,13 @@ func (h *TransferHandler) Create(c *gin.Context) {
 	h.LogService.Record(userID, "CREATE", "StockTransfer", strconv.Itoa(int(transfer.ID)), fmt.Sprintf("Created stock transfer %s", transfer.ReferenceNumber), c.ClientIP())
 
 	c.JSON(http.StatusCreated, gin.H{"message": "Transfer request created", "transfer": transfer})
+
+	// Invalidate dashboard cache after successful create
+	if h.CacheService != nil && h.CacheService.Enabled() {
+		if err := h.CacheService.InvalidateDashboard(c.Request.Context()); err != nil {
+			log.Printf("Warning: failed to invalidate dashboard cache: %v", err)
+		}
+	}
 
 	// Broadcast event for live dashboard updates
 	services.GetBroadcaster().BroadcastToBranch(services.EventTransferUpdated, branchID, nil)
@@ -529,6 +537,13 @@ func (h *TransferHandler) UpdateStatus(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Transfer status updated", "transfer": transfer})
+
+	// Invalidate dashboard cache after successful status update
+	if h.CacheService != nil && h.CacheService.Enabled() {
+		if err := h.CacheService.InvalidateDashboard(c.Request.Context()); err != nil {
+			log.Printf("Warning: failed to invalidate dashboard cache: %v", err)
+		}
+	}
 
 	// Broadcast event for live dashboard updates
 	services.GetBroadcaster().BroadcastToBranch(services.EventTransferUpdated, userBranchID, nil)

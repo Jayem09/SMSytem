@@ -3,6 +3,7 @@ package handlers
 import (
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -17,11 +18,12 @@ import (
 )
 
 type OrderHandler struct {
-	LogService *services.LogService
+	LogService   *services.LogService
+	CacheService *services.CacheService
 }
 
-func NewOrderHandler(logSvc *services.LogService) *OrderHandler {
-	return &OrderHandler{LogService: logSvc}
+func NewOrderHandler(logSvc *services.LogService, cacheSvc *services.CacheService) *OrderHandler {
+	return &OrderHandler{LogService: logSvc, CacheService: cacheSvc}
 }
 
 type orderItemInput struct {
@@ -387,6 +389,13 @@ func (h *OrderHandler) Create(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, gin.H{"message": "Order created", "order": order})
 
+	// Invalidate dashboard cache after successful create
+	if h.CacheService != nil && h.CacheService.Enabled() {
+		if err := h.CacheService.InvalidateDashboard(c.Request.Context()); err != nil {
+			log.Printf("Warning: failed to invalidate dashboard cache: %v", err)
+		}
+	}
+
 	// Broadcast event for live dashboard updates
 	services.GetBroadcaster().BroadcastToBranch(services.EventOrderCreated, order.BranchID, nil)
 	if orderStatus == "completed" {
@@ -508,6 +517,13 @@ func (h *OrderHandler) UpdateStatus(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Order status updated", "order": order})
 
+	// Invalidate dashboard cache after successful status update
+	if h.CacheService != nil && h.CacheService.Enabled() {
+		if err := h.CacheService.InvalidateDashboard(c.Request.Context()); err != nil {
+			log.Printf("Warning: failed to invalidate dashboard cache: %v", err)
+		}
+	}
+
 	// Broadcast event for live dashboard updates
 	if input.Status == "completed" {
 		services.GetBroadcaster().BroadcastToBranch(services.EventOrderCompleted, order.BranchID, nil)
@@ -613,6 +629,13 @@ func (h *OrderHandler) Delete(c *gin.Context) {
 	h.LogService.Record(userID, "DELETE", "Order", strconv.Itoa(int(id)), fmt.Sprintf("Deleted order #%d (stock %s)", id, statusMsg), c.ClientIP())
 
 	c.JSON(http.StatusOK, gin.H{"message": "Order deleted successfully"})
+
+	// Invalidate dashboard cache after successful delete
+	if h.CacheService != nil && h.CacheService.Enabled() {
+		if err := h.CacheService.InvalidateDashboard(c.Request.Context()); err != nil {
+			log.Printf("Warning: failed to invalidate dashboard cache: %v", err)
+		}
+	}
 
 	// Broadcast event for live dashboard updates
 	services.GetBroadcaster().BroadcastToBranch(services.EventOrderDeleted, order.BranchID, nil)

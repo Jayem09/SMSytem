@@ -29,6 +29,9 @@ type Config struct {
 	JWTExpiry   string
 	RedisHost   string
 	RedisPort   string
+	RedisPassword string
+	CacheEnabled  bool
+	CacheDefaultTTL string
 	BackupPath  string
 	// Backup settings
 	AutoBackupEnabled bool   // Enable automatic backups
@@ -69,6 +72,9 @@ func Load() *Config {
 		JWTExpiry:   getEnv("JWT_EXPIRY", "24h"),
 		RedisHost:   getEnv("REDIS_HOST", "127.0.0.1"),
 		RedisPort:   getEnv("REDIS_PORT", "6379"),
+		RedisPassword:   getEnv("REDIS_PASSWORD", ""),
+		CacheEnabled:    getEnv("CACHE_ENABLED", "false") == "true",
+		CacheDefaultTTL: getEnv("CACHE_DEFAULT_TTL", "5m"),
 		BackupPath:  getEnv("BACKUP_PATH", "/var/backups/smsystem"),
 		// Backup settings
 		AutoBackupEnabled: getEnv("AUTO_BACKUP_ENABLED", "false") == "true",

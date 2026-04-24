@@ -54,6 +54,10 @@ func main() {
 	logService := services.NewLogService()
 	backupService := services.NewBackupService(cfg)
 	emailService := services.NewEmailService()
+	cacheService, err := services.NewCacheService(cfg)
+	if err != nil {
+		log.Printf("Warning: cache service initialization failed: %v", err)
+	}
 
 	// Initialize backup scheduler if enabled
 	if cfg.AutoBackupEnabled {
@@ -69,24 +73,24 @@ func main() {
 		Auth:          handlers.NewAuthHandler(authService, logService),
 		Category:      handlers.NewCategoryHandler(logService),
 		Brand:         handlers.NewBrandHandler(logService),
-		Product:       handlers.NewProductHandler(logService),
-		Customer:      handlers.NewCustomerHandler(logService),
-		Order:         handlers.NewOrderHandler(logService),
-		Expense:       handlers.NewExpenseHandler(logService),
-		Dashboard:     handlers.NewDashboardHandler(),
+		Product:       handlers.NewProductHandler(logService, cacheService),
+		Customer:      handlers.NewCustomerHandler(logService, cacheService),
+		Order:         handlers.NewOrderHandler(logService, cacheService),
+		Expense:       handlers.NewExpenseHandler(logService, cacheService),
+		Dashboard:     handlers.NewDashboardHandler(cacheService),
 		Import:        handlers.NewImportHandler(),
 		Log:           handlers.NewLogHandler(),
 		Terminal:      handlers.NewTerminalHandler(terminalService),
 		Supplier:      handlers.NewSupplierHandler(logService),
 		PurchaseOrder: handlers.NewPurchaseOrderHandler(logService),
 		User:          handlers.NewUserHandler(logService),
-		Inventory:     handlers.NewInventoryHandler(logService),
-		Settings:      handlers.NewSettingsHandler(logService),
+		Inventory:     handlers.NewInventoryHandler(logService, cacheService),
+		Settings:      handlers.NewSettingsHandler(logService, cacheService),
 		Report:        handlers.NewReportHandler(),
-		Branch:        handlers.NewBranchHandler(logService),
-		Transfer:      handlers.NewTransferHandler(logService, emailService),
+		Branch:        handlers.NewBranchHandler(logService, cacheService),
+		Transfer:      handlers.NewTransferHandler(logService, emailService, cacheService),
 		Search:        handlers.NewSearchHandler(),
-		System:        handlers.NewSystemHandler(backupService),
+		System:        handlers.NewSystemHandler(backupService, cacheService),
 		Analytics:     handlers.NewAnalyticsHandler(),
 		Promo:         handlers.NewPromoHandler(emailService),
 		Event:         handlers.NewEventHandler(cfg),

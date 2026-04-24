@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 	"smsystem-backend/internal/database"
 	"smsystem-backend/internal/models"
@@ -11,11 +12,12 @@ import (
 )
 
 type ExpenseHandler struct {
-	LogService *services.LogService
+	LogService   *services.LogService
+	CacheService *services.CacheService
 }
 
-func NewExpenseHandler(logService *services.LogService) *ExpenseHandler {
-	return &ExpenseHandler{LogService: logService}
+func NewExpenseHandler(logService *services.LogService, cacheSvc *services.CacheService) *ExpenseHandler {
+	return &ExpenseHandler{LogService: logService, CacheService: cacheSvc}
 }
 
 func (h *ExpenseHandler) Create(c *gin.Context) {
@@ -60,6 +62,13 @@ func (h *ExpenseHandler) Create(c *gin.Context) {
 	h.LogService.Record(userID, "CREATE", "Expense", strconv.Itoa(int(expense.ID)), "Recorded new expense", c.ClientIP())
 
 	c.JSON(http.StatusCreated, expense)
+
+	// Invalidate dashboard cache after successful create
+	if h.CacheService != nil && h.CacheService.Enabled() {
+		if err := h.CacheService.InvalidateDashboard(c.Request.Context()); err != nil {
+			log.Printf("Warning: failed to invalidate dashboard cache: %v", err)
+		}
+	}
 
 	// Broadcast event for live dashboard updates
 	services.GetBroadcaster().BroadcastToBranch(services.EventExpenseAdded, expense.BranchID, nil)
@@ -109,6 +118,13 @@ func (h *ExpenseHandler) Update(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, expense)
+
+	// Invalidate dashboard cache after successful update
+	if h.CacheService != nil && h.CacheService.Enabled() {
+		if err := h.CacheService.InvalidateDashboard(c.Request.Context()); err != nil {
+			log.Printf("Warning: failed to invalidate dashboard cache: %v", err)
+		}
+	}
 }
 
 func (h *ExpenseHandler) Delete(c *gin.Context) {
@@ -132,6 +148,13 @@ func (h *ExpenseHandler) Delete(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Expense deleted successfully"})
+
+	// Invalidate dashboard cache after successful delete
+	if h.CacheService != nil && h.CacheService.Enabled() {
+		if err := h.CacheService.InvalidateDashboard(c.Request.Context()); err != nil {
+			log.Printf("Warning: failed to invalidate dashboard cache: %v", err)
+		}
+	}
 
 	// Broadcast event for live dashboard updates
 	services.GetBroadcaster().BroadcastToBranch(services.EventExpenseAdded, expense.BranchID, nil)

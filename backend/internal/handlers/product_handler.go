@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -15,11 +16,12 @@ import (
 )
 
 type ProductHandler struct {
-	LogService *services.LogService
+	LogService   *services.LogService
+	CacheService *services.CacheService
 }
 
-func NewProductHandler(logSvc *services.LogService) *ProductHandler {
-	return &ProductHandler{LogService: logSvc}
+func NewProductHandler(logSvc *services.LogService, cacheSvc *services.CacheService) *ProductHandler {
+	return &ProductHandler{LogService: logSvc, CacheService: cacheSvc}
 }
 
 type productInput struct {
@@ -51,8 +53,13 @@ type productInput struct {
 }
 
 func (h *ProductHandler) List(c *gin.Context) {
+	ctx := c.Request.Context()
 	branchID, _ := GetUintFromContext(c, "branchID")
 	userRole, _ := c.Get("userRole")
+	roleStr := ""
+	if userRole != nil {
+		roleStr = userRole.(string)
+	}
 
 	// For super_admin, allow explicit branch selection via query param
 	if userRole == "super_admin" {
@@ -65,6 +72,19 @@ func (h *ProductHandler) List(c *gin.Context) {
 			if bID > 0 {
 				branchID = bID
 			}
+		}
+	}
+
+	// Build cache key with branch ID, role, and query params
+	cacheKey := services.BuildScopedListKey(services.ProductListPrefix, branchID, roleStr, c.Request.URL.Query())
+
+	// Try read-through cache first (60s TTL)
+	if h.CacheService != nil && h.CacheService.Enabled() {
+		var cached []map[string]interface{}
+		found, err := h.CacheService.GetJSON(ctx, cacheKey, &cached)
+		if err == nil && found && len(cached) > 0 {
+			c.JSON(http.StatusOK, gin.H{"products": cached})
+			return
 		}
 	}
 
@@ -153,6 +173,13 @@ func (h *ProductHandler) List(c *gin.Context) {
 				fmt.Sscanf(v, "%d", &stock)
 				r["branch_stock"] = stock
 			}
+		}
+	}
+
+	// Cache the result with 60s TTL
+	if h.CacheService != nil && h.CacheService.Enabled() {
+		if err := h.CacheService.SetJSON(ctx, cacheKey, results, 60*time.Second); err != nil {
+			log.Printf("Warning: failed to cache product list: %v", err)
 		}
 	}
 
@@ -309,6 +336,16 @@ func (h *ProductHandler) Create(c *gin.Context) {
 
 	h.LogService.Record(userID, "CREATE", "Product", strconv.Itoa(int(product.ID)), fmt.Sprintf("Created product: %s with initial stock %d", product.Name, input.Stock), c.ClientIP())
 
+	// Invalidate product list and dashboard caches after successful create
+	if h.CacheService != nil && h.CacheService.Enabled() {
+		if err := h.CacheService.InvalidateProducts(c.Request.Context()); err != nil {
+			log.Printf("Warning: failed to invalidate product list cache: %v", err)
+		}
+		if err := h.CacheService.InvalidateDashboard(c.Request.Context()); err != nil {
+			log.Printf("Warning: failed to invalidate dashboard cache: %v", err)
+		}
+	}
+
 	c.JSON(http.StatusCreated, gin.H{"message": "Product created", "product": product})
 }
 
@@ -430,6 +467,16 @@ func (h *ProductHandler) Update(c *gin.Context) {
 		Select("products.*, (SELECT COALESCE(SUM(quantity), 0) FROM batches WHERE product_id = products.id AND branch_id = ?) as stock", bID).
 		First(&product, product.ID)
 
+	// Invalidate product list and dashboard caches after successful update
+	if h.CacheService != nil && h.CacheService.Enabled() {
+		if err := h.CacheService.InvalidateProducts(c.Request.Context()); err != nil {
+			log.Printf("Warning: failed to invalidate product list cache: %v", err)
+		}
+		if err := h.CacheService.InvalidateDashboard(c.Request.Context()); err != nil {
+			log.Printf("Warning: failed to invalidate dashboard cache: %v", err)
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "Product updated", "product": product})
 }
 
@@ -453,5 +500,16 @@ func (h *ProductHandler) Delete(c *gin.Context) {
 
 	userID, _ := GetUintFromContext(c, "userID")
 	h.LogService.Record(userID, "DELETE", "Product", strconv.Itoa(int(id)), fmt.Sprintf("Deleted product: %s", product.Name), c.ClientIP())
+
+	// Invalidate product list and dashboard caches after successful delete
+	if h.CacheService != nil && h.CacheService.Enabled() {
+		if err := h.CacheService.InvalidateProducts(c.Request.Context()); err != nil {
+			log.Printf("Warning: failed to invalidate product list cache: %v", err)
+		}
+		if err := h.CacheService.InvalidateDashboard(c.Request.Context()); err != nil {
+			log.Printf("Warning: failed to invalidate dashboard cache: %v", err)
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "Product deleted"})
 }
