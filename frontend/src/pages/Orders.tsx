@@ -1,13 +1,36 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import api from '../api/axios';
 import DataTable from '../components/DataTable';
 import Modal from '../components/Modal';
 import { useAuth } from '../hooks/useAuth';
-import { Printer, Eye, Trash2, CheckCircle2 } from 'lucide-react';
+import { Printer, Eye, Trash2, CheckCircle2, FilterX, FileSpreadsheet } from 'lucide-react';
 import { printReceipt } from '../components/Receipt';
 import { printDeliveryReceipt } from '../components/DeliveryReceipt';
 import { getIsOfflineMode } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import offlineStorage, { type LocalOrder } from '../services/offlineStorage';
+import {
+  DATE_FILTER_VALUES,
+  ORDER_DATE_INPUT_FORMAT,
+  PAYMENT_STATUS_FILTER_VALUES,
+  SORT_OPTION_VALUES,
+  formatCurrency,
+  formatPaymentMethodLabel,
+  getOrderCustomerName,
+  getResolvedAmountPaid,
+  getResolvedBalanceDue,
+  getResolvedPaymentStatus,
+  isDeferredPaymentMethod,
+  matchesDateFilter,
+  matchesPaymentMethodFilter,
+  matchesPaymentStatusFilter,
+  sortOrders,
+  type DateFilter,
+  type OrdersSortOption,
+  type PaymentStatusFilter,
+} from './ordersFilterUtils';
+import { exportOrdersToExcel } from '../utils/reportExports';
 
 interface Customer { id: number; name: string; phone?: string; }
 interface Product { id: number; name: string; price: number; branch_stock: number; stock?: number; is_service?: boolean; }
@@ -58,14 +81,108 @@ const statusColors: Record<string, string> = {
   cancelled: 'bg-red-100 text-red-800',
 };
 
+const paymentStatusColors: Record<string, string> = {
+  paid: 'bg-green-100 text-green-800',
+  partial: 'bg-amber-100 text-amber-800',
+  unpaid: 'bg-red-100 text-red-800',
+};
+
+const PAYMENT_METHOD_OPTIONS = [
+  { value: 'all', label: 'All Methods' },
+  { value: 'cash', label: 'Cash' },
+  { value: 'gcash', label: 'GCash' },
+  { value: 'card', label: 'Credit Card' },
+  { value: 'bank_transfer', label: 'Bank Transfer' },
+  { value: 'dated_check', label: 'Dated Check' },
+  { value: 'post_dated_check', label: 'Post-Dated Check' },
+  { value: 'claimed_downpayment', label: 'Claimed Downpayment' },
+  { value: 'goodyear_voucher', label: 'Goodyear Voucher' },
+  { value: 'ewt', label: 'EWT' },
+  { value: 'trade_in', label: 'Trade In' },
+];
+
+const PAYMENT_STATUS_OPTIONS: { value: PaymentStatusFilter; label: string }[] = [
+  { value: 'all', label: 'All Payment Statuses' },
+  { value: 'receivable', label: 'Receivables Only' },
+  { value: 'paid', label: 'Paid' },
+  { value: 'partial', label: 'Partial' },
+  { value: 'unpaid', label: 'Unpaid' },
+];
+
+const DATE_FILTER_OPTIONS: { value: DateFilter; label: string }[] = [
+  { value: 'all', label: 'All Dates' },
+  { value: 'today', label: 'Today' },
+  { value: 'this_week', label: 'This Week' },
+  { value: 'this_month', label: 'This Month' },
+  { value: 'specific_day', label: 'Specific Day' },
+];
+
+const SORT_OPTIONS: { value: OrdersSortOption; label: string }[] = [
+  { value: 'date_desc', label: 'Date: Newest First' },
+  { value: 'date_asc', label: 'Date: Oldest First' },
+  { value: 'balance_desc', label: 'Balance Due: Highest First' },
+  { value: 'balance_asc', label: 'Balance Due: Lowest First' },
+  { value: 'total_desc', label: 'Total Amount: Highest First' },
+  { value: 'total_asc', label: 'Total Amount: Lowest First' },
+  { value: 'customer_asc', label: 'Customer: A to Z' },
+];
+
+function parseFilterOption<T extends readonly string[]>(value: string | null, allowedValues: T, fallback: T[number]): T[number] {
+  if (value && allowedValues.includes(value as T[number])) {
+    return value as T[number];
+  }
+
+  return fallback;
+}
+
 export default function Orders() {
   const { user, isAuthenticated } = useAuth();
+  const { showToast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'purchasing' || user?.role === 'purchaser';
   const canCompletePending = user?.role !== 'super_admin';
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [itemsModalOpen, setItemsModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const paymentStatusFilter = parseFilterOption(searchParams.get('payment_status'), PAYMENT_STATUS_FILTER_VALUES, 'all');
+  const paymentMethodFilter = searchParams.get('payment_method') || 'all';
+  const dateFilter = parseFilterOption(searchParams.get('date_filter'), DATE_FILTER_VALUES, 'all');
+  const selectedDate = searchParams.get('date') || new Date().toLocaleDateString(ORDER_DATE_INPUT_FORMAT);
+  const sortOption = parseFilterOption(searchParams.get('sort'), SORT_OPTION_VALUES, 'date_desc');
+
+  const updateFilters = (updates: Record<string, string | null>) => {
+    const nextSearchParams = new URLSearchParams(searchParams);
+
+    Object.entries(updates).forEach(([key, value]) => {
+      if (!value) {
+        nextSearchParams.delete(key);
+      } else {
+        nextSearchParams.set(key, value);
+      }
+    });
+
+    setSearchParams(nextSearchParams, { replace: true });
+  };
+
+  const filteredOrders = useMemo(() => {
+    const nextOrders = orders.filter((order) => (
+      matchesPaymentStatusFilter(order, paymentStatusFilter)
+      && matchesPaymentMethodFilter(order, paymentMethodFilter)
+      && matchesDateFilter(order, dateFilter, selectedDate)
+    ));
+
+    return sortOrders(nextOrders, sortOption);
+  }, [orders, paymentStatusFilter, paymentMethodFilter, dateFilter, selectedDate, sortOption]);
+
+  const filteredReceivableTotal = useMemo(() => (
+    filteredOrders.reduce((sum, order) => sum + getResolvedBalanceDue(order), 0)
+  ), [filteredOrders]);
+
+  const hasActiveFilters = paymentStatusFilter !== 'all'
+    || paymentMethodFilter !== 'all'
+    || dateFilter !== 'all'
+    || sortOption !== 'date_desc';
 
   // Fetch orders when component mounts or when authentication state changes
   useEffect(() => {
@@ -228,8 +345,36 @@ export default function Orders() {
 
   const handleCompletePending = async (order: Order) => {
     if (!confirm(`Complete Pending Order #${order.id}? This will process the payment and deduct stock.`)) return;
+
+    const defaultAmountPaid = getResolvedAmountPaid(order) > 0
+      ? getResolvedAmountPaid(order)
+      : isDeferredPaymentMethod(order.payment_method)
+        ? 0
+        : (order.total_amount ?? 0);
+
+    const rawAmountPaid = window.prompt(
+      `Enter amount paid for Order #${order.id}. Leave blank to keep the default payment handling.`,
+      defaultAmountPaid.toFixed(2),
+    );
+
+    if (rawAmountPaid === null) return;
+
+    const trimmedAmountPaid = rawAmountPaid.trim();
+    const payload: { status: 'completed'; amount_paid?: number } = { status: 'completed' };
+
+    if (trimmedAmountPaid !== '') {
+      const parsedAmountPaid = Number(trimmedAmountPaid);
+
+      if (!Number.isFinite(parsedAmountPaid) || parsedAmountPaid < 0) {
+        alert('Amount paid must be a valid number greater than or equal to 0.');
+        return;
+      }
+
+      payload.amount_paid = parsedAmountPaid;
+    }
+
     try {
-      await api.patch(`/api/orders/${order.id}/status`, { status: 'completed' });
+      await api.patch(`/api/orders/${order.id}/status`, payload);
       fetchOrders();
     } catch (err: unknown) {
       const e = err as { response?: { data?: { details?: string } }; message?: string };
@@ -239,49 +384,195 @@ export default function Orders() {
 
   const handlePrint = async (order: Order) => {
     console.log('[Orders] Printing order:', order);
-    
-    // Ensure items have required fields for receipt
-    const orderForReceipt = {
-      ...order,
-      items: (order.items || []).map((item: OrderItem) => ({
-        ...item,
-        unit_price: item.unit_price ?? item.price ?? 0,
-        subtotal: item.subtotal ?? ((item.quantity || 0) * (item.unit_price ?? item.price ?? 0)),
-        product: item.product || { name: `Product #${item.product_id}` },
-      })),
-    };
-    
-    if (order.receipt_type === 'SI') {
-      await printReceipt(orderForReceipt, order.tin || '', order.business_address || '', order.withholding_tax_rate || 0);
-    } else {
-      await printDeliveryReceipt(orderForReceipt, order.tin || '', order.business_address || '', order.withholding_tax_rate || 0);
+    try {
+      const orderForReceipt = {
+        ...order,
+        items: (order.items || []).map((item: OrderItem) => ({
+          ...item,
+          unit_price: item.unit_price ?? item.price ?? 0,
+          subtotal: item.subtotal ?? ((item.quantity || 0) * (item.unit_price ?? item.price ?? 0)),
+          product: item.product || { name: `Product #${item.product_id}` },
+        })),
+      };
+
+      if (order.receipt_type === 'SI') {
+        await printReceipt(orderForReceipt, order.tin || '', order.business_address || '', order.withholding_tax_rate || 0);
+      } else {
+        await printDeliveryReceipt(orderForReceipt, order.tin || '', order.business_address || '', order.withholding_tax_rate || 0);
+      }
+    } catch (error) {
+      console.error('[Orders] Print failed:', error);
+      alert('Printing failed. Please try again.');
+    }
+  };
+
+  const handleExportExcel = async () => {
+    if (filteredOrders.length === 0) {
+      showToast('No orders match the current filters.', 'info');
+      return;
+    }
+
+    try {
+      const savedPath = await exportOrdersToExcel(filteredOrders, {
+        paymentStatusFilter,
+        paymentMethodFilter,
+        dateFilter,
+        selectedDate,
+        sortOption,
+      });
+      if (typeof savedPath === 'string' && '__TAURI_INTERNALS__' in window) {
+        showToast(`Excel exported to: ${savedPath}`, 'success');
+      } else {
+        showToast('Excel download started.', 'success');
+      }
+    } catch (error) {
+      console.error('[Orders] Excel export failed:', error);
+      showToast('Failed to export orders to Excel.', 'error');
     }
   };
 
   return (
     <div className="p-6 mx-auto">
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col gap-6 mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Orders</h1>
-          <p className="text-gray-500 mt-1">Manage sales, payments, and generate customer receipts.</p>
+          <p className="text-gray-500 mt-1">Manage sales, payments, receivables, and customer receipts.</p>
+        </div>
+
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500">Payment Status</label>
+              <select
+                value={paymentStatusFilter}
+                onChange={(event) => updateFilters({ payment_status: event.target.value === 'all' ? null : event.target.value })}
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                {PAYMENT_STATUS_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500">Payment Method</label>
+              <select
+                value={paymentMethodFilter}
+                onChange={(event) => updateFilters({ payment_method: event.target.value === 'all' ? null : event.target.value })}
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                {PAYMENT_METHOD_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500">Date Filter</label>
+              <select
+                value={dateFilter}
+                onChange={(event) => updateFilters({
+                  date_filter: event.target.value === 'all' ? null : event.target.value,
+                  date: event.target.value === 'specific_day' ? selectedDate : null,
+                })}
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                {DATE_FILTER_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500">Sort By</label>
+              <select
+                value={sortOption}
+                onChange={(event) => updateFilters({ sort: event.target.value === 'date_desc' ? null : event.target.value })}
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                {SORT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {dateFilter === 'specific_day' && (
+            <div className="mt-3 max-w-xs">
+              <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500">Selected Date</label>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(event) => updateFilters({ date: event.target.value })}
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+          )}
+
+          <div className="mt-4 flex flex-col gap-3 border-t border-gray-100 pt-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-col gap-1 text-sm text-gray-500">
+              <span>Showing {filteredOrders.length} of {orders.length} orders</span>
+              {paymentStatusFilter === 'receivable' && (
+                <span className="font-medium text-amber-600">
+                  Outstanding balance in view: {formatCurrency(filteredReceivableTotal)}
+                </span>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-3 md:flex-row">
+              <button
+                type="button"
+                onClick={handleExportExcel}
+                disabled={loading || filteredOrders.length === 0}
+                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-5 text-sm font-semibold text-emerald-700 transition-colors hover:border-emerald-300 hover:bg-emerald-100 hover:text-emerald-800 disabled:cursor-not-allowed disabled:opacity-50 md:w-auto"
+              >
+                <FileSpreadsheet className="h-4 w-4" />
+                {paymentStatusFilter === 'receivable' ? 'Export Receivables' : 'Export Excel'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSearchParams(new URLSearchParams(), { replace: true })}
+                disabled={!hasActiveFilters}
+                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-5 text-sm font-semibold text-gray-700 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50 md:w-auto"
+              >
+                <FilterX className="h-4 w-4" />
+                Clear Filters
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
       <DataTable
         columns={[
           { key: 'id', label: 'Order #', render: (o) => `#${o?.id || 'N/A'}` },
-          { key: 'customer', label: 'Customer', render: (o) => o?.customer?.name || o?.guest_name || 'Walk-In' },
-          { key: 'total_amount', label: 'Total', render: (o) => `P ${(o?.total_amount ?? 0).toLocaleString()}` },
+          { key: 'customer', label: 'Customer', render: (o) => getOrderCustomerName(o) },
+          { key: 'total_amount', label: 'Total', render: (o) => formatCurrency(o?.total_amount) },
+          { key: 'amount_paid', label: 'Paid', render: (o) => formatCurrency(getResolvedAmountPaid(o)) },
+          { key: 'balance_due', label: 'Balance', render: (o) => (
+            <span className={getResolvedBalanceDue(o) > 0 ? 'font-semibold text-amber-600' : 'text-gray-500'}>
+              {formatCurrency(getResolvedBalanceDue(o))}
+            </span>
+          ) },
           { key: 'status', label: 'Status', render: (o) => (
             <span className={`px-2 py-0.5 rounded text-xs font-medium ${statusColors[o?.status] || 'bg-gray-100 text-gray-800'}`}>
               {o?.status || 'unknown'}
             </span>
           )},
-          { key: 'payment_method', label: 'Payment' },
+          { key: 'payment_method', label: 'Payment', render: (o) => (
+            <div className="space-y-1">
+              <div>{formatPaymentMethodLabel(o?.payment_method)}</div>
+              <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider ${paymentStatusColors[getResolvedPaymentStatus(o)] || 'bg-gray-100 text-gray-800'}`}>
+                {getResolvedPaymentStatus(o)}
+              </span>
+            </div>
+          ) },
           { key: 'created_at', label: 'Date', render: (o) => o?.created_at ? new Date(o.created_at).toLocaleDateString() : 'N/A' },
         ]}
-        data={orders}
+        data={filteredOrders}
         loading={loading}
+        emptyMessage="No orders matched the current filters"
         actions={(order) => (
           <div className="flex items-center gap-3 justify-end">
             <button
@@ -378,18 +669,34 @@ export default function Orders() {
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500 font-medium">Subtotal</span>
                   <span className="text-gray-900 font-bold">
-                    ₱{selectedOrder.items?.reduce((sum: number, item: OrderItem) => sum + (item?.subtotal ?? 0), 0).toLocaleString()}
+                    {formatCurrency(selectedOrder.items?.reduce((sum: number, item: OrderItem) => sum + (item?.subtotal ?? 0), 0))}
                   </span>
                 </div>
                 {(selectedOrder?.discount_amount ?? 0) > 0 && (
                   <div className="flex justify-between text-sm text-red-600">
                     <span className="font-medium">Discount</span>
-                    <span className="font-bold">-₱{(selectedOrder?.discount_amount ?? 0).toLocaleString()}</span>
+                    <span className="font-bold">-{formatCurrency(selectedOrder?.discount_amount)}</span>
                   </div>
                 )}
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500 font-medium">Amount Paid</span>
+                  <span className="text-gray-900 font-bold">{formatCurrency(getResolvedAmountPaid(selectedOrder))}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500 font-medium">Balance Due</span>
+                  <span className={`font-bold ${getResolvedBalanceDue(selectedOrder) > 0 ? 'text-amber-600' : 'text-gray-900'}`}>
+                    {formatCurrency(getResolvedBalanceDue(selectedOrder))}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500 font-medium">Payment Status</span>
+                  <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider ${paymentStatusColors[getResolvedPaymentStatus(selectedOrder)] || 'bg-gray-100 text-gray-800'}`}>
+                    {getResolvedPaymentStatus(selectedOrder)}
+                  </span>
+                </div>
                 <div className="flex justify-between items-center pt-3 border-t border-gray-100">
-                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Paid</span>
-                  <span className="text-2xl font-black text-gray-900 tracking-tighter">₱{(selectedOrder?.total_amount ?? 0).toLocaleString()}</span>
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Amount</span>
+                  <span className="text-2xl font-black text-gray-900 tracking-tighter">{formatCurrency(selectedOrder?.total_amount)}</span>
                 </div>
               </div>
             </div>

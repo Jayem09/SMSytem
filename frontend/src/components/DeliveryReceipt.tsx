@@ -124,6 +124,12 @@ export function generateDeliveryReceiptHTML(order: ReceiptOrder, _tin?: string, 
       <style>
         .bir-delivery-app {
           margin: 0;
+          width: 7.68in;
+          height: 5.31in;
+          position: relative;
+          background: white;
+          overflow: hidden;
+          font-family: "Courier New", monospace;
         }
         
         :root {
@@ -139,27 +145,33 @@ export function generateDeliveryReceiptHTML(order: ReceiptOrder, _tin?: string, 
           --offset-y: -0.55in; /* moves name, address, date, items UP */
         }
 
-        html, body {
-          width: 7.68in;
-          height: 5.31in;
-          font-family: "Courier New", monospace;
-          position: relative;
-          background: transparent;
+        @page {
+          size: 7.68in 5.31in;
+          margin: 0;
         }
 
         @media print {
+          html, body {
+            margin: 0;
+            padding: 0;
+            width: 7.68in;
+            height: 5.31in;
+            background: white;
+            overflow: hidden;
+          }
+
           .toolbar { display: none !important; }
         }
 
         /* Customer Info Section */
-        .reg-name {
+        .bir-delivery-app .reg-name {
           position: absolute;
           top: calc(1.75in + var(--offset-y)); /* slightly up */
           left: calc(1.60in + var(--offset-x));
           font-size: 15px;
         }
 
-        .address {
+        .bir-delivery-app .address {
           position: absolute;
           top: calc(1.95in + var(--offset-y)); /* slightly up */
           left: calc(1.30in + var(--offset-x));
@@ -167,7 +179,7 @@ export function generateDeliveryReceiptHTML(order: ReceiptOrder, _tin?: string, 
           width: 4.5in;
         }
 
-        .date-field {
+        .bir-delivery-app .date-field {
           position: absolute;
           top: calc(1.95in + var(--offset-y)); /* slightly up */
           left: calc(6.50in + var(--offset-x));
@@ -175,7 +187,7 @@ export function generateDeliveryReceiptHTML(order: ReceiptOrder, _tin?: string, 
         }
 
         /* Items Section */
-        .col-qty, .col-unit, .col-desc, .col-price, .col-amt {
+        .bir-delivery-app .col-qty, .bir-delivery-app .col-unit, .bir-delivery-app .col-desc, .bir-delivery-app .col-price, .bir-delivery-app .col-amt {
           position: absolute;
           font-size: 13px;
           height: 0.30in;
@@ -183,13 +195,13 @@ export function generateDeliveryReceiptHTML(order: ReceiptOrder, _tin?: string, 
           white-space: nowrap;
         }
         
-        .col-qty   { width: 0.5in; text-align: center; }
-        .col-unit  { width: 0.5in; text-align: center; }
-        .col-desc  { width: 3.2in; text-align: left; }
-        .col-price { width: 1.0in; text-align: right; }
-        .col-amt   { width: 1.0in; text-align: right; }
+        .bir-delivery-app .col-qty   { width: 0.5in; text-align: center; }
+        .bir-delivery-app .col-unit  { width: 0.5in; text-align: center; }
+        .bir-delivery-app .col-desc  { width: 3.2in; text-align: left; }
+        .bir-delivery-app .col-price { width: 1.0in; text-align: right; }
+        .bir-delivery-app .col-amt   { width: 1.0in; text-align: right; }
 
-        .total-due {
+        .bir-delivery-app .total-due {
           position: absolute;
           top: calc(4.90in + var(--offset-y)); /* slightly up, the higher = downwards */
           left: calc(6.90in + var(--offset-x)); /* push backwards slightly - higher the value = move backwards (right)*/
@@ -201,11 +213,13 @@ export function generateDeliveryReceiptHTML(order: ReceiptOrder, _tin?: string, 
       </style>
     </head>
     <body>
-      <div class="date-field">${dateStr}</div>
-      <div class="reg-name">${customerName}</div>
-      <div class="address">${custAddress}</div>
-      ${itemRows}
-      <div class="total-due">${fmt(totalAmount)}</div>
+      <div class="bir-delivery-app">
+        <div class="date-field">${dateStr}</div>
+        <div class="reg-name">${customerName}</div>
+        <div class="address">${custAddress}</div>
+        ${itemRows}
+        <div class="total-due">${fmt(totalAmount)}</div>
+      </div>
     </body>
     </html>
   `;
@@ -213,7 +227,6 @@ export function generateDeliveryReceiptHTML(order: ReceiptOrder, _tin?: string, 
 
 export async function printDeliveryReceipt(order: ReceiptOrder, tin?: string, businessAddress?: string, withholdingTaxRate?: number) {
   const htmlContent = generateDeliveryReceiptHTML(order, tin, businessAddress, withholdingTaxRate);
-
 
   let container = document.getElementById('print-area');
   if (!container) {
@@ -227,12 +240,13 @@ export async function printDeliveryReceipt(order: ReceiptOrder, tin?: string, bu
 
   container.innerHTML = `${headContent}${bodyInner}`;
 
-  // Small delay so DOM is fully painted before the print dialog opens
-  await new Promise<void>((resolve) => setTimeout(resolve, 150));
+  await new Promise<void>((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setTimeout(resolve, 200);
+      });
+    });
+  });
 
   window.print();
-
-  setTimeout(() => {
-    if (container) container.innerHTML = '';
-  }, 3000);
 }

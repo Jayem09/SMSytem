@@ -53,8 +53,11 @@ interface Order {
   guest_name?: string;
   guest_phone?: string;
   total_amount: number;
+  amount_paid?: number;
+  balance_due?: number;
   discount_amount: number;
   payment_method: string;
+  payment_status?: 'paid' | 'partial' | 'unpaid';
   status: string;
   created_at: string;
   items?: OrderItem[];
@@ -73,6 +76,73 @@ interface Customer {
   loyaltyPoints?: number;
 }
 
+type CheckoutStatus = 'pending' | 'completed';
+type PaymentStatus = 'paid' | 'partial' | 'unpaid';
+
+function isDeferredPaymentMethod(paymentMethod: string) {
+  const normalized = paymentMethod.trim().toLowerCase();
+  return normalized === 'dated_check' || normalized === 'post_dated_check';
+}
+
+function clampAmountPaid(amountPaid: number, totalAmount: number) {
+  if (!Number.isFinite(amountPaid) || amountPaid < 0) {
+    return 0;
+  }
+
+  if (amountPaid > totalAmount) {
+    return totalAmount;
+  }
+
+  return amountPaid;
+}
+
+function parseAmountPaidInput(value: string) {
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) {
+    return null;
+  }
+
+  const parsedValue = Number(trimmedValue);
+  return Number.isFinite(parsedValue) ? parsedValue : 0;
+}
+
+function derivePaymentStatus(amountPaid: number, balanceDue: number): PaymentStatus {
+  if (balanceDue <= 0) {
+    return 'paid';
+  }
+
+  if (amountPaid > 0) {
+    return 'partial';
+  }
+
+  return 'unpaid';
+}
+
+function resolveCheckoutPayment(
+  totalAmount: number,
+  status: CheckoutStatus,
+  paymentMethod: string,
+  explicitAmountPaid: number | null,
+) {
+  let amountPaid = 0;
+
+  if (explicitAmountPaid !== null) {
+    amountPaid = clampAmountPaid(explicitAmountPaid, totalAmount);
+  } else if (status === 'completed' && !isDeferredPaymentMethod(paymentMethod)) {
+    amountPaid = totalAmount;
+  }
+
+  const balanceDue = Math.max(totalAmount - amountPaid, 0);
+  const paymentStatus = derivePaymentStatus(amountPaid, balanceDue);
+
+  return { amountPaid, balanceDue, paymentStatus };
+}
+
+function formatMoneyInputValue(value: number) {
+  return value.toFixed(2);
+}
+
 export default function POS() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -89,6 +159,7 @@ export default function POS() {
   const [businessAddress, setBusinessAddress] = useState('');
   const [withholdingTaxRate, setWithholdingTaxRate] = useState('0');
   const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [amountPaid, setAmountPaid] = useState('');
   const [receiptType, setReceiptType] = useState<'SI' | 'DR'>('SI');
   const [discount, setDiscount] = useState('0');
   const [successModalOpen, setSuccessModalOpen] = useState(false);
@@ -237,6 +308,13 @@ export default function POS() {
 
   const finalTotal = Math.max(0, posSubtotal - parseFloat(discount || '0'));
   const earnedPoints = Math.floor(posSubtotal / 200);
+  const previewPayment = resolveCheckoutPayment(
+    finalTotal,
+    'completed',
+    paymentMethod,
+    paymentMethod === 'card' ? finalTotal : parseAmountPaidInput(amountPaid),
+  );
+  const displayedAmountPaid = paymentMethod === 'card' ? formatMoneyInputValue(finalTotal) : amountPaid;
 
   const handleAddToCart = (product: Product) => {
     if (!product.is_service && product.branch_stock <= 0) return;
@@ -249,6 +327,11 @@ export default function POS() {
       showToast('Super Admin cannot create POS transactions. Use a branch staff account.', 'error');
       return;
     }
+
+    const explicitAmountPaid = paymentMethod === 'card' && status === 'completed'
+      ? finalTotal
+      : parseAmountPaidInput(amountPaid);
+    const checkoutPayment = resolveCheckoutPayment(finalTotal, status, paymentMethod, explicitAmountPaid);
     if (!resolvedBranchId) {
       showToast('No branch is assigned to this account.', 'error');
       return;
@@ -287,9 +370,12 @@ export default function POS() {
         guestName: !customerId ? guestName : '',
         guestPhone: !customerId ? guestPhone : '',
         totalAmount: finalTotal,
+        amountPaid: checkoutPayment.amountPaid,
+        balanceDue: checkoutPayment.balanceDue,
         discountAmount: parseFloat(discount),
         status: status,
         paymentMethod: paymentMethod,
+        paymentStatus: checkoutPayment.paymentStatus,
         receiptType: receiptType,
         tin: tin,
         businessAddress: businessAddress,
@@ -325,6 +411,7 @@ export default function POS() {
           guestPhone: !customerId ? guestPhone : '',
           serviceAdvisorName,
           paymentMethod,
+          amountPaid: checkoutPayment.amountPaid,
           discountAmount: parseFloat(discount),
           status,
           receiptType,
@@ -371,8 +458,11 @@ export default function POS() {
         guest_name: !customerId ? guestName : '',
         guest_phone: !customerId ? guestPhone : '',
         total_amount: finalTotal,
+        amount_paid: checkoutPayment.amountPaid,
+        balance_due: checkoutPayment.balanceDue,
         discount_amount: parseFloat(discount),
         payment_method: paymentMethod,
+        payment_status: checkoutPayment.paymentStatus,
         status: status,
         created_at: offlineCreatedAt,
         items: cart.map((item, idx) => ({
@@ -466,7 +556,7 @@ export default function POS() {
     }
     
     try {
-      if (paymentMethod === 'card') {
+      if (paymentMethod === 'card' && status === 'completed') {
         setIsProcessingTerminal(true);
         try {
           const terminalRes = await api.post('/api/terminal/payment', { amount: finalTotal });
@@ -493,6 +583,7 @@ export default function POS() {
         guest_phone: !customerId ? guestPhone : '',
         service_advisor_name: serviceAdvisorName,
         payment_method: paymentMethod,
+        amount_paid: checkoutPayment.amountPaid,
         discount_amount: parseFloat(discount),
         status: status,
         receipt_type: receiptType,
@@ -527,6 +618,7 @@ export default function POS() {
       setBusinessAddress('');
       setWithholdingTaxRate('0');
       setPaymentMethod('cash');
+      setAmountPaid('');
       setReceiptType('SI');
       setDiscount('0');
       setSelectedReward(null);
@@ -1091,15 +1183,7 @@ export default function POS() {
               <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Payment Method</label>
               <select
                 value={paymentMethod}
-                onChange={(e) => {
-                  setPaymentMethod(e.target.value);
-                  if (!amountPaidManuallyEdited || isLockedAmountPaidMethod(e.target.value)) {
-                    setAmountPaid(formatMoneyInputValue(getSuggestedAmountPaid(finalTotal, e.target.value)));
-                  }
-                  if (isLockedAmountPaidMethod(e.target.value)) {
-                    setAmountPaidManuallyEdited(false);
-                  }
-                }}
+                onChange={(e) => setPaymentMethod(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
                 <option value="cash">Cash</option>
@@ -1118,27 +1202,25 @@ export default function POS() {
                   type="number"
                   min="0"
                   step="0.01"
-                  value={amountPaid}
-                  onChange={(e) => {
-                    setAmountPaid(e.target.value);
-                    setAmountPaidManuallyEdited(true);
-                  }}
-                  disabled={isLockedAmountPaidMethod(paymentMethod)}
+                  value={displayedAmountPaid}
+                  onChange={(e) => setAmountPaid(e.target.value)}
+                  disabled={paymentMethod === 'card'}
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-100 disabled:text-gray-500"
-                  placeholder="0.00"
+                  placeholder="Leave blank to auto-calculate"
                 />
                 <p className="mt-2 text-[11px] text-gray-500">
                   {paymentMethod === 'card'
-                    ? 'Card payments are recorded as fully paid after terminal approval.'
+                    ? 'Card payments are captured as fully paid after terminal approval.'
                     : isDeferredPaymentMethod(paymentMethod)
-                      ? 'Checks are tracked as receivables until they are cleared.'
-                      : 'Lower this amount to record a partial payment and leave a balance due.'}
+                      ? 'Leave blank to record the full amount as receivable until the check clears.'
+                      : 'Leave blank for full payment, or enter a lower amount to track a balance due.'}
                 </p>
               </div>
               <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Balance Due</p>
-                <p className="text-xl font-black text-gray-900">₱{previewBalanceDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                <p className="mt-2 text-[11px] font-semibold uppercase tracking-wider text-gray-500">Payment Status: {previewPaymentStatus}</p>
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">If Confirmed Now</p>
+                <p className="text-xl font-black text-gray-900">₱{previewPayment.balanceDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                <p className="mt-2 text-[11px] font-semibold uppercase tracking-wider text-gray-500">Payment Status: {previewPayment.paymentStatus}</p>
+                <p className="mt-2 text-[11px] text-gray-500">Hold Sale keeps unpaid amounts as receivables until the order is completed.</p>
               </div>
             </div>
 
@@ -1173,6 +1255,7 @@ export default function POS() {
               <div className="grid grid-cols-2 gap-3 mt-3">
                 <button
                   onClick={() => handleCheckout('pending')}
+                  disabled={paymentMethod === 'card'}
                   className="py-3 bg-white border-2 border-gray-200 text-gray-700 rounded-xl text-sm font-bold hover:border-gray-900 transition-colors"
                 >
                   Hold Sale

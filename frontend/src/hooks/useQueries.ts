@@ -56,6 +56,8 @@ export function useDashboardStats(days: number = 30, branchId?: string) {
       }
       return get('/api/dashboard', { params }).then(res => res.data);
     },
+    staleTime: 0, // Always refetch on branch change
+    refetchOnWindowFocus: false,
   });
 }
 

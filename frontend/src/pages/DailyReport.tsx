@@ -1,6 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
-import { Printer, Calendar } from 'lucide-react';
+import { Printer, Calendar, FileSpreadsheet } from 'lucide-react';
+import { formatCurrency, getCollectedTotal, getPaymentValue } from './dailyReportUtils';
+import { printMarkup } from '../components/printArea';
+import { exportDailySummaryToExcel } from '../utils/reportExports';
+import { useToast } from '../context/ToastContext';
 
 const DATE_INPUT_FORMAT = 'en-CA';
 
@@ -51,6 +56,9 @@ function getAdvisorDisplayName(advisorName: string | undefined) {
 }
 
 export default function DailyReport() {
+  const navigate = useNavigate();
+  const { showToast } = useToast();
+  const reportRef = useRef<HTMLDivElement | null>(null);
   const [date, setDate] = useState(getLocalDateInputValue);
   const [data, setData] = useState<DailySummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -79,8 +87,42 @@ export default function DailyReport() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date]);
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = async () => {
+    if (!reportRef.current) {
+      return;
+    }
+
+    await printMarkup(reportRef.current.outerHTML);
+  };
+
+  const handleExportExcel = async () => {
+    if (!data) {
+      showToast('No daily summary data to export yet.', 'info');
+      return;
+    }
+
+    try {
+      const savedPath = await exportDailySummaryToExcel(data);
+      if (typeof savedPath === 'string' && '__TAURI_INTERNALS__' in window) {
+        showToast(`Excel exported to: ${savedPath}`, 'success');
+      } else {
+        showToast('Excel download started.', 'success');
+      }
+    } catch (error) {
+      console.error('Daily summary export failed:', error);
+      showToast('Failed to export the daily summary to Excel.', 'error');
+    }
+  };
+
+  const handleViewReceivables = () => {
+    const queryParams = new URLSearchParams({
+      payment_status: 'receivable',
+      date_filter: 'specific_day',
+      date,
+      sort: 'balance_desc',
+    });
+
+    navigate(`/orders?${queryParams.toString()}`);
   };
 
   const advisorPerformance = data?.advisor_performance ?? [];
@@ -102,14 +144,10 @@ export default function DailyReport() {
     { key: 'trade_in', label: 'Trade In' },
   ];
 
-  const getPaymentValue = (key: string) => {
-    return paymentSummary.find((p: PaymentSummary) => p.method.toLowerCase() === key.toLowerCase())?.total || 0;
-  };
-
-  const totalGoodAsCash = paymentSummary.reduce((acc: number, curr: PaymentSummary) => acc + curr.total, 0) || 0;
+  const totalGoodAsCash = getCollectedTotal(data?.total_sales || 0, data?.account_receivables || 0);
 
   return (
-    <div className="daily-report-print p-6">
+    <div ref={reportRef} className="daily-report-print p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-6 no-print">
         <h1 className="text-xl font-semibold text-gray-900">Daily Report</h1>
@@ -123,6 +161,14 @@ export default function DailyReport() {
               className="bg-transparent border-none text-sm focus:ring-0 cursor-pointer"
             />
           </div>
+          <button 
+            onClick={handleExportExcel}
+            disabled={loading || !data}
+            className="flex items-center gap-2 border border-gray-200 bg-white px-4 py-2 rounded-lg text-sm font-medium text-gray-700 transition-colors hover:border-gray-300 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            Export Excel
+          </button>
           <button 
             onClick={handlePrint}
             className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors cursor-pointer"
@@ -154,7 +200,7 @@ export default function DailyReport() {
       <div className="grid grid-cols-4 gap-4 mb-6">
         <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
           <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Total Sales</p>
-          <p className="text-2xl font-bold text-gray-900">{loading ? 'Loading...' : `₱${(data?.total_sales || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`}</p>
+          <p className="text-2xl font-bold text-gray-900">{loading ? 'Loading...' : formatCurrency(data?.total_sales || 0)}</p>
         </div>
         <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
           <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Items Sold</p>
@@ -162,12 +208,17 @@ export default function DailyReport() {
         </div>
         <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
           <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Good as Cash</p>
-          <p className="text-2xl font-bold text-gray-900">{loading ? 'Loading...' : `₱${totalGoodAsCash.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}</p>
+          <p className="text-2xl font-bold text-gray-900">{loading ? 'Loading...' : formatCurrency(totalGoodAsCash)}</p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-          <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Receivables</p>
-          <p className="text-2xl font-bold text-amber-600">{loading ? 'Loading...' : `₱${(data?.account_receivables || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`}</p>
-        </div>
+        <button
+          type="button"
+          onClick={handleViewReceivables}
+          className="rounded-xl border border-amber-200 bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-md"
+        >
+          <p className="text-xs font-semibold uppercase mb-1 text-gray-500">Receivables</p>
+          <p className="text-2xl font-bold text-amber-600">{loading ? 'Loading...' : formatCurrency(data?.account_receivables || 0)}</p>
+          <p className="mt-2 text-xs font-medium text-amber-600">Click to view receivable orders</p>
+        </button>
       </div>
 
       {/* Main Content */}
@@ -234,21 +285,21 @@ export default function DailyReport() {
           {/* Payment Summary */}
           <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-100">
-              <h2 className="text-sm font-semibold text-gray-900">Payment Summary</h2>
+              <h2 className="text-sm font-semibold text-gray-900">Collected Payments</h2>
             </div>
             <div className="divide-y divide-gray-100">
               {paymentMethodsDisplay.map((pm) => (
                 <div key={pm.key} className="px-4 py-2.5 flex items-center justify-between">
                   <span className="text-sm text-gray-700">{pm.label}</span>
-                  <span className={`text-sm font-semibold ${getPaymentValue(pm.key) > 0 ? 'text-gray-900' : 'text-gray-400'}`}>
-                    {getPaymentValue(pm.key) > 0 ? `₱${getPaymentValue(pm.key).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '—'}
+                  <span className={`text-sm font-semibold ${getPaymentValue(paymentSummary, pm.key) > 0 ? 'text-gray-900' : 'text-gray-400'}`}>
+                    {getPaymentValue(paymentSummary, pm.key) > 0 ? formatCurrency(getPaymentValue(paymentSummary, pm.key)) : '—'}
                   </span>
                 </div>
               ))}
               <div className="px-4 py-3 bg-gray-50">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-gray-700">Total</span>
-                  <span className="text-lg font-bold text-indigo-600">₱{totalGoodAsCash.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                  <span className="text-sm font-semibold text-gray-700">Total Collected</span>
+                  <span className="text-lg font-bold text-indigo-600">{formatCurrency(totalGoodAsCash)}</span>
                 </div>
               </div>
             </div>
@@ -262,11 +313,27 @@ export default function DailyReport() {
 
         @media print {
           @page { margin: 0.5cm; size: portrait; }
-          #root { display: block !important; min-height: auto !important; }
-          .daily-report-print { display: block !important; padding: 0 !important; }
-          .print-only { display: block !important; }
-          .no-print { display: none !important; }
-          .bg-gray-50 { background-color: #f9fafb !important; }
+          #print-area {
+            position: static !important;
+            width: auto !important;
+          }
+          #print-area .daily-report-print {
+            display: block !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+          #print-area .print-only { display: block !important; }
+          #print-area .no-print { display: none !important; }
+          #print-area .bg-gray-50 { background-color: #f9fafb !important; }
+          #print-area .shadow-sm { box-shadow: none !important; }
+          #print-area .grid,
+          #print-area table,
+          #print-area tr,
+          #print-area td,
+          #print-area th,
+          #print-area button {
+            break-inside: avoid;
+          }
           body { background: white !important; }
         }
       `}</style>

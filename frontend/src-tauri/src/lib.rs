@@ -9,6 +9,16 @@ pub struct ApiResponse {
 }
 
 #[tauri::command]
+async fn save_excel_file(filename: String, bytes: Vec<u8>) -> Result<String, String> {
+    let downloads_dir = dirs::download_dir().unwrap_or_else(|| PathBuf::from("."));
+    let path = downloads_dir.join(&filename);
+
+    std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
+
+    Ok(path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
 async fn download_backup(url: String, filename: String, token: Option<String>) -> Result<String, String> {
     let client = reqwest::Client::new();
     let mut request = client.get(&url);
@@ -152,7 +162,7 @@ pub fn run() {
          
       Ok(())
     })
-    .invoke_handler(tauri::generate_handler![download_backup, api_get, api_post, api_put, api_delete, api_patch])
+    .invoke_handler(tauri::generate_handler![save_excel_file, download_backup, api_get, api_post, api_put, api_delete, api_patch])
     .plugin(tauri_plugin_shell::init())
     .plugin(tauri_plugin_http::init())
     .plugin(tauri_plugin_updater::Builder::new().build())

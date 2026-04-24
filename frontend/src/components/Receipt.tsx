@@ -129,11 +129,26 @@ export function generateReceiptHTML(order: ReceiptOrder, tin?: string, businessA
           position: relative;
           background: white;
           --printer-offset: 0in;
+          overflow: hidden;
         }
         .bir-receipt-app * { margin: 0; padding: 0; box-sizing: border-box; }
         @page {
           size: 8.27in 11.69in;
           margin: 0;
+        }
+        @media print {
+          html, body {
+            margin: 0;
+            padding: 0;
+            width: 8.27in;
+            height: 11.69in;
+            background: white;
+            overflow: hidden;
+          }
+
+          .bir-receipt-app {
+            page-break-after: avoid;
+          }
         }
 
         .bir-receipt-app .date-field, .bir-receipt-app .reg-name, .bir-receipt-app .tin-field, .bir-receipt-app .address,
@@ -214,11 +229,6 @@ export function generateReceiptHTML(order: ReceiptOrder, tin?: string, businessA
 export async function printReceipt(order: ReceiptOrder, tin?: string, businessAddress?: string, withholdingTaxRate?: number) {
   const htmlContent = generateReceiptHTML(order, tin, businessAddress, withholdingTaxRate);
 
-  // Inject the receipt into #print-area and trigger window.print().
-  // This works for BOTH browser dev AND Tauri (WKWebView honours @media print
-  // the same as a normal browser — #root is hidden, #print-area is shown).
-  // The old webview.print() call was the cause of the alignment bug because it
-  // printed the entire app window instead of just the receipt area.
   let container = document.getElementById('print-area');
   if (!container) {
     container = document.createElement('div');
@@ -227,17 +237,17 @@ export async function printReceipt(order: ReceiptOrder, tin?: string, businessAd
   }
 
   const headContent = htmlContent.match(/<head[^>]*>([\s\S]*)<\/head>/)?.[1] || '';
-  const bodyInner   = htmlContent.match(/<body[^>]*>([\s\S]*)<\/body>/)?.[1] || htmlContent;
+  const bodyInner = htmlContent.match(/<body[^>]*>([\s\S]*)<\/body>/)?.[1] || htmlContent;
 
   container.innerHTML = `${headContent}${bodyInner}`;
 
-  // Small delay so the DOM is fully painted before the print dialog opens
-  await new Promise<void>((resolve) => setTimeout(resolve, 150));
+  await new Promise<void>((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setTimeout(resolve, 200);
+      });
+    });
+  });
 
   window.print();
-
-  // Cleanup after print dialog is dismissed
-  setTimeout(() => {
-    if (container) container.innerHTML = '';
-  }, 3000);
 }

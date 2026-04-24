@@ -69,6 +69,7 @@ func (h *ReportHandler) GetDailySummary(c *gin.Context) {
 	endOfDay := nextDailySummaryDate(dateStr) + " 00:00:00"
 	branchID, _ := GetUintFromContext(c, "branchID")
 	userRole, _ := GetStringFromContext(c, "userRole")
+	branchScope := newDashboardBranchScope(branchID)
 
 	if userRole == "super_admin" {
 		branchQuery := c.Query("branch_id")
@@ -81,82 +82,53 @@ func (h *ReportHandler) GetDailySummary(c *gin.Context) {
 				}
 			}
 		}
+		branchScope = newDashboardBranchScope(branchID)
 	}
 
 	advisors := make([]AdvisorPerformance, 0)
-	database.DB.Table("orders").
+	branchScope.apply(database.DB.Table("orders"), branchScope.orderJoinBranchColumn()).
 		Select("COALESCE(NULLIF(TRIM(orders.service_advisor_name), ''), 'Unassigned') as advisor_name, SUM(order_items.quantity) as tires_sold").
 		Joins("JOIN order_items ON orders.id = order_items.order_id").
 		Joins("JOIN products ON order_items.product_id = products.id").
 		Joins("JOIN categories ON products.category_id = categories.id").
 		Where("orders.status = 'completed' AND (categories.name LIKE '%TIRE%' OR categories.name LIKE '%MAGS%')").
 		Where("orders.created_at >= ? AND orders.created_at < ?", startOfDay, endOfDay).
-		Where(func() string {
-			if branchID != 0 {
-				return "orders.branch_id = ?"
-			}
-			return "1=1"
-		}(), branchID).
 		Group("COALESCE(NULLIF(TRIM(orders.service_advisor_name), ''), 'Unassigned')").
 		Order("tires_sold DESC").
 		Scan(&advisors)
 
 	categories := make([]CategorySale, 0)
-	database.DB.Table("order_items").
+	branchScope.apply(database.DB.Table("order_items"), branchScope.orderJoinBranchColumn()).
 		Select("COALESCE(categories.name, 'Uncategorized') as category, SUM(order_items.subtotal) as total_sales").
 		Joins("JOIN products ON order_items.product_id = products.id").
 		Joins("LEFT JOIN categories ON products.category_id = categories.id").
 		Joins("JOIN orders ON order_items.order_id = orders.id").
 		Where("orders.status = 'completed'").
 		Where("orders.created_at >= ? AND orders.created_at < ?", startOfDay, endOfDay).
-		Where(func() string {
-			if branchID != 0 {
-				return "orders.branch_id = ?"
-			}
-			return "1=1"
-		}(), branchID).
 		Group("categories.name").
 		Order("total_sales DESC").
 		Scan(&categories)
 
 	payments := make([]PaymentSummary, 0)
-	database.DB.Model(&models.Order{}).
-		Select("payment_method as method, SUM(total_amount) as total").
+	branchScope.apply(database.DB.Model(&models.Order{}), branchScope.directBranchColumn()).
+		Select("payment_method as method, COALESCE(SUM(amount_paid), 0) as total").
 		Where("status = 'completed'").
 		Where("created_at >= ? AND created_at < ?", startOfDay, endOfDay).
-		Where(func() string {
-			if branchID != 0 {
-				return "branch_id = ?"
-			}
-			return "1=1"
-		}(), branchID).
 		Group("payment_method").
 		Scan(&payments)
 
 	var ar float64
-	database.DB.Model(&models.Order{}).
+	branchScope.apply(database.DB.Model(&models.Order{}), branchScope.directBranchColumn()).
 		Select("COALESCE(SUM(balance_due), 0)").
-		Where("balance_due > 0 AND status != 'cancelled'").
+		Where("balance_due > 0 AND status = 'completed'").
 		Where("created_at >= ? AND created_at < ?", startOfDay, endOfDay).
-		Where(func() string {
-			if branchID != 0 {
-				return "branch_id = ?"
-			}
-			return "1=1"
-		}(), branchID).
 		Scan(&ar)
 
 	var totalSales float64
-	database.DB.Model(&models.Order{}).
+	branchScope.apply(database.DB.Model(&models.Order{}), branchScope.directBranchColumn()).
 		Select("COALESCE(SUM(total_amount), 0)").
 		Where("status = 'completed'").
 		Where("created_at >= ? AND created_at < ?", startOfDay, endOfDay).
-		Where(func() string {
-			if branchID != 0 {
-				return "branch_id = ?"
-			}
-			return "1=1"
-		}(), branchID).
 		Scan(&totalSales)
 
 	c.JSON(http.StatusOK, DailySummaryResponse{
