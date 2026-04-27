@@ -146,7 +146,7 @@ function formatMoneyInputValue(value: number) {
 export default function POS() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { state, dispatch, addToCart, removeFromCart, updateQuantity, clearCart, setSearch, setCategory, subtotal: posSubtotal, filteredProducts } = usePOS();
+  const { state, dispatch, addToCart, removeFromCart, updateQuantity, clearCart, setSearch, setCategory, subtotal: posSubtotal, filteredProducts, lastAddBlocked } = usePOS();
   const { products, categories, customers, cart, search, selectedCategory, loading, error } = state;
   const isSuperAdmin = user?.role === 'super_admin';
 
@@ -317,8 +317,14 @@ export default function POS() {
   const displayedAmountPaid = paymentMethod === 'card' ? formatMoneyInputValue(finalTotal) : amountPaid;
 
   const handleAddToCart = (product: Product) => {
-    if (!product.is_service && product.branch_stock <= 0) return;
-    addToCart(product as POSProduct);
+    if (!product.is_service && product.branch_stock <= 0) {
+      showToast(`No stock available for ${product.name}`, 'error');
+      return;
+    }
+    const success = addToCart(product as POSProduct);
+    if (!success) {
+      showToast(`Cannot add more ${product.name} - max stock reached`, 'error');
+    }
   };
 
   const handleCheckout = async (status: 'pending' | 'completed' = 'completed') => {

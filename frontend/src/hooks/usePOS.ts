@@ -1,4 +1,4 @@
-import { useReducer, useCallback } from 'react';
+import { useReducer, useCallback, useState } from 'react';
 
 export interface POSProduct {
   id: number;
@@ -63,14 +63,25 @@ function posReducer(state: POSState, action: POSAction): POSState {
     case 'ADD_TO_CART': {
       const existing = state.cart.find(item => item.id === action.payload.id);
       if (existing) {
+        // Check stock limit - don't allow adding more than available
+        const maxQty = action.payload.is_service ? 999 : action.payload.branch_stock;
+        const newQty = Math.min(existing.quantity + 1, maxQty);
+        if (newQty === existing.quantity && existing.quantity >= maxQty) {
+          // Already at max stock, don't add
+          return state;
+        }
         return {
           ...state,
           cart: state.cart.map(item =>
             item.id === action.payload.id
-              ? { ...item, quantity: item.quantity + 1 }
+              ? { ...item, quantity: newQty }
               : item
           ),
         };
+      }
+      // New item - check if out of stock
+      if (!action.payload.is_service && action.payload.branch_stock <= 0) {
+        return state; // Don't add out of stock items
       }
       return { ...state, cart: [...state.cart, { ...action.payload, quantity: 1 }] };
     }
@@ -110,9 +121,28 @@ function posReducer(state: POSState, action: POSAction): POSState {
 export function usePOS() {
   const [state, dispatch] = useReducer(posReducer, initialState);
 
-  const addToCart = useCallback((product: POSProduct) => {
+  // Track if last addToCart was blocked due to stock
+  const [lastAddBlocked, setLastAddBlocked] = useState(false);
+
+  const addToCart = useCallback((product: POSProduct): boolean => {
+    // Check if we can add this product
+    const existing = state.cart.find(item => item.id === product.id);
+    const maxQty = product.is_service ? 999 : product.branch_stock;
+    
+    if (!product.is_service && product.branch_stock <= 0) {
+      setLastAddBlocked(true);
+      return false; // Out of stock
+    }
+    
+    if (existing && existing.quantity >= maxQty) {
+      setLastAddBlocked(true);
+      return false; // Would exceed stock
+    }
+    
     dispatch({ type: 'ADD_TO_CART', payload: product });
-  }, []);
+    setLastAddBlocked(false);
+    return true;
+  }, [state.cart]);
 
   const removeFromCart = useCallback((productId: number) => {
     dispatch({ type: 'REMOVE_FROM_CART', payload: productId });
@@ -153,5 +183,6 @@ export function usePOS() {
     setCategory,
     subtotal,
     filteredProducts,
+    lastAddBlocked,
   };
 }
