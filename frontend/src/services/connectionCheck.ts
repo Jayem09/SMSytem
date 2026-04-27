@@ -2,28 +2,29 @@
  * Connection check with retry - more resilient to network hiccups
  */
 import { invoke } from '@tauri-apps/api/core';
+import { isTauriRuntime } from '../utils/runtime';
 
 export async function checkServerConnection(): Promise<boolean> {
   const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://168.144.46.137:8080';
+  const useTauri = isTauriRuntime();
   
-  // Try Tauri invoke first (uses Rust reqwest), fall back to fetch
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
       console.log('[ConnectionCheck] Attempt', attempt + 1, 'to', apiUrl);
       
-      // Try Tauri invoke first
-      try {
-        const result = await invoke<{data: unknown; status: number}>('api_get', { 
-          url: `${apiUrl}/api/health`, 
-          token: null 
-        });
-        console.log('[ConnectionCheck] Tauri invoke response:', result.status);
-        if (result.status === 200) return true;
-      } catch (invokeErr) {
-        console.log('[ConnectionCheck] Tauri invoke error:', invokeErr);
+      if (useTauri) {
+        try {
+          const result = await invoke<{data: unknown; status: number}>('api_get', {
+            url: `${apiUrl}/api/health`,
+            token: null,
+          });
+          console.log('[ConnectionCheck] Tauri invoke response:', result.status);
+          if (result.status === 200) return true;
+        } catch (invokeErr) {
+          console.log('[ConnectionCheck] Tauri invoke error:', invokeErr);
+        }
       }
       
-      // Fallback to fetch
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
       

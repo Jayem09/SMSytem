@@ -1,13 +1,10 @@
 import { invoke } from '@tauri-apps/api/core';
+import { isTauriRuntime } from '../utils/runtime';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://168.144.46.137:8080';
 console.debug('API_BASE:', API_BASE);
 
-// Force Tauri mode in production - the detection might not work correctly
-const isTauri = typeof window !== 'undefined' && 
-  ('__TAURI_INTERNALS__' in window || 
-   typeof window.__TAURI__ !== 'undefined' ||
-   navigator.userAgent.includes('Macintosh'));
+const isTauri = isTauriRuntime();
 console.log('[API] isTauri:', isTauri);
 
 interface ApiResponse {

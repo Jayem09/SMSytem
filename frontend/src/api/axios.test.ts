@@ -36,4 +36,27 @@ describe('axios GET params in Tauri mode', () => {
       }),
     );
   });
+
+  it('does not use Tauri invoke for a normal Mac browser without Tauri globals', async () => {
+    delete (window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
+    Object.defineProperty(window.navigator, 'userAgent', {
+      configurable: true,
+      value: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      status: 200,
+      statusText: 'OK',
+      json: vi.fn().mockResolvedValue({ ok: true }),
+    }));
+
+    const { get } = await import('./axios');
+
+    await get('/api/health');
+
+    expect(mockInvoke).not.toHaveBeenCalled();
+    expect(fetch).toHaveBeenCalledWith(
+      'http://168.144.46.137:8080/api/health',
+      expect.objectContaining({ method: 'GET' }),
+    );
+  });
 });
