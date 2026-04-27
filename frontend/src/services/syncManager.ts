@@ -100,6 +100,7 @@ function buildOrderSyncPayload(payload: Record<string, unknown>) {
     guest_name: toStringValue(payload.guestName ?? payload.guest_name),
     guest_phone: toStringValue(payload.guestPhone ?? payload.guest_phone),
     service_advisor_name: toStringValue(payload.serviceAdvisorName ?? payload.service_advisor_name),
+    mechanic_name: toStringValue(payload.mechanicName ?? payload.mechanic_name),
     payment_method: toStringValue(payload.paymentMethod ?? payload.payment_method),
     amount_paid: toNumberValue(payload.amountPaid ?? payload.amount_paid),
     discount_amount: toNumberValue(payload.discountAmount ?? payload.discount_amount),

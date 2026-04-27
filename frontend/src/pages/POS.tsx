@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 import api from '../api/axios';
 import Modal from '../components/Modal';
 import { printReceipt } from '../components/Receipt';
@@ -23,6 +23,7 @@ import { invalidateDashboardQueries } from '../services/dashboardRefresh';
 import { usePOS, type POSProduct } from '../hooks/usePOS';
 import { usePOSData } from '../hooks/useQueries';
 import { useAuth } from '../hooks/useAuth';
+import { filterStaffDirectoryByType, normalizeStaffDirectorySettings } from '../utils/staffDirectory';
 
 interface Product {
   id: number;
@@ -147,12 +148,28 @@ export default function POS() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { state, dispatch, addToCart, removeFromCart, updateQuantity, clearCart, setSearch, setCategory, subtotal: posSubtotal, filteredProducts, lastAddBlocked } = usePOS();
+  
+  // Fetch settings for staff directory dropdowns
+  const { data: settingsData } = useQuery({
+    queryKey: ['settings'],
+    queryFn: async () => {
+      const res = await api.get('/api/settings');
+      return res.data as Record<string, unknown>;
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+  
+  const staffDirectory = settingsData ? normalizeStaffDirectorySettings(settingsData) : [];
+  const serviceAdvisors = filterStaffDirectoryByType(staffDirectory, 'service_advisor');
+  const mechanics = filterStaffDirectoryByType(staffDirectory, 'mechanic');
+  
   const { products, categories, customers, cart, search, selectedCategory, loading, error } = state;
   const isSuperAdmin = user?.role === 'super_admin';
 
   const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
   const [customerId, setCustomerId] = useState('');
   const [serviceAdvisorName, setServiceAdvisorName] = useState('');
+  const [mechanicName, setMechanicName] = useState('');
   const [guestName, setGuestName] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
   const [tin, setTin] = useState('');
@@ -387,6 +404,7 @@ export default function POS() {
         businessAddress: businessAddress,
         withholdingTaxRate: parseFloat(withholdingTaxRate) || 0,
         serviceAdvisorName: serviceAdvisorName,
+        mechanicName: mechanicName,
         rewardId: selectedReward?.id || null,
         rewardPoints: selectedReward?.points_required || 0,
         items: JSON.stringify(cart.map(item => ({
@@ -416,6 +434,7 @@ export default function POS() {
           guestName: !customerId ? guestName : '',
           guestPhone: !customerId ? guestPhone : '',
           serviceAdvisorName,
+          mechanicName,
           paymentMethod,
           amountPaid: checkoutPayment.amountPaid,
           discountAmount: parseFloat(discount),
@@ -588,6 +607,7 @@ export default function POS() {
         guest_name: !customerId ? guestName : '',
         guest_phone: !customerId ? guestPhone : '',
         service_advisor_name: serviceAdvisorName,
+        mechanic_name: mechanicName,
         payment_method: paymentMethod,
         amount_paid: checkoutPayment.amountPaid,
         discount_amount: parseFloat(discount),
@@ -620,6 +640,7 @@ export default function POS() {
       setGuestName('');
       setGuestPhone('');
       setServiceAdvisorName('');
+      setMechanicName('');
       setTin('');
       setBusinessAddress('');
       setWithholdingTaxRate('0');
@@ -1183,6 +1204,36 @@ export default function POS() {
                 </div>
               </div>
             )}
+
+            {/* Service Advisor */}
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Service Advisor</label>
+              <select
+                value={serviceAdvisorName}
+                onChange={(e) => setServiceAdvisorName(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="">Select Advisor</option>
+                {serviceAdvisors.map((entry) => (
+                  <option key={entry.name} value={entry.name}>{entry.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Mechanic */}
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Mechanic</label>
+              <select
+                value={mechanicName}
+                onChange={(e) => setMechanicName(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="">Select Mechanic</option>
+                {mechanics.map((entry) => (
+                  <option key={entry.name} value={entry.name}>{entry.name}</option>
+                ))}
+              </select>
+            </div>
 
             {/* Payment Method */}
             <div>

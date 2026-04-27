@@ -17,6 +17,8 @@ interface Order {
   status: string;
   created_at: string;
   payment_method: string;
+  service_advisor_name?: string;
+  mechanic_name?: string;
 }
 
 interface Customer {
@@ -518,6 +520,20 @@ export default function Customers() {
                         {order.status}
                       </span>
                     </div>
+                    {(order.service_advisor_name || order.mechanic_name) && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {order.service_advisor_name && (
+                          <span className="inline-flex items-center px-2 py-1 rounded-md bg-indigo-50 text-xs font-medium text-indigo-700 border border-indigo-100">
+                            SA: {order.service_advisor_name}
+                          </span>
+                        )}
+                        {order.mechanic_name && (
+                          <span className="inline-flex items-center px-2 py-1 rounded-md bg-sky-50 text-xs font-medium text-sky-700 border border-sky-100">
+                            Mech: {order.mechanic_name}
+                          </span>
+                        )}
+                      </div>
+                    )}
                     <div className="flex items-center justify-between pt-3 border-t border-gray-50">
                       <div className="flex items-center gap-2 text-xs text-gray-500">
                         <CreditCard className="w-3.5 h-3.5" />

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, Save, Plus, Trash2 } from 'lucide-react';
+import { Settings as SettingsIcon, Save } from 'lucide-react';
 import api from '../api/axios';
 import { useToast } from '../context/ToastContext';
 import { startSyncManager, stopSyncManager, isOnline } from '../services/syncManager';
@@ -9,8 +9,6 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [storeName, setStoreName] = useState('SMSystem');
   const [contactEmail, setContactEmail] = useState('johndinglasan12@gmail.com');
-  const [serviceAdvisors, setServiceAdvisors] = useState<string[]>([]);
-  const [newAdvisor, setNewAdvisor] = useState('');
   const [offlineMode, setOfflineMode] = useState(false);
   const { showToast } = useToast();
 
@@ -21,20 +19,10 @@ export default function Settings() {
   const fetchSettings = async () => {
     try {
       setLoading(true);
-      const res = await api.get('/api/settings') as { data: { store_name?: string; contact_email?: string; service_advisors?: string | string[] } };
+      const res = await api.get('/api/settings') as { data: { store_name?: string; contact_email?: string } };
       if (res.data) {
         if (res.data.store_name) setStoreName(res.data.store_name);
         if (res.data.contact_email) setContactEmail(res.data.contact_email);
-        if (res.data.service_advisors) {
-          try {
-            const parsed = Array.isArray(res.data.service_advisors)
-              ? res.data.service_advisors
-              : JSON.parse(res.data.service_advisors);
-            setServiceAdvisors(parsed);
-          } catch (e) {
-            console.error("Failed to parse SAs", e);
-          }
-        }
       }
     } catch (err) {
       console.error('Failed to load settings', err);
@@ -50,7 +38,6 @@ export default function Settings() {
       await api.post('/api/settings', {
         store_name: storeName,
         contact_email: contactEmail,
-        service_advisors: JSON.stringify(serviceAdvisors)
       });
       showToast('Settings saved successfully!', 'success');
     } catch (err) {
@@ -59,17 +46,6 @@ export default function Settings() {
     } finally {
       setSaving(false);
     }
-  };
-
-  const addAdvisor = () => {
-    if (newAdvisor.trim() && !serviceAdvisors.includes(newAdvisor.trim())) {
-      setServiceAdvisors([...serviceAdvisors, newAdvisor.trim()]);
-      setNewAdvisor('');
-    }
-  };
-
-  const removeAdvisor = (name: string) => {
-    setServiceAdvisors(serviceAdvisors.filter(sa => sa !== name));
   };
 
   const toggleOfflineMode = () => {
@@ -126,53 +102,6 @@ export default function Settings() {
                 readOnly
                 className="w-full px-4 py-2 bg-gray-100 border border-gray-200 rounded-xl text-sm text-gray-500 cursor-not-allowed outline-none"
               />
-            </div>
-          </div>
-
-          <div className="border-t border-gray-100 pt-6">
-            <h2 className="text-lg font-bold text-gray-900">Service Advisors</h2>
-            <p className="text-sm text-gray-500 mt-1 mb-4">Manage the list of service advisors available for checkout attribution.</p>
-
-            <div className="max-w-md">
-              <div className="flex gap-2 mb-4">
-                <input
-                  type="text"
-                  value={newAdvisor}
-                  onChange={e => setNewAdvisor(e.target.value)}
-                  placeholder="Enter advisor name..."
-                  className="flex-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-gray-900/20 focus:border-gray-900 outline-none transition-all"
-                  onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addAdvisor())}
-                />
-                <button
-                  type="button"
-                  onClick={addAdvisor}
-                  disabled={!newAdvisor.trim()}
-                  className="px-4 py-2 bg-gray-900 text-white rounded-xl hover:bg-gray-800 disabled:opacity-50 transition-colors"
-                >
-                  <Plus className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
-                {serviceAdvisors.length === 0 ? (
-                  <div className="p-4 text-center text-sm text-gray-400">No advisors configured.</div>
-                ) : (
-                  <ul className="divide-y divide-gray-200">
-                    {serviceAdvisors.map((advisor) => (
-                      <li key={advisor} className="flex justify-between items-center p-3 hover:bg-white transition-colors">
-                        <span className="text-sm font-medium text-gray-900">{advisor}</span>
-                        <button
-                          type="button"
-                          onClick={() => removeAdvisor(advisor)}
-                          className="text-red-500 hover:text-red-700 p-1"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
             </div>
           </div>
 

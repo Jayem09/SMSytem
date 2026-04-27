@@ -12,6 +12,7 @@ type Order struct {
 	UserID             uint      `gorm:"index;not null" json:"user_id"`
 	BranchID           uint      `gorm:"index;not null" json:"branch_id"`
 	ServiceAdvisorName string    `gorm:"size:255" json:"service_advisor_name"`
+	MechanicName       string    `gorm:"size:255" json:"mechanic_name"`
 	TotalAmount        float64   `gorm:"not null;default:0" json:"total_amount"`
 	AmountPaid         float64   `gorm:"not null;default:0" json:"amount_paid"`
 	BalanceDue         float64   `gorm:"not null;default:0;index" json:"balance_due"`

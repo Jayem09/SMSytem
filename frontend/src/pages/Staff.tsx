@@ -5,6 +5,15 @@ import DataTable from '../components/DataTable';
 import Modal from '../components/Modal';
 import FormField from '../components/FormField';
 import { useAuth } from '../hooks/useAuth';
+import { useToast } from '../context/ToastContext';
+import {
+  addStaffDirectoryEntry,
+  filterStaffDirectoryByType,
+  normalizeStaffDirectorySettings,
+  removeStaffDirectoryEntry,
+  type StaffDirectoryEntry,
+  type StaffDirectoryType,
+} from '../utils/staffDirectory';
 
 interface StaffUser {
   id: number;
@@ -39,6 +48,14 @@ export default function Staff() {
   const [resetError, setResetError] = useState('');
   const [isResetting, setIsResetting] = useState(false);
 
+  // Named staff directory state
+  const { showToast } = useToast();
+  const [staffDirectory, setStaffDirectory] = useState<StaffDirectoryEntry[]>([]);
+  const [isStaffDirectoryModalOpen, setIsStaffDirectoryModalOpen] = useState(false);
+  const [staffDirectoryName, setStaffDirectoryName] = useState('');
+  const [staffDirectoryType, setStaffDirectoryType] = useState<StaffDirectoryType>('service_advisor');
+  const [isSavingStaffDirectory, setIsSavingStaffDirectory] = useState(false);
+
   const fetchUsers = async () => {
     try {
       const res = await api.get('/api/users');
@@ -60,9 +77,20 @@ export default function Staff() {
     }
   };
 
+  const fetchSettings = async () => {
+    try {
+      const res = await api.get('/api/settings');
+      setStaffDirectory(normalizeStaffDirectorySettings(res.data as Record<string, unknown>));
+    } catch (error) {
+      console.error('Failed to fetch staff directory settings:', error);
+      setStaffDirectory([]);
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
     fetchBranches();
+    fetchSettings();
   }, []);
 
   const handleRoleChange = async (userId: number, newRole: string) => {
@@ -139,6 +167,46 @@ export default function Staff() {
     } finally {
       setIsResetting(false);
     }
+  };
+
+  const saveStaffDirectory = async (nextDirectory: StaffDirectoryEntry[]) => {
+    setIsSavingStaffDirectory(true);
+    try {
+      await api.post('/api/settings', { staff_directory: nextDirectory });
+      setStaffDirectory(nextDirectory);
+      showToast('Staff directory updated.', 'success');
+      return true;
+    } catch (error) {
+      console.error('Failed to save staff directory:', error);
+      showToast('Failed to save staff directory.', 'error');
+      return false;
+    } finally {
+      setIsSavingStaffDirectory(false);
+    }
+  };
+
+  const handleAddStaffDirectoryEntry = async () => {
+    try {
+      const nextDirectory = addStaffDirectoryEntry(staffDirectory, {
+        name: staffDirectoryName,
+        type: staffDirectoryType,
+      });
+
+      const saved = await saveStaffDirectory(nextDirectory);
+      if (!saved) return;
+
+      setStaffDirectoryName('');
+      setStaffDirectoryType('service_advisor');
+      setIsStaffDirectoryModalOpen(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to add staff name.';
+      showToast(message, 'error');
+    }
+  };
+
+  const handleRemoveStaffDirectoryEntry = async (entry: StaffDirectoryEntry) => {
+    const nextDirectory = removeStaffDirectoryEntry(staffDirectory, entry);
+    await saveStaffDirectory(nextDirectory);
   };
 
   const columns = [
@@ -244,9 +312,16 @@ export default function Staff() {
           </h1>
           <p className="text-gray-500 text-sm mt-2 flex items-center">
             <Shield className="w-4 h-4 mr-2 text-indigo-500" />
-            Manage team access levels and security permissions
+            Manage team access levels, security permissions, and named staff attribution.
           </p>
         </div>
+        <button
+          type="button"
+          onClick={() => setIsStaffDirectoryModalOpen(true)}
+          className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors"
+        >
+          Add Staff Name
+        </button>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -269,6 +344,89 @@ export default function Staff() {
           loading={loading}
         />
       </div>
+
+      {/* Named Staff Directory */}
+      <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="p-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">Named Staff Directory</h2>
+          <p className="text-sm text-gray-500 mt-1">Use these entries for POS attribution without creating login accounts.</p>
+        </div>
+        <div className="divide-y divide-gray-100">
+          {staffDirectory.length === 0 ? (
+            <div className="p-4 text-sm text-gray-400">No named staff added yet.</div>
+          ) : (
+            staffDirectory.map((entry) => (
+              <div key={`${entry.type}:${entry.name}`} className="p-4 flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-gray-900">{entry.name}</p>
+                  <p className="text-xs text-gray-500">
+                    {entry.type === 'service_advisor' ? 'Service Advisor' :
+                     entry.type === 'mechanic' ? 'Mechanic' :
+                     entry.type === 'carwasher' ? 'Carwasher' : entry.type}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveStaffDirectoryEntry(entry)}
+                  className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      <Modal
+        open={isStaffDirectoryModalOpen}
+        onClose={() => setIsStaffDirectoryModalOpen(false)}
+        title="Add Staff Name"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="staff-directory-name">Name</label>
+            <input
+              id="staff-directory-name"
+              name="staff-directory-name"
+              value={staffDirectoryName}
+              onChange={(e) => setStaffDirectoryName(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="staff-directory-type">Type</label>
+            <select
+              id="staff-directory-type"
+              name="staff-directory-type"
+              value={staffDirectoryType}
+              onChange={(e) => setStaffDirectoryType(e.target.value as StaffDirectoryType)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="service_advisor">Service Advisor</option>
+              <option value="mechanic">Mechanic</option>
+              <option value="carwasher">Carwasher</option>
+            </select>
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setIsStaffDirectoryModalOpen(false)}
+              className="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleAddStaffDirectoryEntry}
+              disabled={isSavingStaffDirectory}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors disabled:opacity-50"
+            >
+              {isSavingStaffDirectory ? 'Saving...' : 'Save Staff Name'}
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal
         open={isDeleteModalOpen}

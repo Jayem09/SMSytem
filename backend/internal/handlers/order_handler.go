@@ -37,6 +37,7 @@ type orderInput struct {
 	GuestName          string           `json:"guest_name"`
 	GuestPhone         string           `json:"guest_phone"`
 	ServiceAdvisorName string           `json:"service_advisor_name"`
+	MechanicName       string           `json:"mechanic_name"`
 	PaymentMethod      string           `json:"payment_method" binding:"required"`
 	DiscountAmount     float64          `json:"discount_amount"`
 	DiscountType       string           `json:"discount_type"`
@@ -250,6 +251,7 @@ func (h *OrderHandler) Create(c *gin.Context) {
 			GuestPhone:         input.GuestPhone,
 			UserID:             uID,
 			ServiceAdvisorName: input.ServiceAdvisorName,
+			MechanicName:       input.MechanicName,
 			TotalAmount:        finalTotal,
 			AmountPaid:         amountPaid,
 			BalanceDue:         balanceDue,

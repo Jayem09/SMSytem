@@ -29,6 +29,7 @@ export interface LocalOrder {
   businessAddress?: string;
   withholdingTaxRate?: number;
   serviceAdvisorName?: string;
+  mechanicName?: string;
   rewardId?: number | null;
   rewardPoints?: number;
   items: string;
