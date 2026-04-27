@@ -886,7 +886,7 @@ export default function POS() {
         setIsRfidScanning(false);
         setRfidBuffer('');
         setRfidError(false);
-      }} title="Finalize Sale" maxWidth="max-w-4xl">
+      }} title="Finalize Sale" maxWidth="max-w-6xl">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Left Column: Customer */}
           <div className="space-y-4">
