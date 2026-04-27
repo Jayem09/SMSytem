@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -104,19 +103,9 @@ func (h *EventHandler) Stream(c *gin.Context) {
 			if !ok {
 				return
 			}
-			data, err := json.Marshal(event)
-			if err != nil {
-				continue
-			}
-			if _, err := c.Writer.Write([]byte("data: ")); err != nil {
-				return
-			}
-			if _, err := c.Writer.Write(data); err != nil {
-				return
-			}
-			if _, err := c.Writer.Write([]byte("\n\n")); err != nil {
-				return
-			}
+			// Use named SSE event so the browser EventSource can dispatch
+			// by event type (e.g. addEventListener('order_created', ...))
+			c.SSEvent(event.Type, event)
 			c.Writer.Flush()
 		}
 	}

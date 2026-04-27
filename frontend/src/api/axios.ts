@@ -171,7 +171,7 @@ const wrapMethod = (originalFn: (url: string, dataOrConfig?: unknown, config?: A
         const hasSignal = 'signal' in (dataOrConfig as ApiConfig);
         const hasParams = 'params' in (dataOrConfig as ApiConfig);
         if (hasSignal || hasParams) {
-          return await originalFn(url, undefined, dataOrConfig as ApiConfig);
+          return await originalFn(url, dataOrConfig as ApiConfig);
         }
       }
       return await originalFn(url, dataOrConfig, config);

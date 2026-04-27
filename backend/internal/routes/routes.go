@@ -34,6 +34,7 @@ type Handlers struct {
 	Transfer      *handlers.TransferHandler
 	Search        *handlers.SearchHandler
 	System        *handlers.SystemHandler
+	Transaction   *handlers.TransactionHandler
 	Analytics     *handlers.AnalyticsHandler
 	Promo         *handlers.PromoHandler
 	Event         *handlers.EventHandler
@@ -132,6 +133,7 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 
 		protected.GET("/branches", h.Branch.List)
 		protected.GET("/suppliers", h.Supplier.List)
+		protected.GET("/transactions", h.Transaction.List)
 
 		transfers := protected.Group("/transfers")
 		{

@@ -87,6 +87,7 @@ func main() {
 		Transfer:      handlers.NewTransferHandler(logService, emailService),
 		Search:        handlers.NewSearchHandler(),
 		System:        handlers.NewSystemHandler(backupService),
+		Transaction:   handlers.NewTransactionHandler(),
 		Analytics:     handlers.NewAnalyticsHandler(),
 		Promo:         handlers.NewPromoHandler(emailService),
 		Event:         handlers.NewEventHandler(cfg),

@@ -1,5 +1,6 @@
 import { queryClient } from '../lib/queryClient';
 import { invalidateDashboardQueries } from './dashboardRefresh';
+import { checkServerConnection } from './connectionCheck';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://168.144.46.137:8080';
 
@@ -18,7 +19,7 @@ export interface DashboardEvent {
   payload: unknown;
 }
 
-export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
+export type ConnectionStatus = 'connecting' | 'connected' | 'polling' | 'disconnected';
 
 type StatusCallback = (status: ConnectionStatus) => void;
 
@@ -27,6 +28,7 @@ let eventSource: EventSource | null = null;
 let currentStatus: ConnectionStatus = 'disconnected';
 let reconnectAttempts = 0;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let pollingTimer: ReturnType<typeof setInterval> | null = null;
 
 // Callbacks registered via onEvent
 type EventCallback = (event: DashboardEvent) => void;
@@ -36,6 +38,19 @@ const eventCallbacks: Set<EventCallback> = new Set();
 const statusCallbacks: Set<StatusCallback> = new Set();
 
 const MAX_RECONNECT_DELAY = 30000;
+const POLLING_INTERVAL = 15000;
+
+function isPackagedTauriApp(): boolean {
+  if (typeof window === 'undefined' || !("__TAURI_INTERNALS__" in window)) {
+    return false;
+  }
+
+  const isViteDevWindow = window.location.protocol === 'http:'
+    && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    && window.location.port === '5173';
+
+  return !isViteDevWindow;
+}
 
 function getReconnectDelay(): number {
   return Math.min(1000 * 2 ** reconnectAttempts, MAX_RECONNECT_DELAY);
@@ -72,6 +87,30 @@ function handleEvent(event: MessageEvent) {
 
   // Notify all registered callbacks
   eventCallbacks.forEach((cb) => cb(parsed as DashboardEvent));
+}
+
+async function pollDashboardUpdates() {
+  const connected = await checkServerConnection();
+
+  if (!connected) {
+    notifyStatus('disconnected');
+    return;
+  }
+
+  notifyStatus('polling');
+  await invalidateDashboardQueries(queryClient);
+}
+
+function startPollingFallback() {
+  if (pollingTimer) {
+    return;
+  }
+
+  notifyStatus('connecting');
+  void pollDashboardUpdates();
+  pollingTimer = setInterval(() => {
+    void pollDashboardUpdates();
+  }, POLLING_INTERVAL);
 }
 
 function connect() {
@@ -128,6 +167,10 @@ export function disconnect() {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
   }
+  if (pollingTimer) {
+    clearInterval(pollingTimer);
+    pollingTimer = null;
+  }
   if (eventSource) {
     eventSource.close();
     eventSource = null;
@@ -157,6 +200,11 @@ export function onStatusChange(callback: StatusCallback): () => void {
 
 /** Start the SSE connection. Idempotent — safe to call multiple times. */
 export function startEventService(): void {
+  if (isPackagedTauriApp()) {
+    startPollingFallback();
+    return;
+  }
+
   if (eventSource) return; // already connected
   connect();
 }

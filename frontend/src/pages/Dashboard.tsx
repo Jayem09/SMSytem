@@ -78,7 +78,7 @@ export default function Dashboard() {
     }
   }, [isSuperAdmin]);
 
-  const { data: statsData, isLoading: loading } = useDashboardStats(
+  const { data: statsData, isLoading: loading, isFetching } = useDashboardStats(
     timeRange,
     isSuperAdmin ? branchFilter : undefined,
   );
@@ -86,16 +86,24 @@ export default function Dashboard() {
   useEffect(() => {
     if (statsData) {
       const data = statsData as Record<string, unknown>;
-      setStats(prev => ({
-        ...prev,
-        ...data,
-        sales_trend: (data.sales_trend as typeof prev.sales_trend) || [],
-        low_stock_products: (data.low_stock_products as typeof prev.low_stock_products) || [],
-        top_advisors_today: (data.top_advisors_today as typeof prev.top_advisors_today) || [],
-        top_products_today: (data.top_products_today as typeof prev.top_products_today) || [],
-        category_profits: (data.category_profits as typeof prev.category_profits) || [],
-        product_revenue: (data.product_revenue as typeof prev.product_revenue) || []
-      }));
+      setStats({
+        total_sales: (data.total_sales as number) ?? 0,
+        total_expenses: (data.total_expenses as number) ?? 0,
+        net_profit: (data.net_profit as number) ?? 0,
+        sales_change: (data.sales_change as string) ?? '0%',
+        expenses_change: (data.expenses_change as string) ?? '0%',
+        profit_change: (data.profit_change as string) ?? '0%',
+        product_count: (data.product_count as number) ?? 0,
+        order_count: (data.order_count as number) ?? 0,
+        customer_count: (data.customer_count as number) ?? 0,
+        sales_trend: (data.sales_trend as { date: string; amount: number }[]) || [],
+        low_stock_products: (data.low_stock_products as { id: number; name: string; stock: number }[]) || [],
+        top_advisors_today: (data.top_advisors_today as { advisor_name: string; total_sales: number; order_count: number }[]) || [],
+        top_products_today: (data.top_products_today as { product_name: string; category_name: string; total_qty: number; total_sales: number }[]) || [],
+        category_profits: (data.category_profits as { category_name: string; percentage: number }[]) || [],
+        product_revenue: (data.product_revenue as { product: string; revenue: number; profit: number; income: number }[]) || [],
+      });
+      setLastUpdated(new Date());
     }
   }, [statsData]);
 
@@ -242,7 +250,7 @@ export default function Dashboard() {
         <div className="hidden md:flex items-center gap-6">
           {/* Live status indicator */}
           <div className="flex items-center gap-2">
-            {connectionStatus === 'connected' ? (
+            {connectionStatus === 'connected' || connectionStatus === 'polling' ? (
               <Wifi className="w-4 h-4 text-emerald-500" />
             ) : connectionStatus === 'connecting' ? (
               <Wifi className="w-4 h-4 text-amber-400 animate-pulse" />
@@ -251,15 +259,24 @@ export default function Dashboard() {
             )}
             <span
               className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                connectionStatus === 'connected'
+                connectionStatus === 'connected' || connectionStatus === 'polling'
                   ? 'bg-emerald-50 text-emerald-600'
                   : connectionStatus === 'connecting'
                   ? 'bg-amber-50 text-amber-600'
                   : 'bg-gray-100 text-gray-400'
               }`}
             >
-              {connectionStatus === 'connected' ? 'Live' : connectionStatus === 'connecting' ? 'Connecting' : 'Offline'}
+              {connectionStatus === 'connected'
+                ? 'Live'
+                : connectionStatus === 'polling'
+                ? 'Online'
+                : connectionStatus === 'connecting'
+                ? 'Connecting'
+                : 'No Live Updates'}
             </span>
+            {isFetching && (
+              <span className="text-xs text-blue-400 animate-pulse">Refreshing...</span>
+            )}
           </div>
           {/* Reactive last updated */}
           <div className="text-right">

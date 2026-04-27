@@ -30,6 +30,7 @@ import Transfers from './pages/Transfers';
 import Analytics from './pages/Analytics';
 import PromoEmail from './pages/PromoEmail';
 import Monitoring from './pages/Monitoring';
+import Transactions from './pages/Transactions';
 import Backups from './pages/Backups';
 import SyncCenter from './pages/SyncCenter';
 import MaintenanceGuard from './components/MaintenanceGuard';
@@ -237,6 +238,7 @@ function App() {
                     <Route path="/pos" element={<ProtectedRoute requiredRole={["admin", "cashier"]} disallowedRoles={["super_admin"]}><POS /></ProtectedRoute>} />
                     <Route path="/customers" element={<Customers />} />
                     <Route path="/orders" element={<Orders />} />
+                    <Route path="/transactions" element={<ProtectedRoute requiredRole={['admin', 'super_admin', 'cashier']}><Transactions /></ProtectedRoute>} />
                     <Route path="/sync-center" element={<ProtectedRoute requiredRole={["admin", "super_admin"]}><SyncCenter /></ProtectedRoute>} />
 
                     { }

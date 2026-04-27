@@ -25,9 +25,10 @@
 cd frontend
 npm run dev          # Start Vite dev server (http://localhost:5173)
 npm run build        # Production build → dist/
-npm run lint         # ESLint
-npm run test         # Vitest (unit tests)
-npm run tauri dev    # Run in Tauri dev mode
+npm run lint       # ESLint
+npm run test       # Vitest (watch mode)
+npm run test:run  # Vitest (single run)
+npm run tauri dev  # Run in Tauri dev mode
 npm run tauri:build # Build desktop app
 ```
 
@@ -46,7 +47,7 @@ make lint            # golangci-lint run
 
 ### Full Stack (Docker)
 ```bash
-docker-compose up -d   # MySQL + backend
+docker-compose up -d   # MySQL + backend only (frontend runs separately via npm)
 ```
 
 ## Config Quirks
@@ -102,7 +103,7 @@ backend/*.db
 
 ## Version & Build Info
 
-- Frontend: `frontend/package.json` → version `4.1.1`
-- Tauri: `frontend/src-tauri/Cargo.toml` → version `2.10.0`
+- Frontend: `frontend/package.json` → version `4.2.0`
+- Tauri: `frontend/src-tauri/Cargo.toml` → version `4.2.0`
 - Backend: `backend/go.mod` → Go `1.21`
 - Build outputs (not in repo): `frontend/dist/`, `backend/smsystem-server`, `frontend/src-tauri/target/release/`
