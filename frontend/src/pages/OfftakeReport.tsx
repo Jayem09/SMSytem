@@ -33,10 +33,20 @@ export default function OfftakeReport() {
   const { user } = useAuth();
   const { showToast } = useToast();
   const isSuperAdmin = user?.role === 'super_admin';
-  const today = getLocalDateValue();
 
-  const [startDate, setStartDate] = useState(today);
-  const [endDate, setEndDate] = useState(today);
+  // Default to this month
+  const getDefaultDates = () => {
+    const now = new Date();
+    const first = new Date(now.getFullYear(), now.getMonth(), 1);
+    return {
+      start: first.toLocaleDateString('en-CA'),
+      end: now.toLocaleDateString('en-CA')
+    };
+  };
+  const defaultDates = getDefaultDates();
+
+  const [startDate, setStartDate] = useState(defaultDates.start);
+  const [endDate, setEndDate] = useState(defaultDates.end);
   const [customer, setCustomer] = useState('');
   const [invoiceNo, setInvoiceNo] = useState('');
   const [itemName, setItemName] = useState('');
