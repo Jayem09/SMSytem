@@ -154,7 +154,7 @@ export default function PromoEmail() {
           <Mail className="w-6 h-6" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Promo Email</h1>
+          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Promo Email</h1>
           <p className="text-sm text-gray-500">Send promotional emails to your customers and suppliers.</p>
         </div>
       </div>

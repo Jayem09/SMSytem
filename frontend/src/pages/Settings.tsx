@@ -71,7 +71,7 @@ export default function Settings() {
           <SettingsIcon className="w-6 h-6" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">System Settings</h1>
+          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">System Settings</h1>
           <p className="text-sm text-gray-500">Manage application configuration and preferences.</p>
         </div>
       </div>

@@ -147,7 +147,7 @@ export default function Branches() {
     <div className="p-6 mx-auto">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold border-b-2 border-indigo-500 pb-2 inline-block text-gray-800">
+          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
             Branch Management
           </h1>
           <p className="text-gray-500 text-sm mt-2 flex items-center">

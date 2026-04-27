@@ -137,7 +137,7 @@ export default function Expenses() {
     <div className="p-6">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Expenses</h1>
+          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Expenses</h1>
           <p className="text-sm text-gray-500">Manage your overhead costs and business spending.</p>
         </div>
         {isAdmin && (

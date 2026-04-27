@@ -82,7 +82,7 @@ export default function Brands() {
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-semibold text-gray-900">Brands</h1>
+        <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Brands</h1>
         {isAdmin && (
           <button onClick={openCreate} className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 rounded-md cursor-pointer">
             Add Brand

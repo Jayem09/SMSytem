@@ -45,7 +45,7 @@ export default function ActivityLogs() {
   return (
     <div className="p-6">
       <div className="mb-8">
-        <h1 className="text-2xl font-semibold text-gray-900">Activity Logs</h1>
+        <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Activity Logs</h1>
         <p className="text-sm text-gray-500">Audit trail of sensitive administrative actions.</p>
       </div>
 

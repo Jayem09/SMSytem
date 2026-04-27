@@ -150,7 +150,7 @@ export default function DailyReport() {
     <div ref={reportRef} className="daily-report-print p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-6 no-print">
-        <h1 className="text-xl font-semibold text-gray-900">Daily Report</h1>
+        <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Daily Report</h1>
         <div className="flex items-center gap-4">
           <div className="flex items-center border border-gray-200 rounded-lg px-3 py-2 bg-white">
             <Calendar className="w-4 h-4 text-gray-400 mr-2" />
@@ -180,7 +180,7 @@ export default function DailyReport() {
       </div>
 
       <div className="print-only mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Daily Summary Report</h1>
+        <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Daily Summary Report</h1>
         <p className="text-sm text-gray-600">Report Date: {date}</p>
       </div>
 

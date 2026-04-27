@@ -99,7 +99,7 @@ export default function Transactions() {
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <FileText className="w-6 h-6 text-gray-600" />
-          <h1 className="text-xl font-semibold text-gray-900">Transaction Log</h1>
+          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Transaction Log</h1>
         </div>
         <span className="text-sm text-gray-500">{rows.length} record{rows.length !== 1 ? 's' : ''}</span>
       </div>
