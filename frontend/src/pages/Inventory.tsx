@@ -380,86 +380,95 @@ export default function Inventory() {
               </button>
             </div>
             {loading ? <SkeletonTable rows={6} cols={6} /> : (
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Product</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Warehouse</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">On Hand</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">In Transit</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Expiring</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Closest Expiry</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-100">
-                  {stockLevels.length === 0 ? (
-                    <tr><td colSpan={6} className="p-6 text-center text-gray-500 text-sm">No stock found.</td></tr>
-                  ) : stockLevels.map((s, i) => (
-                    <React.Fragment key={i}>
-                    <tr key={i} className={`hover:bg-gray-50 transition-colors cursor-pointer ${expandedProduct === s.product_id ? 'bg-indigo-50/30' : ''}`} onClick={async () => {
-                      if (expandedProduct === s.product_id) {
-                        setExpandedProduct(null);
-                        setProductBatches([]);
-                      } else {
-                        setExpandedProduct(s.product_id);
-                        setBatchLoading(true);
-                        try {
-                          const res = await api.get(`/api/inventory/batches?product_id=${s.product_id}&warehouse_id=${s.warehouse_id}`);
-                          setProductBatches(res.data.batches || []);
-                        } catch (err) {
-                          console.error(err);
-                        } finally {
-                          setBatchLoading(false);
-                        }
-                      }
-                    }}>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="bg-gray-100 p-1.5 rounded-lg text-gray-400">
-                            {expandedProduct === s.product_id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                          </div>
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">{s.product_name}</div>
-                            <div className="text-xs text-gray-500">{s.product_size} | ID: {s.product_id}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-500">
-                        {s.warehouse_name}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${s.total_stock <= 5 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                          {s.total_stock} Units
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        {s.in_transit_stock > 0 ? (
-                          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-700">
-                            +{s.in_transit_stock} Shipped
-                          </span>
-                        ) : (
-                          <span className="text-gray-300 text-xs">--</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        {s.expiring_batches > 0 ? (
-                          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-700">
-                            {s.expiring_batches} batches
-                          </span>
-                        ) : (
-                          <span className="text-gray-300 text-xs">OK</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-500">
-                        {s.closest_expiry ? (
-                          <div className="flex items-center gap-2">
-                            <AlertOctagon className="w-4 h-4 text-orange-500" />
-                            {new Date(s.closest_expiry).toLocaleDateString()}
-                          </div>
-                        ) : 'No expiry tracked'}
-                      </td>
-                    </tr>
-                    {expandedProduct === s.product_id && (
+              <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        <th className="px-4 py-3 text-left font-medium text-gray-600 whitespace-nowrap">Product</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-600 whitespace-nowrap">Warehouse</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-600 whitespace-nowrap">On Hand</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-600 whitespace-nowrap">In Transit</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-600 whitespace-nowrap">Expiring</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-600 whitespace-nowrap">Closest Expiry</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {stockLevels.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="px-4 py-12 text-center text-gray-400">
+                            No stock found.
+                          </td>
+                        </tr>
+                      ) : stockLevels.map((s, i) => (
+                        <React.Fragment key={i}>
+                          <tr 
+                            className={`hover:bg-gray-50 transition-colors cursor-pointer ${expandedProduct === s.product_id ? 'bg-indigo-50/30' : ''}`} 
+                            onClick={async () => {
+                              if (expandedProduct === s.product_id) {
+                                setExpandedProduct(null);
+                                setProductBatches([]);
+                              } else {
+                                setExpandedProduct(s.product_id);
+                                setBatchLoading(true);
+                                try {
+                                  const res = await api.get(`/api/inventory/batches?product_id=${s.product_id}&warehouse_id=${s.warehouse_id}`);
+                                  setProductBatches(res.data.batches || []);
+                                } catch (err) {
+                                  console.error(err);
+                                } finally {
+                                  setBatchLoading(false);
+                                }
+                              }
+                            }}
+                          >
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-3">
+                                <div className="bg-gray-100 p-1.5 rounded-lg text-gray-400">
+                                  {expandedProduct === s.product_id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                </div>
+                                <div>
+                                  <div className="text-sm font-medium text-gray-900">{s.product_name}</div>
+                                  <div className="text-xs text-gray-500">{s.product_size} | ID: {s.product_id}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                              {s.warehouse_name}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${s.total_stock <= 5 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                                {s.total_stock} Units
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              {s.in_transit_stock > 0 ? (
+                                <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-700">
+                                  +{s.in_transit_stock} Shipped
+                                </span>
+                              ) : (
+                                <span className="text-gray-300 text-xs">--</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              {s.expiring_batches > 0 ? (
+                                <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-700">
+                                  {s.expiring_batches} batches
+                                </span>
+                              ) : (
+                                <span className="text-gray-400 text-xs">OK</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                              {s.closest_expiry ? (
+                                <div className="flex items-center gap-2">
+                                  <AlertOctagon className="w-4 h-4 text-orange-500" />
+                                  {new Date(s.closest_expiry).toLocaleDateString()}
+                                </div>
+                              ) : <span className="text-gray-400 text-xs">No expiry</span>}
+                            </td>
+                          </tr>
+                          {expandedProduct === s.product_id && (
                       <tr className="bg-white">
                         <td colSpan={6} className="px-12 py-4">
                           <div className="border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
@@ -504,17 +513,19 @@ export default function Inventory() {
                                       </button>
                                     </td>
                                   </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
+))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>
+                </div>
+              </div>
             )}
           </div>
         )}
