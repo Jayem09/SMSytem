@@ -13,6 +13,7 @@ const allNavItems = [
   { to: '/pos', label: 'POS Checkout', roles: ['admin', 'cashier'] },
   { to: '/orders', label: 'Orders', roles: ['super_admin', 'admin', 'cashier'] },
   { to: '/transactions', label: 'Transaction Log', roles: ['super_admin', 'admin', 'cashier'] },
+  { to: '/offtake-report', label: 'Offtake Report', roles: ['super_admin', 'admin', 'cashier'] },
   { to: '/transfers', label: 'Branch Transfers', roles: ['super_admin', 'admin', 'cashier', 'user', 'purchasing', 'purchaser'] },
   { to: '/inventory', label: 'Inventory Management', roles: ['super_admin', 'admin', 'purchasing', 'purchaser'] },
   { to: '/products', label: 'Products', roles: ['super_admin', 'admin', 'purchasing', 'purchaser'] },

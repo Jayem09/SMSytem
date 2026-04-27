@@ -232,6 +232,7 @@ func Setup(router *gin.Engine, cfg *config.Config, h *Handlers) {
 			reports := admin.Group("/reports")
 			{
 				reports.GET("/daily-summary", h.Report.GetDailySummary)
+				reports.GET("/offtake", h.Report.GetOfftake)
 			}
 
 			superAdmin := admin.Group("")

@@ -51,6 +51,32 @@ export interface OrdersExportFilters {
   sortOption: OrdersSortOption;
 }
 
+export interface OfftakeReportRow {
+  order_id: number;
+  invoice_no: string;
+  invoice_date: string;
+  customer_name: string;
+  branch_name: string;
+  service_advisor: string;
+  payment_status: string;
+  total_amount: number;
+  amount_paid: number;
+  balance_due: number;
+  item_summary: string;
+  quantity_total: number;
+}
+
+export interface OfftakeExportFilters {
+  startDate: string;
+  endDate: string;
+  customer: string;
+  invoiceNo: string;
+  itemName: string;
+  branchLabel: string;
+  paymentStatus: string;
+  serviceAdvisor: string;
+}
+
 const PAYMENT_METHOD_LABELS = [
   { key: 'cash', label: 'Cash' },
   { key: 'dated_check', label: 'Dated Check' },
@@ -211,4 +237,51 @@ export async function exportOrdersToExcel(orders: ExportableOrder[], filters: Or
   appendSheet(workbook, buildOrdersExportRows(orders), filters.paymentStatusFilter === 'receivable' ? 'Receivables' : 'Orders');
 
   return saveWorkbook(workbook, `${workbookBaseName}-${fileDate}.xlsx`);
+}
+
+export function buildOfftakeExportSummaryRows(rows: OfftakeReportRow[], filters: OfftakeExportFilters) {
+  const totalAmount = rows.reduce((sum, row) => sum + row.total_amount, 0);
+  const totalPaid = rows.reduce((sum, row) => sum + row.amount_paid, 0);
+  const totalBalance = rows.reduce((sum, row) => sum + row.balance_due, 0);
+
+  return [{
+    'Exported At': new Date().toLocaleString(),
+    'Date Range': `${filters.startDate} to ${filters.endDate}`,
+    'Branch': filters.branchLabel || 'All Branches',
+    'Customer': filters.customer || 'All',
+    'Invoice #': filters.invoiceNo || 'All',
+    'Item': filters.itemName || 'All',
+    'Payment Status': filters.paymentStatus || 'All',
+    'Salesperson': filters.serviceAdvisor || 'All',
+    'Invoice Count': rows.length,
+    'Total Amount': totalAmount,
+    'Total Paid': totalPaid,
+    'Total Balance Due': totalBalance,
+  }];
+}
+
+export function buildOfftakeExportRows(rows: OfftakeReportRow[]) {
+  return rows.map((row) => ({
+    'Invoice #': row.invoice_no,
+    'Date': row.invoice_date,
+    'Customer': row.customer_name,
+    'Branch': row.branch_name,
+    'Salesperson': row.service_advisor,
+    'Payment Status': row.payment_status,
+    'Total Amount': row.total_amount,
+    'Amount Paid': row.amount_paid,
+    'Balance Due': row.balance_due,
+    'Items': row.item_summary,
+    'Quantity Total': row.quantity_total,
+  }));
+}
+
+export async function exportOfftakeToExcel(rows: OfftakeReportRow[], filters: OfftakeExportFilters) {
+  const workbook = XLSX.utils.book_new();
+  const fileDate = filters.endDate || new Date().toISOString().slice(0, 10);
+
+  appendSheet(workbook, buildOfftakeExportSummaryRows(rows, filters), 'Summary');
+  appendSheet(workbook, buildOfftakeExportRows(rows), 'Details');
+
+  return saveWorkbook(workbook, `offtake-${fileDate}.xlsx`);
 }

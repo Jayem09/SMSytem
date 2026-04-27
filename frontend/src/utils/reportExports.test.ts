@@ -3,10 +3,13 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   buildDailySummaryOverviewRows,
   buildDailySummaryPaymentRows,
+  buildOfftakeExportRows,
+  buildOfftakeExportSummaryRows,
   buildOrdersExportRows,
   buildOrdersExportSummaryRows,
   type DailySummaryExportData,
   type ExportableOrder,
+  type OfftakeReportRow,
   type OrdersExportFilters,
 } from './reportExports';
 
@@ -113,5 +116,67 @@ describe('reportExports', () => {
     expect(row['Total Balance Due']).toBe(6174);
 
     vi.useRealTimers();
+  });
+});
+
+describe('offtakeReportExports', () => {
+  it('builds offtake export summary rows from active filters', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-10T15:00:00'));
+
+    const rows: OfftakeReportRow[] = [{
+      order_id: 42,
+      invoice_no: 'SI-00042',
+      invoice_date: '2026-04-10',
+      customer_name: 'John Doe',
+      branch_name: 'LIPA A',
+      service_advisor: 'Mike',
+      payment_status: 'paid',
+      total_amount: 12500,
+      amount_paid: 12500,
+      balance_due: 0,
+      item_summary: 'Accelera Tire x2, Alignment x1',
+      quantity_total: 3,
+    }];
+
+    const filters = {
+      startDate: '2026-04-05',
+      endDate: '2026-04-10',
+      customer: 'John',
+      invoiceNo: '',
+      itemName: 'Accelera',
+      branchLabel: 'LIPA A',
+      paymentStatus: 'paid',
+      serviceAdvisor: 'Mike',
+    };
+
+    const summary = buildOfftakeExportSummaryRows(rows, filters)[0];
+
+    expect(summary['Date Range']).toBe('2026-04-05 to 2026-04-10');
+    expect(summary['Branch']).toBe('LIPA A');
+    expect(summary['Invoice Count']).toBe(1);
+
+    vi.useRealTimers();
+  });
+
+  it('builds invoice-level offtake export rows', () => {
+    const rows = buildOfftakeExportRows([{
+      order_id: 42,
+      invoice_no: 'SI-00042',
+      invoice_date: '2026-04-10',
+      customer_name: 'John Doe',
+      branch_name: 'LIPA A',
+      service_advisor: 'Mike',
+      payment_status: 'paid',
+      total_amount: 12500,
+      amount_paid: 12500,
+      balance_due: 0,
+      item_summary: 'Accelera Tire x2, Alignment x1',
+      quantity_total: 3,
+    }]);
+
+    expect(rows[0]['Invoice #']).toBe('SI-00042');
+    expect(rows[0]['Items']).toContain('Accelera Tire x2');
+    expect(rows[0]['Quantity Total']).toBe(3);
   });
 });
