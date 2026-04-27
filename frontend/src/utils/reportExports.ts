@@ -280,8 +280,10 @@ export async function exportOfftakeToExcel(rows: OfftakeReportRow[], filters: Of
   const workbook = XLSX.utils.book_new();
   const fileDate = filters.endDate || new Date().toISOString().slice(0, 10);
 
-  appendSheet(workbook, buildOfftakeExportSummaryRows(rows, filters), 'Summary');
+  // Add Details sheet first (default view)
   appendSheet(workbook, buildOfftakeExportRows(rows), 'Details');
+  // Add Summary sheet second
+  appendSheet(workbook, buildOfftakeExportSummaryRows(rows, filters), 'Summary');
 
   return saveWorkbook(workbook, `offtake-${fileDate}.xlsx`);
 }
