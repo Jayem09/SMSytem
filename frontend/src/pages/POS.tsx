@@ -5,7 +5,7 @@ import Modal from '../components/Modal';
 import { printReceipt } from '../components/Receipt';
 import { printDeliveryReceipt } from '../components/DeliveryReceipt';
 import {
-  Search, ShoppingCart, Trash2, Printer, CheckCircle, Package
+  Search, ShoppingCart, Trash2, Printer, CheckCircle, Package, User, CreditCard, FileText, Users
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { getIsOfflineMode } from '../context/AuthContext';
@@ -1205,34 +1205,46 @@ export default function POS() {
               </div>
             )}
 
-            {/* Service Advisor */}
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Service Advisor</label>
-              <select
-                value={serviceAdvisorName}
-                onChange={(e) => setServiceAdvisorName(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                <option value="">Select Advisor</option>
-                {serviceAdvisors.map((entry) => (
-                  <option key={entry.name} value={entry.name}>{entry.name}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Mechanic */}
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Mechanic</label>
-              <select
-                value={mechanicName}
-                onChange={(e) => setMechanicName(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                <option value="">Select Mechanic</option>
-                {mechanics.map((entry) => (
-                  <option key={entry.name} value={entry.name}>{entry.name}</option>
-                ))}
-              </select>
+            {/* Service Advisor & Mechanic - Staff Attribution */}
+            <div className="bg-gradient-to-r from-indigo-50 to-sky-50 rounded-xl p-4 border border-indigo-100">
+              <div className="flex items-center gap-2 mb-3">
+                <Users className="w-4 h-4 text-indigo-600" />
+                <span className="text-xs font-bold text-indigo-600 uppercase tracking-wider">Staff Attribution</span>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">Service Advisor</label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <select
+                      value={serviceAdvisorName}
+                      onChange={(e) => setServiceAdvisorName(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2.5 border border-indigo-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                    >
+                      <option value="">Select Advisor</option>
+                      {serviceAdvisors.map((entry) => (
+                        <option key={entry.name} value={entry.name}>{entry.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">Mechanic</label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <select
+                      value={mechanicName}
+                      onChange={(e) => setMechanicName(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2.5 border border-sky-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 bg-white"
+                    >
+                      <option value="">Select Mechanic</option>
+                      {mechanics.map((entry) => (
+                        <option key={entry.name} value={entry.name}>{entry.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Payment Method */}
